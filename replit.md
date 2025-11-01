@@ -48,9 +48,15 @@ lib/
 
 ## Environment Variables
 Required secrets (configured in Replit Secrets):
-- `MONGODB_URI`: MongoDB Atlas connection string
-- `NEXT_PUBLIC_CESIUM_ION_TOKEN`: Cesium Ion access token for globe visualization
-- `AUTH_SECRET`: Secret key for authentication
+- `MONGODB_URI`: MongoDB Atlas connection string (validated at runtime via Zod)
+- `NEXT_PUBLIC_CESIUM_ION_TOKEN`: Cesium Ion access token for globe visualization (validated at runtime via Zod)
+- `AUTH_SECRET`: Secret key for authentication (validated at runtime via Zod)
+
+Optional:
+- `NEXT_PUBLIC_API_BASE_URL`: API base URL (defaults to Replit domain or localhost:5000)
+- `MONGODB_DB`: Database name (defaults to 'tswi')
+
+**Note**: All required environment variables are validated at application startup using Zod schema validation in `lib/config.ts`. The application will fail fast with clear error messages if any required variables are missing or invalid.
 
 ## Development
 - **Port**: 5000 (configured for Replit webview)

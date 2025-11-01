@@ -17,6 +17,10 @@ const configSchema = z.object({
 });
 
 function getConfig() {
+  const defaultBaseUrl = process.env.REPLIT_DEV_DOMAIN 
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
+    : 'http://localhost:5000';
+
   const config = {
     mongodb: {
       uri: process.env.MONGODB_URI || '',
@@ -26,14 +30,24 @@ function getConfig() {
       ionToken: process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN || '',
     },
     auth: {
-      secret: process.env.AUTH_SECRET || 'dev-secret-change-me',
+      secret: process.env.AUTH_SECRET || '',
     },
     api: {
-      baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000',
+      baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || defaultBaseUrl,
     },
   };
 
-  return configSchema.parse(config);
+  try {
+    return configSchema.parse(config);
+  } catch (error) {
+    console.error('❌ Configuration validation failed:');
+    if (error instanceof z.ZodError) {
+      error.errors.forEach((err) => {
+        console.error(`  - ${err.path.join('.')}: ${err.message}`);
+      });
+    }
+    throw new Error('Missing or invalid required environment variables. Please check your Replit Secrets.');
+  }
 }
 
 export const config = getConfig();
