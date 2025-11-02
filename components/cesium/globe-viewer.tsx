@@ -12,7 +12,6 @@ export default function GlobeViewer() {
   useEffect(() => {
     if (!viewerRef.current || cesiumViewerRef.current) return;
 
-    // Check if Cesium token is set
     if (!config.cesium.ionToken) {
       setError('Cesium Ion token not configured. Please add NEXT_PUBLIC_CESIUM_ION_TOKEN to Replit Secrets.');
       setIsLoading(false);
@@ -23,15 +22,12 @@ export default function GlobeViewer() {
 
     const initCesium = async () => {
       try {
-        // Dynamic import of Cesium
         const Cesium = await import('cesium');
 
         if (!mounted) return;
 
-        // Set Cesium Ion token
         Cesium.Ion.defaultAccessToken = config.cesium.ionToken;
 
-        // Initialize Cesium Viewer with Replit-friendly settings
         const viewer = new Cesium.Viewer(viewerRef.current!, {
           animation: false,
           baseLayerPicker: false,
@@ -45,20 +41,16 @@ export default function GlobeViewer() {
           timeline: true,
           navigationHelpButton: false,
           navigationInstructionsInitiallyVisible: false,
-          // Use a simpler imagery provider for better performance
           imageryProvider: new Cesium.IonImageryProvider({ assetId: 2 }),
-          // Disable terrain for faster loading in Replit
           terrainProvider: new Cesium.EllipsoidTerrainProvider(),
-          requestRenderMode: true, // Only render when needed
+          requestRenderMode: true,
           maximumRenderTimeChange: Infinity,
         });
 
-        // Enable lighting
         viewer.scene.globe.enableLighting = true;
         viewer.scene.globe.dynamicAtmosphereLighting = true;
         viewer.scene.globe.dynamicAtmosphereLightingFromSun = false;
 
-        // Set initial camera position
         viewer.camera.setView({
           destination: Cesium.Cartesian3.fromDegrees(-98.5, 39.8, 15000000),
           orientation: {
@@ -68,7 +60,6 @@ export default function GlobeViewer() {
           },
         });
 
-        // Disable depth testing for better performance
         viewer.scene.globe.depthTestAgainstTerrain = false;
 
         cesiumViewerRef.current = viewer;
@@ -76,14 +67,6 @@ export default function GlobeViewer() {
         setError(null);
 
         console.log('✅ Cesium initialized successfully');
-
-        // TODO: Add Kp latitude bands as color-coded regions
-        // TODO: Add TEC raster overlay from timeseries data
-        // TODO: Add satellite tracks from TLE data
-        // TODO: Add SuperMAG ground station markers
-        // TODO: Add time scrubber for last 24 hours
-        // TODO: Add satellite search and selection
-        // TODO: Add click handler for pass time calculations
 
       } catch (err) {
         console.error('❌ Cesium initialization error:', err);
@@ -137,21 +120,3 @@ export default function GlobeViewer() {
 
   return <div ref={viewerRef} className="w-full h-full" />;
 }
-```
-
-## 🎯 Key Improvements:
-
-1. **Better Error Handling** - Shows specific error messages if Cesium fails to load
-2. **Token Validation** - Checks if the token is set before attempting to load
-3. **Performance Optimizations** for Replit:
-   - `requestRenderMode: true` - Only renders when needed
-   - `EllipsoidTerrainProvider` - Simpler terrain for faster loading
-   - Disabled depth testing
-4. **Loading States** - Shows spinner while initializing
-5. **Troubleshooting Guide** - If it fails, shows what to check
-
-## 🔍 Check Cesium Token
-
-Make sure in your Replit Secrets you have:
-```
-NEXT_PUBLIC_CESIUM_ION_TOKEN=your_actual_token_here

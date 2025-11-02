@@ -2,25 +2,21 @@ import { z } from 'zod';
 
 const configSchema = z.object({
   mongodb: z.object({
-    uri: z.string().min(1, 'MongoDB URI is required'),
+    uri: z.string().optional().default(''),
     dbName: z.string().default('tswi'),
   }),
   cesium: z.object({
-    ionToken: z.string().min(1, 'Cesium Ion token is required'),
+    ionToken: z.string().optional().default(''),
   }),
   auth: z.object({
-    secret: z.string().min(1, 'Auth secret is required'),
+    secret: z.string().default('dev-secret-change-me'),
   }),
   api: z.object({
-    baseUrl: z.string().url(),
+    baseUrl: z.string().default('http://localhost:3000'),
   }),
 });
 
 function getConfig() {
-  const defaultBaseUrl = process.env.REPLIT_DEV_DOMAIN 
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-    : 'http://localhost:5000';
-
   const config = {
     mongodb: {
       uri: process.env.MONGODB_URI || '',
@@ -30,24 +26,29 @@ function getConfig() {
       ionToken: process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN || '',
     },
     auth: {
-      secret: process.env.AUTH_SECRET || '',
+      secret: process.env.AUTH_SECRET || 'dev-secret-change-me',
     },
     api: {
-      baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || defaultBaseUrl,
+      baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || 
+        (process.env.REPL_SLUG 
+          ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+          : 'http://localhost:3000'),
     },
   };
 
-  try {
-    return configSchema.parse(config);
-  } catch (error) {
-    console.error('❌ Configuration validation failed:');
-    if (error instanceof z.ZodError) {
-      error.errors.forEach((err) => {
-        console.error(`  - ${err.path.join('.')}: ${err.message}`);
-      });
+  const parsed = configSchema.parse(config);
+
+  // Warn in development if important configs are missing
+  if (typeof window === 'undefined' && process.env.NODE_ENV !== 'production') {
+    if (!parsed.mongodb.uri) {
+      console.warn('⚠️  MONGODB_URI not set - database features will not work');
     }
-    throw new Error('Missing or invalid required environment variables. Please check your Replit Secrets.');
+    if (!parsed.cesium.ionToken) {
+      console.warn('⚠️  NEXT_PUBLIC_CESIUM_ION_TOKEN not set - Cesium globe will not load');
+    }
   }
+
+  return parsed;
 }
 
 export const config = getConfig();
