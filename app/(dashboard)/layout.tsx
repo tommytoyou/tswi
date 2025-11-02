@@ -1,16 +1,15 @@
-import { TopNav } from '@/components/navigation/top-nav';
+import React from 'react'
+import TopNav from '@/components/navigation/top-nav'
 
 export default function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen bg-background">
       <TopNav />
-      <main className="flex-1 p-6 bg-slate-950">
-        {children}
-      </main>
+      <main className="mx-auto max-w-6xl p-6">{children}</main>
     </div>
-  );
+  )
 }
