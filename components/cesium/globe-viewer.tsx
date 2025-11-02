@@ -8,9 +8,15 @@ export default function GlobeViewer() {
   const cesiumViewerRef = useRef<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isClient, setIsClient] = useState(false);
+
+  // Only render on client
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   useEffect(() => {
-    if (!viewerRef.current || cesiumViewerRef.current) return;
+    if (!isClient || !viewerRef.current || cesiumViewerRef.current) return;
 
     if (!config.cesium.ionToken) {
       setError('Cesium Ion token not configured');
@@ -26,9 +32,7 @@ export default function GlobeViewer() {
 
         if (!mounted) return;
 
-        // Tell Cesium where to find its assets
         (window as any).CESIUM_BASE_URL = '/cesium/';
-
         (Cesium as any).Ion.defaultAccessToken = config.cesium.ionToken;
 
         const viewer = new (Cesium as any).Viewer(viewerRef.current, {
@@ -69,7 +73,19 @@ export default function GlobeViewer() {
         cesiumViewerRef.current.destroy();
       }
     };
-  }, []);
+  }, [isClient]);
+
+  // Don't render anything until client-side
+  if (!isClient) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-slate-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4" />
+          <p className="text-white text-xl">Loading 3D Globe...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (error) {
     return (
