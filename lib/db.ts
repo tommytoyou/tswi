@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection } from 'mongodb';
+import { MongoClient, Db, Collection, Document } from 'mongodb';
 import { config } from './config';
 
 let client: MongoClient | null = null;
@@ -37,13 +37,13 @@ export async function getDb(): Promise<Db> {
 }
 
 // Time Series Collections
-export async function getTimeSeriesCollection<T = any>(name: string): Promise<Collection<T>> {
+export async function getTimeSeriesCollection<T extends Document = Document>(name: string): Promise<Collection<T>> {
   const database = await getDb();
   return database.collection<T>(name);
 }
 
 // Standard Collections
-export async function getCollection<T = any>(name: string): Promise<Collection<T>> {
+export async function getCollection<T extends Document = Document>(name: string): Promise<Collection<T>> {
   const database = await getDb();
   return database.collection<T>(name);
 }

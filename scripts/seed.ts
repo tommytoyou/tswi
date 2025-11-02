@@ -24,7 +24,7 @@ async function seed() {
     await usersCollection.deleteMany({});
 
     const demoUser = {
-      _id: 'user_demo_001',
+      userId: 'user_demo_001',
       email: 'operator@tswi.space',
       name: 'Demo Operator',
       plan: 'pro',
@@ -32,7 +32,7 @@ async function seed() {
       created_at: new Date('2025-01-15T00:00:00Z'),
     };
 
-    await usersCollection.insertOne(demoUser);
+    await usersCollection.insertOne(demoUser as any);
     console.log('✅ Demo user created');
 
     // SEED ALERT RULES
