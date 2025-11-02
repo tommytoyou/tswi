@@ -1,22 +1,16 @@
 'use client';
-
 import { useEffect, useRef, useState } from 'react';
 import { config } from '@/lib/config';
+import dynamic from 'next/dynamic';
 
-export default function GlobeViewer() {
+function GlobeViewerComponent() {
   const viewerRef = useRef<HTMLDivElement>(null);
   const cesiumViewerRef = useRef<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isClient, setIsClient] = useState(false);
-
-  // Only render on client
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
 
   useEffect(() => {
-    if (!isClient || !viewerRef.current || cesiumViewerRef.current) return;
+    if (!viewerRef.current || cesiumViewerRef.current) return;
 
     if (!config.cesium.ionToken) {
       setError('Cesium Ion token not configured');
@@ -57,7 +51,6 @@ export default function GlobeViewer() {
         cesiumViewerRef.current = viewer;
         setIsLoading(false);
         setError(null);
-
       } catch (err: any) {
         console.error('Cesium error:', err);
         setError(err.message || 'Failed to initialize Cesium');
@@ -73,19 +66,7 @@ export default function GlobeViewer() {
         cesiumViewerRef.current.destroy();
       }
     };
-  }, [isClient]);
-
-  // Don't render anything until client-side
-  if (!isClient) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-slate-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4" />
-          <p className="text-white text-xl">Loading 3D Globe...</p>
-        </div>
-      </div>
-    );
-  }
+  }, []);
 
   if (error) {
     return (
@@ -111,3 +92,16 @@ export default function GlobeViewer() {
 
   return <div ref={viewerRef} className="w-full h-full" />;
 }
+
+// Export with SSR disabled
+export default dynamic(() => Promise.resolve(GlobeViewerComponent), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-slate-900">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4" />
+        <p className="text-white text-xl">Loading 3D Globe...</p>
+      </div>
+    </div>
+  ),
+});
