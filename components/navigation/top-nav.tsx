@@ -17,7 +17,7 @@ export default function TopNav() {
           <Link href="/dashboard" className="text-sm hover:underline">
             Dashboard
           </Link>
-          <Link href="/globe" className="text-sm hover:underline">
+          <Link href="/map" className="text-sm hover:underline">
             Globe
           </Link>
           <Button size="sm" variant="outline" className="flex items-center gap-2">
