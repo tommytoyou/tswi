@@ -4,6 +4,16 @@
 Real-time space weather monitoring and forecasting platform built with Next.js 14, MongoDB Atlas, and Cesium for 3D visualization. The platform monitors solar wind, geomagnetic indices (Kp, Dst), Total Electron Content (TEC), solar flares, and Solar Energetic Particle (SEP) events.
 
 ## Recent Changes
+**2025-11-12**: Fixed Next.js deployment and Cesium integration
+- Removed custom webpack CSS loader configuration that conflicted with Next.js built-in CSS handling
+- Fixed Cesium module resolution by updating webpack alias to point to Source/Cesium.js entry file
+- Copied Cesium static assets (Workers, Widgets, ThirdParty, Assets) to public/cesium/ directory
+- Removed CopyWebpackPlugin - Cesium assets now served as static files
+- Cesium CSS loaded via @import in globals.css (already present from previous migration)
+- Added cesium to server-side webpack externals to prevent SSR bundling issues
+- Configured CESIUM_BASE_URL via webpack.DefinePlugin
+- Production build now succeeds without webpack errors
+
 **2025-11-01**: Migrated from Vercel to Replit
 - Configured Next.js to run on port 5000 with 0.0.0.0 host binding for Replit compatibility
 - Fixed hydration errors by moving Cesium CSS import from layout head to globals.css
