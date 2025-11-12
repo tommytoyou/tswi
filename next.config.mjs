@@ -1,5 +1,6 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
+import CopyWebpackPlugin from 'copy-webpack-plugin';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,7 +52,6 @@ const nextConfig = {
 
     // Copy Cesium Assets, Widgets, and Workers to public directory
     if (!isServer) {
-      const CopyWebpackPlugin = require('copy-webpack-plugin');
       config.plugins.push(
         new CopyWebpackPlugin({
           patterns: [
