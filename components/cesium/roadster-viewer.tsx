@@ -13,9 +13,31 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!viewerRef.current || cesiumViewerRef.current) return;
+    console.log('🚀 Roadster viewer useEffect triggered');
+    console.log('📦 roadsterData:', roadsterData);
+    console.log('📍 viewerRef.current:', viewerRef.current);
+    console.log('🔧 cesiumViewerRef.current:', cesiumViewerRef.current);
+
+    // Don't initialize if we don't have data
+    if (!roadsterData) {
+      console.log('⏳ Waiting for roadsterData...');
+      return;
+    }
+
+    // Don't initialize if viewer ref isn't ready
+    if (!viewerRef.current) {
+      console.log('⏳ Waiting for viewerRef...');
+      return;
+    }
+
+    // Don't re-initialize if already created
+    if (cesiumViewerRef.current) {
+      console.log('✅ Cesium viewer already initialized');
+      return;
+    }
 
     if (!config.cesium.ionToken) {
+      console.error('❌ Cesium Ion token not configured');
       setError('Cesium Ion token not configured');
       setIsLoading(false);
       return;
@@ -25,16 +47,23 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
 
     const initCesium = async () => {
       try {
+        console.log('🔄 Starting Cesium initialization...');
         const Cesium = (await import('cesium')).default || await import('cesium');
+        console.log('✅ Cesium module loaded');
 
-        if (!mounted) return;
+        if (!mounted) {
+          console.log('⚠️ Component unmounted, aborting');
+          return;
+        }
 
         if (typeof window !== 'undefined') {
           (window as any).CESIUM_BASE_URL = '/cesium/';
         }
 
         Cesium.Ion.defaultAccessToken = config.cesium.ionToken;
+        console.log('✅ Cesium Ion token set');
 
+        console.log('🌍 Creating Cesium Viewer...');
         const viewer = new Cesium.Viewer(viewerRef.current!, {
           animation: false,
           baseLayerPicker: false,
@@ -58,6 +87,7 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
             },
           }),
         });
+        console.log('✅ Cesium Viewer created');
 
         // Enable lighting for realistic space visualization
         viewer.scene.globe.enableLighting = true;
@@ -65,16 +95,20 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
         if (viewer.scene.skyAtmosphere) {
           viewer.scene.skyAtmosphere.show = true;
         }
+        console.log('✅ Scene settings configured');
 
         // Convert AU position to kilometers for Cesium
         const AU_TO_KM = 149597870.7;
+        console.log('📍 Roadster position:', roadsterData.position);
         const position = Cesium.Cartesian3.fromElements(
           roadsterData.position.x * AU_TO_KM * 1000,
           roadsterData.position.y * AU_TO_KM * 1000,
           roadsterData.position.z * AU_TO_KM * 1000
         );
+        console.log('✅ Position converted to Cartesian3');
 
         // Add the Roadster as a point entity
+        console.log('🚗 Adding Roadster entity...');
         const roadster = viewer.entities.add({
           name: 'Tesla Roadster (Starman)',
           position: position,
@@ -103,9 +137,15 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
             </div>
           `,
         });
+        console.log('✅ Roadster entity added');
 
         // Draw orbital path if available
+        console.log('🛰️ Checking for trajectory data...');
+        console.log('Trajectory available:', !!roadsterData.trajectory);
+        console.log('Trajectory length:', roadsterData.trajectory?.length);
+
         if (roadsterData.trajectory && roadsterData.trajectory.length > 0) {
+          console.log(`🎨 Rendering trajectory with ${roadsterData.trajectory.length} points...`);
           const pathPositions = roadsterData.trajectory.map((point: any) => {
             return Cesium.Cartesian3.fromElements(
               point.x * AU_TO_KM * 1000,
@@ -125,9 +165,13 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
               }),
             },
           });
+          console.log('✅ Trajectory rendered');
+        } else {
+          console.log('⚠️ No trajectory data to render');
         }
 
         // Add Earth for reference
+        console.log('🌍 Adding Earth reference...');
         const earth = viewer.entities.add({
           name: 'Earth',
           position: Cesium.Cartesian3.ZERO,
@@ -146,8 +190,10 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
             pixelOffset: new Cesium.Cartesian2(0, -15),
           },
         });
+        console.log('✅ Earth reference added');
 
         // Add Sun for reference
+        console.log('☀️ Adding Sun reference...');
         const sun = viewer.entities.add({
           name: 'Sun',
           position: Cesium.Cartesian3.fromElements(0, 0, 0),
@@ -166,8 +212,10 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
             pixelOffset: new Cesium.Cartesian2(0, -20),
           },
         });
+        console.log('✅ Sun reference added');
 
         // Set camera to view the entire orbit
+        console.log('📷 Setting camera view...');
         viewer.camera.setView({
           destination: Cesium.Cartesian3.fromElements(
             0,
@@ -180,9 +228,12 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
             roll: 0.0,
           },
         });
+        console.log('✅ Camera view set');
 
         // Fly to Roadster after a moment
+        console.log('🎬 Scheduling flyTo animation...');
         setTimeout(() => {
+          console.log('🚁 Executing flyTo...');
           viewer.flyTo(roadster, {
             duration: 3,
             offset: new Cesium.HeadingPitchRange(
@@ -194,30 +245,37 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
         }, 1000);
 
         cesiumViewerRef.current = viewer;
+        console.log('🎯 Setting isLoading to false...');
         setIsLoading(false);
         setError(null);
 
-        console.log('✅ Roadster viewer initialized');
+        console.log('✅✅✅ Roadster viewer initialized successfully!');
       } catch (err: any) {
-        console.error('❌ Cesium error:', err);
+        console.error('❌❌❌ Cesium initialization error:', err);
+        console.error('Error details:', err.stack);
         setError(err.message || 'Failed to initialize Cesium');
         setIsLoading(false);
       }
     };
 
+    console.log('▶️ Calling initCesium()...');
     initCesium();
 
     return () => {
+      console.log('🧹 Cleanup: unmounting Roadster viewer');
       mounted = false;
       if (cesiumViewerRef.current && !cesiumViewerRef.current.isDestroyed()) {
         try {
           cesiumViewerRef.current.destroy();
+          console.log('✅ Cesium viewer destroyed');
         } catch (err) {
-          console.error('Error destroying Cesium viewer:', err);
+          console.error('❌ Error destroying Cesium viewer:', err);
         }
       }
     };
   }, [roadsterData]);
+
+  console.log('🎨 Render - isLoading:', isLoading, 'error:', error);
 
   if (error) {
     return (
