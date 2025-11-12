@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { config } from '@/lib/config';
 import dynamic from 'next/dynamic';
-import 'cesium/Build/Cesium/Widgets/widgets.css';
 
 function GlobeViewerComponent() {
   const viewerRef = useRef<HTMLDivElement>(null);

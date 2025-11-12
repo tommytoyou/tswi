@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { config } from '@/lib/config';
-import 'cesium/Build/Cesium/Widgets/widgets.css';
 
 interface RoadsterViewerProps {
   roadsterData: any;

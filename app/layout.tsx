@@ -16,6 +16,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <link rel="stylesheet" href="/cesium/Widgets/widgets.css" suppressHydrationWarning />
+      </head>
       <body className={inter.className}>{children}</body>
     </html>
   );
