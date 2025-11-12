@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { config } from '@/lib/config';
 import dynamic from 'next/dynamic';
+import 'cesium/Build/Cesium/Widgets/widgets.css';
 
 function GlobeViewerComponent() {
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -22,14 +23,21 @@ function GlobeViewerComponent() {
 
     const initCesium = async () => {
       try {
-        const Cesium = await import('cesium');
+        // Import Cesium dynamically
+        const Cesium = (await import('cesium')).default || await import('cesium');
 
         if (!mounted) return;
 
-        (window as any).CESIUM_BASE_URL = '/cesium/';
-        (Cesium as any).Ion.defaultAccessToken = config.cesium.ionToken;
+        // Configure Cesium base URL
+        if (typeof window !== 'undefined') {
+          (window as any).CESIUM_BASE_URL = '/cesium/';
+        }
 
-        const viewer = new (Cesium as any).Viewer(viewerRef.current, {
+        // Set Ion token
+        Cesium.Ion.defaultAccessToken = config.cesium.ionToken;
+
+        // Create the Cesium viewer
+        const viewer = new Cesium.Viewer(viewerRef.current!, {
           animation: false,
           baseLayerPicker: false,
           fullscreenButton: false,
@@ -43,16 +51,30 @@ function GlobeViewerComponent() {
           navigationHelpButton: true,
         });
 
+        // Enable lighting for realistic day/night visualization
         viewer.scene.globe.enableLighting = true;
+        viewer.scene.globe.showGroundAtmosphere = true;
+        if (viewer.scene.skyAtmosphere) {
+          viewer.scene.skyAtmosphere.show = true;
+        }
+
+        // Set initial camera position (centered over US)
         viewer.camera.setView({
-          destination: (Cesium as any).Cartesian3.fromDegrees(-98.5, 39.8, 15000000),
+          destination: Cesium.Cartesian3.fromDegrees(-98.5, 39.8, 15000000),
+          orientation: {
+            heading: Cesium.Math.toRadians(0),
+            pitch: Cesium.Math.toRadians(-90),
+            roll: 0.0,
+          },
         });
 
         cesiumViewerRef.current = viewer;
         setIsLoading(false);
         setError(null);
+
+        console.log('✅ Cesium initialized successfully');
       } catch (err: any) {
-        console.error('Cesium error:', err);
+        console.error('❌ Cesium initialization error:', err);
         setError(err.message || 'Failed to initialize Cesium');
         setIsLoading(false);
       }
@@ -63,7 +85,12 @@ function GlobeViewerComponent() {
     return () => {
       mounted = false;
       if (cesiumViewerRef.current && !cesiumViewerRef.current.isDestroyed()) {
-        cesiumViewerRef.current.destroy();
+        try {
+          cesiumViewerRef.current.destroy();
+          console.log('🗑️ Cesium viewer destroyed');
+        } catch (err) {
+          console.error('Error destroying Cesium viewer:', err);
+        }
       }
     };
   }, []);

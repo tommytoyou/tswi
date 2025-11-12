@@ -97,6 +97,28 @@ export async function initializeCollections(): Promise<void> {
       granularity: 'minutes' as const,
       expireAfterSeconds: 90 * 24 * 60 * 60, // 90 days
     },
+    // NOAA Real-Time Data Collections
+    {
+      name: 'timeseries_noaa_solarwind_mag',
+      timeField: 'ts',
+      metaField: 'meta',
+      granularity: 'minutes' as const,
+      expireAfterSeconds: 30 * 24 * 60 * 60, // 30 days
+    },
+    {
+      name: 'timeseries_noaa_kp_index',
+      timeField: 'ts',
+      metaField: 'meta',
+      granularity: 'minutes' as const,
+      expireAfterSeconds: 90 * 24 * 60 * 60, // 90 days
+    },
+    {
+      name: 'timeseries_noaa_xray_flux',
+      timeField: 'ts',
+      metaField: 'meta',
+      granularity: 'minutes' as const,
+      expireAfterSeconds: 7 * 24 * 60 * 60, // 7 days
+    },
   ];
 
   for (const tsConfig of timeSeriesCollections) {

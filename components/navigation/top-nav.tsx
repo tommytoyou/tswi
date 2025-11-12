@@ -20,6 +20,9 @@ export default function TopNav() {
           <Link href="/map" className="text-sm hover:underline">
             Globe
           </Link>
+          <Link href="/roadster" className="text-sm hover:underline">
+            Roadster
+          </Link>
           <Button size="sm" variant="outline" className="flex items-center gap-2">
             <Bell className="h-4 w-4" />
             Alerts

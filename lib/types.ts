@@ -56,6 +56,64 @@ export const TecRegionalSchema = z.object({
 export type TecRegional = z.infer<typeof TecRegionalSchema>;
 
 // ============================================================================
+// NOAA REAL-TIME DATA TYPES
+// ============================================================================
+
+// NOAA Solar Wind Magnetic Field (RTSW MAG 1-minute)
+export const NoaaSolarWindMagSchema = z.object({
+  ts: z.date(),
+  bx_gsm: z.number(),  // X component in GSM coordinates (nT)
+  by_gsm: z.number(),  // Y component in GSM coordinates (nT)
+  bz_gsm: z.number(),  // Z component in GSM coordinates (nT)
+  lon_gsm: z.number(), // Longitude in GSM (degrees)
+  lat_gsm: z.number(), // Latitude in GSM (degrees)
+  bt: z.number(),      // Total magnetic field (nT)
+  meta: z.object({}).optional(),
+});
+export type NoaaSolarWindMag = z.infer<typeof NoaaSolarWindMagSchema>;
+
+// NOAA Planetary K-Index (1-minute)
+export const NoaaKpIndexSchema = z.object({
+  ts: z.date(),
+  kp: z.number(),           // Planetary K-index (0-9)
+  kp_index: z.number(),     // Current Kp value
+  a_running: z.number(),    // Running A-index
+  station_count: z.number(), // Number of stations reporting
+  meta: z.object({}).optional(),
+});
+export type NoaaKpIndex = z.infer<typeof NoaaKpIndexSchema>;
+
+// NOAA GOES X-Ray Flux (6-hour data)
+export const NoaaXrayFluxSchema = z.object({
+  ts: z.date(),
+  satellite: z.number(),         // GOES satellite number
+  flux: z.number(),              // X-ray flux (W/m²)
+  observed_flux: z.number(),     // Observed flux value
+  electron_correction: z.number(),// Electron correction
+  electron_contamination: z.string().optional(), // Contamination flag
+  energy: z.string(),            // Energy band (0.05-0.4nm or 0.1-0.8nm)
+  meta: z.object({}).optional(),
+});
+export type NoaaXrayFlux = z.infer<typeof NoaaXrayFluxSchema>;
+
+// NOAA Solar Events (edited events)
+export const NoaaSolarEventSchema = z.object({
+  event_id: z.string(),
+  event_type: z.string(),        // FLA (flare), CME, SEP, etc.
+  begin_time: z.date(),
+  max_time: z.date().optional(),
+  end_time: z.date().optional(),
+  source_location: z.string().optional(),
+  active_region: z.number().optional(),
+  particulars: z.string().optional(),
+  class_type: z.string().optional(), // For flares: C, M, X
+  intensity: z.number().optional(),   // Flare intensity
+  created_at: z.date(),
+  meta: z.object({}).optional(),
+});
+export type NoaaSolarEvent = z.infer<typeof NoaaSolarEventSchema>;
+
+// ============================================================================
 // FORECAST TYPES
 // ============================================================================
 
