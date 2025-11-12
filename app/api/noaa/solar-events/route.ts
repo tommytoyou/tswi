@@ -3,6 +3,7 @@ import { getCollection } from '@/lib/db';
 import { NoaaSolarEvent } from '@/lib/types';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/noaa/solar-events

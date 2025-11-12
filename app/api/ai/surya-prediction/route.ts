@@ -4,6 +4,7 @@ import { getTimeSeriesCollection } from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // Allow up to 60 seconds for AI inference
+export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/ai/surya-prediction

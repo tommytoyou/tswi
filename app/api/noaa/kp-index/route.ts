@@ -3,6 +3,7 @@ import { getTimeSeriesCollection } from '@/lib/db';
 import { NoaaKpIndex } from '@/lib/types';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/noaa/kp-index

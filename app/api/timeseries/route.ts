@@ -3,6 +3,7 @@ import { getTimeSeriesCollection } from '@/lib/db';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 const querySchema = z.object({
   collection: z.enum([

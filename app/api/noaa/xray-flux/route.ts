@@ -3,6 +3,7 @@ import { getTimeSeriesCollection } from '@/lib/db';
 import { NoaaXrayFlux } from '@/lib/types';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/noaa/xray-flux
