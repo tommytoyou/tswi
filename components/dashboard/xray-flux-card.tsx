@@ -22,7 +22,17 @@ export function XRayFluxCard() {
       const response = await fetch('/api/noaa/xray-flux');
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
-      setData(result);
+
+      // Extract latest data from API response
+      if (result.success && result.latest && result.flareClass) {
+        setData({
+          class: result.flareClass,
+          intensity: result.latest.flux || 0,
+          timestamp: result.latest.ts || new Date().toISOString(),
+        });
+      } else {
+        throw new Error('No data available');
+      }
       setError(null);
     } catch (err) {
       setError('Failed to load data');

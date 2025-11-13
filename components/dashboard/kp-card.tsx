@@ -22,7 +22,23 @@ export function KpCard() {
       const response = await fetch('/api/noaa/kp-index');
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
-      setData(result);
+
+      // Extract latest data from API response
+      if (result.success && result.latest) {
+        const kpValue = result.latest.kp || result.latest.kp_index || 0;
+        let status = 'Quiet';
+        if (kpValue >= 7) status = 'Severe';
+        else if (kpValue >= 5) status = 'Strong';
+        else if (kpValue >= 4) status = 'Active';
+
+        setData({
+          current: kpValue,
+          status: status,
+          timestamp: result.latest.ts || new Date().toISOString(),
+        });
+      } else {
+        throw new Error('No data available');
+      }
       setError(null);
     } catch (err) {
       setError('Failed to load data');

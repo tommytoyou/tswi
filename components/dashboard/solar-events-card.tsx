@@ -27,7 +27,24 @@ export function SolarEventsCard() {
       const response = await fetch('/api/noaa/solar-events');
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
-      setData(result);
+
+      // Extract and transform event data from API response
+      if (result.success && result.data) {
+        const events: SolarEvent[] = result.data.map((event: any) => ({
+          type: event.event_type || 'Unknown',
+          date: event.begin_time || new Date().toISOString(),
+          intensity: event.class_type
+            ? `${event.class_type}${event.intensity ? event.intensity : ''}`
+            : undefined,
+        }));
+
+        setData({
+          events: events,
+          lastUpdated: new Date().toISOString(),
+        });
+      } else {
+        setData({ events: [], lastUpdated: new Date().toISOString() });
+      }
       setError(null);
     } catch (err) {
       setError('Failed to load data');

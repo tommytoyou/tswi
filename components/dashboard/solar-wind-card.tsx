@@ -24,7 +24,21 @@ export function SolarWindCard() {
       const response = await fetch('/api/noaa/solar-wind');
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
-      setData(result);
+
+      // Extract latest data from API response
+      if (result.success && result.data && result.data.length > 0) {
+        const latest = result.data[result.data.length - 1];
+        setData({
+          bx: latest.bx_gsm || 0,
+          by: latest.by_gsm || 0,
+          bz: latest.bz_gsm || 0,
+          speed: 0, // Not available in mag data, would need plasma data
+          density: 0, // Not available in mag data, would need plasma data
+          timestamp: latest.ts || new Date().toISOString(),
+        });
+      } else {
+        throw new Error('No data available');
+      }
       setError(null);
     } catch (err) {
       setError('Failed to load data');
