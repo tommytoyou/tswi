@@ -3,23 +3,24 @@
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 
-interface KpData {
-  current: number;
-  status: string;
+interface SuryaPrediction {
+  riskLevel: string;
+  confidence: number;
+  prediction: string;
   timestamp: string;
 }
 
-export function KpCard() {
-  const [data, setData] = useState<KpData | null>(null);
+export function SuryaPredictionCard() {
+  const [data, setData] = useState<SuryaPrediction | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/noaa/kp-index');
+      const response = await fetch('/api/ai/surya-prediction');
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
       setData(result);
@@ -37,10 +38,9 @@ export function KpCard() {
     return () => clearInterval(interval);
   }, []);
 
-  const getKpColor = (kp: number) => {
-    if (kp >= 7) return 'bg-red-500';
-    if (kp >= 5) return 'bg-orange-500';
-    if (kp >= 4) return 'bg-yellow-500';
+  const getRiskColor = (level: string) => {
+    if (level === 'HIGH') return 'bg-red-500';
+    if (level === 'MEDIUM') return 'bg-yellow-500';
     return 'bg-green-500';
   };
 
@@ -48,7 +48,10 @@ export function KpCard() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Kp Index</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            Surya AI Predictions
+          </CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-32">
           <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
@@ -61,7 +64,10 @@ export function KpCard() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Kp Index</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            Surya AI Predictions
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-red-400">{error || 'No data'}</p>
@@ -73,18 +79,25 @@ export function KpCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Kp Index</CardTitle>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Sparkles className="h-4 w-4" />
+          Surya AI Predictions
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex items-end gap-2">
-          <div className="text-3xl font-bold text-white">{data.current}</div>
-          <Badge className={getKpColor(data.current)}>{data.status}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge className={getRiskColor(data.riskLevel)}>
+            {data.riskLevel} RISK
+          </Badge>
+          <span className="text-sm text-slate-400">
+            {Math.round(data.confidence * 100)}% confidence
+          </span>
         </div>
-        <div className="text-xs text-slate-400">
-          Geomagnetic activity level
-        </div>
+        <p className="text-sm text-slate-300 leading-relaxed">
+          {data.prediction}
+        </p>
         <div className="text-xs text-slate-500">
-          {new Date(data.timestamp).toLocaleString()}
+          Generated: {new Date(data.timestamp).toLocaleString()}
         </div>
       </CardContent>
     </Card>

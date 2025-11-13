@@ -2,26 +2,24 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Car } from 'lucide-react';
 
-interface SolarWindData {
-  bx: number;
-  by: number;
-  bz: number;
-  speed: number;
-  density: number;
-  timestamp: string;
+interface RoadsterData {
+  distance_km: number;
+  distance_au: number;
+  speed_kmh: number;
+  last_updated: string;
 }
 
-export function SolarWindCard() {
-  const [data, setData] = useState<SolarWindData | null>(null);
+export function RoadsterCard() {
+  const [data, setData] = useState<RoadsterData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/noaa/solar-wind');
+      const response = await fetch('/api/roadster');
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
       setData(result);
@@ -43,7 +41,10 @@ export function SolarWindCard() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Solar Wind</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Car className="h-4 w-4" />
+            Roadster Position
+          </CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-32">
           <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
@@ -56,7 +57,10 @@ export function SolarWindCard() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Solar Wind</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Car className="h-4 w-4" />
+            Roadster Position
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-red-400">{error || 'No data'}</p>
@@ -68,33 +72,34 @@ export function SolarWindCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Solar Wind</CardTitle>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Car className="h-4 w-4" />
+          Roadster Position
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <div>
-          <div className="text-2xl font-bold text-white">{data.speed} km/s</div>
-          <div className="text-xs text-slate-400">Speed</div>
+          <div className="text-2xl font-bold text-white">
+            {(data.distance_au || 0).toFixed(2)} AU
+          </div>
+          <div className="text-xs text-slate-400">Distance from Earth</div>
         </div>
-        <div className="grid grid-cols-3 gap-2 text-sm">
+        <div className="grid grid-cols-2 gap-2 text-sm">
           <div>
-            <div className="font-semibold text-white">{data.bx.toFixed(1)} nT</div>
-            <div className="text-xs text-slate-400">Bx</div>
+            <div className="font-semibold text-white">
+              {((data.distance_km || 0) / 1_000_000).toFixed(1)}M km
+            </div>
+            <div className="text-xs text-slate-400">Distance (km)</div>
           </div>
           <div>
-            <div className="font-semibold text-white">{data.by.toFixed(1)} nT</div>
-            <div className="text-xs text-slate-400">By</div>
+            <div className="font-semibold text-white">
+              {(data.speed_kmh || 0).toLocaleString()} km/h
+            </div>
+            <div className="text-xs text-slate-400">Speed</div>
           </div>
-          <div>
-            <div className="font-semibold text-white">{data.bz.toFixed(1)} nT</div>
-            <div className="text-xs text-slate-400">Bz</div>
-          </div>
-        </div>
-        <div>
-          <div className="font-semibold text-white">{data.density.toFixed(1)} /cm³</div>
-          <div className="text-xs text-slate-400">Density</div>
         </div>
         <div className="text-xs text-slate-500">
-          {new Date(data.timestamp).toLocaleString()}
+          Updated: {data.last_updated ? new Date(data.last_updated).toLocaleString() : 'N/A'}
         </div>
       </CardContent>
     </Card>
