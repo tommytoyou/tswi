@@ -13,7 +13,7 @@ interface XRayDataPoint {
   ts: string;
   flux: number;
   energy: string;
-  satellite?: string;
+  satellite?: number;
 }
 
 export function XRayFluxCardV2() {
@@ -217,7 +217,7 @@ export function XRayFluxCardV2() {
         {/* Footer Info */}
         <div className="flex justify-between items-center text-xs">
           <div className="text-slate-500">
-            Last 6 hours • {data.find(d => d.satellite !== undefined)?.satellite || 'GOES-18'}
+            Last 6 hours • GOES-{data.find(d => d.satellite !== undefined)?.satellite ?? 18}
           </div>
           <div className="text-slate-400">
             {format(new Date(latest.ts), 'HH:mm:ss')} UTC
