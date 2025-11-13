@@ -5,7 +5,9 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    const { username, password } = await request.json();
+    const text = await request.text();
+    const body = JSON.parse(text);
+    const { username, password } = body;
 
     if (!username || !password) {
       return NextResponse.json(
@@ -14,17 +16,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (validateCredentials(username, password)) {
+    const isValid = validateCredentials(username, password);
+
+    if (isValid) {
+      // Serialize user object for JSON response
+      const userForResponse = {
+        ...AUTHENTICATED_USER,
+        created_at: AUTHENTICATED_USER.created_at.toISOString(),
+      };
+
       // Create session data
       const sessionData = {
-        user: AUTHENTICATED_USER,
+        user: userForResponse,
         expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
       };
 
       // Create response with session cookie
       const response = NextResponse.json({
         success: true,
-        user: AUTHENTICATED_USER,
+        user: userForResponse,
       });
 
       // Set HTTP-only cookie
