@@ -10,7 +10,7 @@ import { RoadsterCard } from '@/components/dashboard/roadster-card';
 import { StatusBar } from '@/components/dashboard/status-bar';
 import { Satellite } from 'lucide-react';
 
-export default function DashboardPage() {
+export default function DashboardPageV2() {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [refreshInterval, setRefreshInterval] = useState(120000); // 2 minutes default
   const [autoRefresh, setAutoRefresh] = useState(true);
