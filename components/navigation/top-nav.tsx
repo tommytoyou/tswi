@@ -55,6 +55,9 @@ export default function TopNav() {
           <Link href="/roadster" className="text-sm hover:underline">
             Roadster
           </Link>
+          <Link href="/agent" className="text-sm hover:underline flex items-center gap-1">
+            <span>🤖</span> Agent
+          </Link>
           <Button size="sm" variant="outline" className="flex items-center gap-2">
             <Bell className="h-4 w-4" />
             Alerts

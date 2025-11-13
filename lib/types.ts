@@ -240,3 +240,115 @@ export type ApiResponse<T> = {
   success: false;
   error: string;
 };
+
+// ============================================================================
+// AGENTIC AI MONITORING TYPES
+// ============================================================================
+
+// Agent Decision Priority Levels
+export const AgentPrioritySchema = z.enum(['critical', 'high', 'medium', 'low']);
+export type AgentPriority = z.infer<typeof AgentPrioritySchema>;
+
+// Agent Decision Record
+export const AgentDecisionSchema = z.object({
+  _id: z.string().optional(),
+  ts: z.date(),
+  decision_type: z.enum(['alert_evaluation', 'threshold_adjustment', 'event_classification', 'recommendation']),
+  priority: AgentPrioritySchema,
+  reasoning: z.string(), // AI-generated reasoning
+  confidence: z.number().min(0).max(1), // 0-1 confidence score
+  data_snapshot: z.record(z.any()), // Data at decision time
+  action_taken: z.string(),
+  outcome: z.enum(['pending', 'success', 'false_positive', 'missed_event']).optional(),
+  user_feedback: z.string().optional(),
+  created_at: z.date(),
+});
+export type AgentDecision = z.infer<typeof AgentDecisionSchema>;
+
+// Prediction Accuracy Tracking
+export const PredictionAccuracySchema = z.object({
+  _id: z.string().optional(),
+  prediction_ts: z.date(),
+  predicted_event: z.string(), // What was predicted
+  predicted_value: z.number(),
+  predicted_time: z.date(), // When it was predicted to occur
+  actual_event: z.string().optional(), // What actually happened
+  actual_value: z.number().optional(),
+  actual_time: z.date().optional(), // When it actually occurred
+  error_magnitude: z.number().optional(), // Absolute error
+  error_timing_min: z.number().optional(), // Timing error in minutes
+  accuracy_score: z.number().min(0).max(1).optional(), // 0-1 score
+  prediction_source: z.string(), // 'surya', 'statistical', 'ensemble'
+  created_at: z.date(),
+});
+export type PredictionAccuracy = z.infer<typeof PredictionAccuracySchema>;
+
+// Alert History with AI Reasoning
+export const AlertHistorySchema = z.object({
+  _id: z.string().optional(),
+  alert_id: z.string(),
+  user_id: z.string(),
+  triggered_at: z.date(),
+  priority: AgentPrioritySchema,
+  conditions_met: z.record(z.any()),
+  ai_reasoning: z.string(), // Why the agent decided to alert
+  ai_confidence: z.number().min(0).max(1),
+  data_snapshot: z.record(z.any()),
+  notification_sent: z.boolean(),
+  notification_channel: z.enum(['email', 'webhook', 'sms', 'websocket']),
+  user_acknowledged: z.boolean().default(false),
+  acknowledged_at: z.date().optional(),
+  false_positive: z.boolean().default(false),
+  user_feedback: z.string().optional(),
+  created_at: z.date(),
+});
+export type AlertHistory = z.infer<typeof AlertHistorySchema>;
+
+// Self-Tuning Threshold Configuration
+export const AdaptiveThresholdSchema = z.object({
+  _id: z.string().optional(),
+  parameter: z.string(), // 'kp', 'bz', 'speed', etc.
+  current_threshold: z.number(),
+  initial_threshold: z.number(),
+  adjustment_history: z.array(z.object({
+    ts: z.date(),
+    old_value: z.number(),
+    new_value: z.number(),
+    reason: z.string(),
+    false_positive_rate: z.number(),
+  })),
+  false_positive_rate: z.number(), // Current FP rate
+  target_false_positive_rate: z.number().default(0.05), // 5% target
+  last_adjusted_at: z.date(),
+  created_at: z.date(),
+});
+export type AdaptiveThreshold = z.infer<typeof AdaptiveThresholdSchema>;
+
+// Agent Performance Metrics
+export const AgentMetricsSchema = z.object({
+  _id: z.string().optional(),
+  ts: z.date(),
+  period: z.enum(['hourly', 'daily', 'weekly']),
+  total_alerts: z.number(),
+  critical_alerts: z.number(),
+  false_positives: z.number(),
+  missed_events: z.number(),
+  true_positives: z.number(),
+  precision: z.number(), // TP / (TP + FP)
+  recall: z.number(), // TP / (TP + FN)
+  f1_score: z.number(),
+  avg_confidence: z.number(),
+  avg_prediction_accuracy: z.number(),
+  threshold_adjustments: z.number(),
+  created_at: z.date(),
+});
+export type AgentMetrics = z.infer<typeof AgentMetricsSchema>;
+
+// WebSocket Message Types
+export const WebSocketMessageSchema = z.object({
+  type: z.enum(['alert', 'agent_decision', 'data_update', 'system_status']),
+  priority: AgentPrioritySchema.optional(),
+  data: z.record(z.any()),
+  timestamp: z.date(),
+});
+export type WebSocketMessage = z.infer<typeof WebSocketMessageSchema>;

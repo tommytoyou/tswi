@@ -23,7 +23,28 @@ export function SuryaPredictionCard() {
       const response = await fetch('/api/ai/surya-prediction');
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
-      setData(result);
+
+      // Parse the API response
+      if (result.success && result.data && result.data.predictions) {
+        const predictions = result.data.predictions;
+        const avgProbability = predictions.reduce((sum: number, p: any) => sum + p.flare_probability, 0) / predictions.length;
+        const avgConfidence = predictions.reduce((sum: number, p: any) => sum + p.confidence, 0) / predictions.length;
+
+        let riskLevel = 'LOW';
+        if (avgProbability > 0.3) riskLevel = 'HIGH';
+        else if (avgProbability > 0.15) riskLevel = 'MEDIUM';
+
+        const predictionText = `Solar flare probability: ${(avgProbability * 100).toFixed(1)}% over the next 2 hours. Highest risk for ${predictions[0].class_probabilities.C > predictions[0].class_probabilities.M ? 'C-class' : 'M-class'} flares.`;
+
+        setData({
+          riskLevel,
+          confidence: avgConfidence,
+          prediction: predictionText,
+          timestamp: result.data.prediction_time || new Date().toISOString(),
+        });
+      } else {
+        throw new Error('Invalid data format');
+      }
       setError(null);
     } catch (err) {
       setError('Failed to load data');

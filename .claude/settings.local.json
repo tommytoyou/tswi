@@ -14,7 +14,14 @@
       "Bash(npm run dev:*)",
       "Bash(curl:*)",
       "Bash(pkill:*)",
-      "Bash(printf:*)"
+      "Bash(printf:*)",
+      "Bash(find:*)",
+      "Bash(rm:*)",
+      "Bash(nslookup:*)",
+      "Bash(host:*)",
+      "Bash(dig:*)",
+      "Bash(test:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []
