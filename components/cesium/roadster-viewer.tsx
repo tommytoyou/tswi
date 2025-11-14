@@ -84,13 +84,13 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
         }
         console.log('✅ Scene settings configured');
 
-        // Convert AU position to kilometers for Cesium
+        // Convert AU position to kilometers for Cesium (scaled down to prevent math overflow)
         const AU_TO_KM = 149597870.7;
         console.log('📍 Roadster position:', roadsterData.position);
         const position = Cesium.Cartesian3.fromElements(
-          roadsterData.position.x * AU_TO_KM * 1000,
-          roadsterData.position.y * AU_TO_KM * 1000,
-          roadsterData.position.z * AU_TO_KM * 1000
+          roadsterData.position.x * AU_TO_KM,
+          roadsterData.position.y * AU_TO_KM,
+          roadsterData.position.z * AU_TO_KM
         );
         console.log('✅ Position converted to Cartesian3');
 
@@ -135,9 +135,9 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
           console.log(`🎨 Rendering trajectory with ${roadsterData.trajectory.length} points...`);
           const pathPositions = roadsterData.trajectory.map((point: any) => {
             return Cesium.Cartesian3.fromElements(
-              point.x * AU_TO_KM * 1000,
-              point.y * AU_TO_KM * 1000,
-              point.z * AU_TO_KM * 1000
+              point.x * AU_TO_KM,
+              point.y * AU_TO_KM,
+              point.z * AU_TO_KM
             );
           });
 
@@ -201,13 +201,13 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
         });
         console.log('✅ Sun reference added');
 
-        // Set camera to view the entire orbit
+        // Set camera to view the entire orbit (scaled down camera distance)
         console.log('📷 Setting camera view...');
         viewer.camera.setView({
           destination: Cesium.Cartesian3.fromElements(
             0,
             0,
-            roadsterData.orbit.semi_major_axis_au * AU_TO_KM * 3000
+            roadsterData.orbit.semi_major_axis_au * AU_TO_KM * 3
           ),
           orientation: {
             heading: Cesium.Math.toRadians(0),
@@ -216,8 +216,6 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
           },
         });
         console.log('✅ Camera view set');
-
-   
 
         cesiumViewerRef.current = viewer;
         console.log('🎯 Setting isLoading to false...');
