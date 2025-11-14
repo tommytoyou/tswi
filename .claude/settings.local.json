@@ -21,7 +21,10 @@
       "Bash(host:*)",
       "Bash(dig:*)",
       "Bash(test:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(lsof:*)",
+      "Bash(ss:*)",
+      "Bash(netstat:*)"
     ],
     "deny": [],
     "ask": []

@@ -3,16 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import dynamic from 'next/dynamic';
-
-const GlobeViewer = dynamic(() => import('@/components/cesium/roadster-viewer'), {
-  ssr: false,
-  loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-slate-900">
-      <p className="text-white">Loading Roadster visualization...</p>
-    </div>
-  ),
-});
+import RoadsterViewer from '@/components/cesium/roadster-viewer';
 
 interface RoadsterData {
   name: string;
@@ -209,7 +200,7 @@ export default function RoadsterPage() {
 
       {/* 3D Visualization */}
       <div className="flex-1 relative">
-        <GlobeViewer roadsterData={data} />
+        <RoadsterViewer roadsterData={data} />
       </div>
     </div>
   );

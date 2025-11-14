@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { config } from '@/lib/config';
+import dynamic from 'next/dynamic';
 
 interface RoadsterViewerProps {
   roadsterData: any;
@@ -48,16 +49,12 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
     const initCesium = async () => {
       try {
         console.log('🔄 Starting Cesium initialization...');
-        const Cesium = (await import('cesium')).default || await import('cesium');
+        const Cesium = await import('cesium');
         console.log('✅ Cesium module loaded');
 
         if (!mounted) {
           console.log('⚠️ Component unmounted, aborting');
           return;
-        }
-
-        if (typeof window !== 'undefined') {
-          (window as any).CESIUM_BASE_URL = '/cesium/';
         }
 
         Cesium.Ion.defaultAccessToken = config.cesium.ionToken;
@@ -76,16 +73,6 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
           selectionIndicator: true,
           timeline: false,
           navigationHelpButton: true,
-          skyBox: new Cesium.SkyBox({
-            sources: {
-              positiveX: '/cesium/Assets/Textures/SkyBox/tycho2t3_80_px.jpg',
-              negativeX: '/cesium/Assets/Textures/SkyBox/tycho2t3_80_mx.jpg',
-              positiveY: '/cesium/Assets/Textures/SkyBox/tycho2t3_80_py.jpg',
-              negativeY: '/cesium/Assets/Textures/SkyBox/tycho2t3_80_my.jpg',
-              positiveZ: '/cesium/Assets/Textures/SkyBox/tycho2t3_80_pz.jpg',
-              negativeZ: '/cesium/Assets/Textures/SkyBox/tycho2t3_80_mz.jpg',
-            },
-          }),
         });
         console.log('✅ Cesium Viewer created');
 
@@ -302,4 +289,15 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
   return <div ref={viewerRef} className="w-full h-full" />;
 }
 
-export default RoadsterViewerComponent;
+// Export with SSR disabled
+export default dynamic(() => Promise.resolve(RoadsterViewerComponent), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-slate-900">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-red-500 mx-auto mb-4" />
+        <p className="text-white text-xl">Plotting trajectory...</p>
+      </div>
+    </div>
+  ),
+});

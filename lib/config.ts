@@ -16,6 +16,13 @@ const configSchema = z.object({
   }),
 });
 
+// Define these at module level so webpack can replace them
+const CESIUM_TOKEN = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN || '';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ||
+  (process.env.REPL_SLUG
+    ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+    : 'http://localhost:3000');
+
 function getConfig() {
   const config = {
     mongodb: {
@@ -23,16 +30,13 @@ function getConfig() {
       dbName: process.env.MONGODB_DB || 'tswi',
     },
     cesium: {
-      ionToken: process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN || '',
+      ionToken: CESIUM_TOKEN,
     },
     auth: {
       secret: process.env.AUTH_SECRET || 'dev-secret-change-me',
     },
     api: {
-      baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || 
-        (process.env.REPL_SLUG 
-          ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
-          : 'http://localhost:3000'),
+      baseUrl: API_BASE_URL,
     },
   };
 
@@ -46,6 +50,15 @@ function getConfig() {
     if (!parsed.cesium.ionToken) {
       console.warn('⚠️  NEXT_PUBLIC_CESIUM_ION_TOKEN not set - Cesium globe will not load');
     }
+  }
+
+  // Client-side debug logging
+  if (typeof window !== 'undefined') {
+    console.log('🔧 Cesium config on client:', {
+      hasCesiumToken: !!parsed.cesium.ionToken,
+      tokenLength: parsed.cesium.ionToken?.length || 0,
+      tokenPreview: parsed.cesium.ionToken ? parsed.cesium.ionToken.substring(0, 20) + '...' : 'NONE',
+    });
   }
 
   return parsed;

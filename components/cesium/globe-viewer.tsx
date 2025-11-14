@@ -23,14 +23,9 @@ function GlobeViewerComponent() {
     const initCesium = async () => {
       try {
         // Import Cesium dynamically
-        const Cesium = (await import('cesium')).default || await import('cesium');
+        const Cesium = await import('cesium');
 
         if (!mounted) return;
-
-        // Configure Cesium base URL
-        if (typeof window !== 'undefined') {
-          (window as any).CESIUM_BASE_URL = '/cesium/';
-        }
 
         // Set Ion token
         Cesium.Ion.defaultAccessToken = config.cesium.ionToken;
