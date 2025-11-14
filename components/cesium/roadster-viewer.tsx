@@ -217,19 +217,7 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
         });
         console.log('✅ Camera view set');
 
-        // Fly to Roadster after a moment
-        console.log('🎬 Scheduling flyTo animation...');
-        setTimeout(() => {
-          console.log('🚁 Executing flyTo...');
-          viewer.flyTo(roadster, {
-            duration: 3,
-            offset: new Cesium.HeadingPitchRange(
-              0,
-              Cesium.Math.toRadians(-45),
-              roadsterData.earth_distance_km * 1000 * 2
-            ),
-          });
-        }, 1000);
+   
 
         cesiumViewerRef.current = viewer;
         console.log('🎯 Setting isLoading to false...');
@@ -275,18 +263,19 @@ function RoadsterViewerComponent({ roadsterData }: RoadsterViewerProps) {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-slate-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-red-500 mx-auto mb-4" />
-          <p className="text-white text-xl">Plotting trajectory...</p>
+  return (
+    <>
+      {isLoading && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-red-500 mx-auto mb-4" />
+            <p className="text-white text-xl">Plotting trajectory...</p>
+          </div>
         </div>
-      </div>
-    );
-  }
-
-  return <div ref={viewerRef} className="w-full h-full" />;
+      )}
+      <div ref={viewerRef} className="w-full h-full" />
+    </>
+  );
 }
 
 // Export with SSR disabled
@@ -296,7 +285,7 @@ export default dynamic(() => Promise.resolve(RoadsterViewerComponent), {
     <div className="w-full h-full flex items-center justify-center bg-slate-900">
       <div className="text-center">
         <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-red-500 mx-auto mb-4" />
-        <p className="text-white text-xl">Plotting trajectory...</p>
+        <p className="text-white text-xl">Loading component...</p>
       </div>
     </div>
   ),

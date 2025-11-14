@@ -198,9 +198,11 @@ export default function RoadsterPage() {
         </Card>
       </div>
 
-      {/* 3D Visualization */}
-      <div className="flex-1 relative">
-        <RoadsterViewer roadsterData={data} />
+       {/* 3D Visualization */}
+      <div className="flex-1 relative min-h-0">
+        <div className="absolute inset-0">
+          <RoadsterViewer roadsterData={data} />
+        </div>
       </div>
     </div>
   );
