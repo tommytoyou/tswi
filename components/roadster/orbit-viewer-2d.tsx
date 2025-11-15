@@ -32,6 +32,9 @@ export default function RoadsterOrbitViewer({ roadsterData }: RoadsterOrbitViewe
       const centerY = rect.height / 2;
       const scale = Math.min(rect.width, rect.height) / 3.5; // Scale factor for AU
 
+      // Conversion factor: position data is in millions of miles, we need AU
+      const MILLION_MILES_TO_AU = 1 / 92.956; // 1 AU = 92.956 million miles
+
       // Clear canvas
       ctx.fillStyle = '#0f172a'; // slate-900
       ctx.fillRect(0, 0, rect.width, rect.height);
@@ -123,8 +126,9 @@ export default function RoadsterOrbitViewer({ roadsterData }: RoadsterOrbitViewe
         
         let started = false;
         roadsterData.trajectory.forEach((point: any) => {
-          const x = centerX + point.x * scale;
-          const y = centerY + point.y * scale;
+          // Convert from millions of miles to AU
+          const x = centerX + (point.x * MILLION_MILES_TO_AU * scale);
+          const y = centerY + (point.y * MILLION_MILES_TO_AU * scale);
           
           if (!started) {
             ctx.moveTo(x, y);
@@ -140,12 +144,15 @@ export default function RoadsterOrbitViewer({ roadsterData }: RoadsterOrbitViewe
         console.log('⚠️ No trajectory data available');
       }
 
-      // Draw Roadster's current position
-      const roadsterX = centerX + (roadsterData.position.x * scale);
-      const roadsterY = centerY + (roadsterData.position.y * scale);
+      // Draw Roadster's current position - CONVERT FROM MILLIONS OF MILES TO AU
+      const roadsterAU_X = roadsterData.position.x * MILLION_MILES_TO_AU;
+      const roadsterAU_Y = roadsterData.position.y * MILLION_MILES_TO_AU;
+      const roadsterX = centerX + (roadsterAU_X * scale);
+      const roadsterY = centerY + (roadsterAU_Y * scale);
       
       console.log('🚗 Roadster position:', { 
-        raw: roadsterData.position, 
+        raw_millions_miles: roadsterData.position,
+        converted_AU: { x: roadsterAU_X, y: roadsterAU_Y },
         screen: { x: roadsterX, y: roadsterY },
         center: { x: centerX, y: centerY }
       });
