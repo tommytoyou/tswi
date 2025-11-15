@@ -183,8 +183,9 @@ export default function RoadsterOrbitViewer({ roadsterData }: RoadsterOrbitViewe
       console.log('✅ Calculated roadster orbit with', orbitPoints.length, 'points');
       console.log('📊 Orbit params: a=' + semiMajorAxis + ' AU, e=' + eccentricity);
       
-      ctx.strokeStyle = '#fb923c'; // orange
-      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#ea580c80'; // burnt orange with transparency (matches planet style)
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 4]); // Dashed like Earth and Mars
       ctx.beginPath();
       
       orbitPoints.forEach((point, i) => {
@@ -200,6 +201,7 @@ export default function RoadsterOrbitViewer({ roadsterData }: RoadsterOrbitViewe
       
       ctx.closePath();
       ctx.stroke();
+      ctx.setLineDash([]); // Reset dash pattern
 
       // Calculate current position
       const currentPos = calculateCurrentPosition(semiMajorAxis, eccentricity, daysSinceLaunch);
