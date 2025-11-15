@@ -100,18 +100,19 @@ function GlobeViewerComponent() {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-slate-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4" />
-          <p className="text-white text-xl">Loading 3D Globe...</p>
+  return (
+    <>
+      {isLoading && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4" />
+            <p className="text-white text-xl">Loading 3D Globe...</p>
+          </div>
         </div>
-      </div>
-    );
-  }
-
-  return <div ref={viewerRef} className="w-full h-full" />;
+      )}
+      <div ref={viewerRef} className="w-full h-full" />
+    </>
+  );
 }
 
 // Export with SSR disabled
