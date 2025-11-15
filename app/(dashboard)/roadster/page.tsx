@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import RoadsterViewer from '@/components/cesium/roadster-viewer';
+import RoadsterOrbitViewer from '@/components/roadster/orbit-viewer-2d';
 
 interface RoadsterData {
   name: string;
@@ -198,10 +198,10 @@ export default function RoadsterPage() {
         </Card>
       </div>
 
-       {/* 3D Visualization */}
+      {/* 2D Orbital Visualization */}
       <div className="flex-1 relative min-h-0">
         <div className="absolute inset-0">
-          <RoadsterViewer roadsterData={data} />
+          <RoadsterOrbitViewer roadsterData={data} />
         </div>
       </div>
     </div>
