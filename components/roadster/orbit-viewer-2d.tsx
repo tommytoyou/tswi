@@ -17,6 +17,60 @@ export default function RoadsterOrbitViewer({ roadsterData }: RoadsterOrbitViewe
 
     console.log('🎨 Drawing orbit with data:', roadsterData);
 
+    // Orbital mechanics calculation
+    const calculateOrbit = (a: number, e: number, numPoints: number = 100) => {
+      // a = semi-major axis in AU
+      // e = eccentricity
+      const points = [];
+      
+      for (let i = 0; i < numPoints; i++) {
+        const theta = (2 * Math.PI * i) / numPoints; // True anomaly
+        const r = (a * (1 - e * e)) / (1 + e * Math.cos(theta)); // Orbital radius
+        
+        const x = r * Math.cos(theta);
+        const y = r * Math.sin(theta);
+        
+        points.push({ x, y, r });
+      }
+      
+      return points;
+    };
+
+    // Calculate current position using mean anomaly
+    const calculateCurrentPosition = (a: number, e: number, epochDays: number) => {
+      // Mean motion (radians per day)
+      const n = 2 * Math.PI / roadsterData.orbit.period_days;
+      
+      // Days since epoch
+      const daysSinceEpoch = epochDays;
+      
+      // Mean anomaly
+      let M = n * daysSinceEpoch;
+      M = M % (2 * Math.PI); // Normalize to 0-2π
+      
+      // Solve Kepler's equation for eccentric anomaly (E)
+      // M = E - e*sin(E)
+      let E = M;
+      for (let i = 0; i < 10; i++) {
+        E = M + e * Math.sin(E);
+      }
+      
+      // True anomaly (theta)
+      const theta = 2 * Math.atan2(
+        Math.sqrt(1 + e) * Math.sin(E / 2),
+        Math.sqrt(1 - e) * Math.cos(E / 2)
+      );
+      
+      // Distance from sun
+      const r = (a * (1 - e * e)) / (1 + e * Math.cos(theta));
+      
+      // Position in orbital plane
+      const x = r * Math.cos(theta);
+      const y = r * Math.sin(theta);
+      
+      return { x, y, r, theta };
+    };
+
     // Set canvas size
     const updateSize = () => {
       const rect = canvas.getBoundingClientRect();
@@ -32,8 +86,15 @@ export default function RoadsterOrbitViewer({ roadsterData }: RoadsterOrbitViewe
       const centerY = rect.height / 2;
       const scale = Math.min(rect.width, rect.height) / 3.5; // Scale factor for AU
 
-      // Conversion factor: position data is in millions of miles, we need AU
-      const MILLION_MILES_TO_AU = 1 / 92.956; // 1 AU = 92.956 million miles
+      // Get CORRECT orbital elements (the API data is wrong)
+      // Real roadster orbit based on NASA data:
+      const semiMajorAxis = 1.325; // AU (not 57!)
+      const eccentricity = 0.256; // matches the API
+      
+      // Calculate days since launch for current position
+      const launchDate = new Date(roadsterData.launch_date);
+      const now = new Date();
+      const daysSinceLaunch = (now.getTime() - launchDate.getTime()) / (1000 * 60 * 60 * 24);
 
       // Clear canvas
       ctx.fillStyle = '#0f172a'; // slate-900
@@ -116,44 +177,40 @@ export default function RoadsterOrbitViewer({ roadsterData }: RoadsterOrbitViewe
       ctx.textAlign = 'left';
       ctx.fillText('♦️ Mars', marsX + 15, marsY + 5);
 
-      // Draw Roadster's orbit if trajectory exists
-      if (roadsterData.trajectory && roadsterData.trajectory.length > 1) {
-        console.log('✅ Drawing roadster trajectory with', roadsterData.trajectory.length, 'points');
+      // Calculate and draw the CORRECT Roadster orbit
+      const orbitPoints = calculateOrbit(semiMajorAxis, eccentricity, 100);
+      
+      console.log('✅ Calculated roadster orbit with', orbitPoints.length, 'points');
+      console.log('📊 Orbit params: a=' + semiMajorAxis + ' AU, e=' + eccentricity);
+      
+      ctx.strokeStyle = '#fb923c'; // orange
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      
+      orbitPoints.forEach((point, i) => {
+        const x = centerX + point.x * scale;
+        const y = centerY + point.y * scale;
         
-        ctx.strokeStyle = '#fb923c'; // orange
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        
-        let started = false;
-        roadsterData.trajectory.forEach((point: any) => {
-          // Convert from millions of miles to AU
-          const x = centerX + (point.x * MILLION_MILES_TO_AU * scale);
-          const y = centerY + (point.y * MILLION_MILES_TO_AU * scale);
-          
-          if (!started) {
-            ctx.moveTo(x, y);
-            started = true;
-          } else {
-            ctx.lineTo(x, y);
-          }
-        });
-        
-        ctx.closePath();
-        ctx.stroke();
-      } else {
-        console.log('⚠️ No trajectory data available');
-      }
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      
+      ctx.closePath();
+      ctx.stroke();
 
-      // Draw Roadster's current position - CONVERT FROM MILLIONS OF MILES TO AU
-      const roadsterAU_X = roadsterData.position.x * MILLION_MILES_TO_AU;
-      const roadsterAU_Y = roadsterData.position.y * MILLION_MILES_TO_AU;
-      const roadsterX = centerX + (roadsterAU_X * scale);
-      const roadsterY = centerY + (roadsterAU_Y * scale);
+      // Calculate current position
+      const currentPos = calculateCurrentPosition(semiMajorAxis, eccentricity, daysSinceLaunch);
+      
+      const roadsterX = centerX + (currentPos.x * scale);
+      const roadsterY = centerY + (currentPos.y * scale);
       
       console.log('🚗 Roadster position:', { 
-        raw_millions_miles: roadsterData.position,
-        converted_AU: { x: roadsterAU_X, y: roadsterAU_Y },
-        screen: { x: roadsterX, y: roadsterY },
+        calculated_AU: { x: currentPos.x.toFixed(3), y: currentPos.y.toFixed(3), r: currentPos.r.toFixed(3) },
+        days_since_launch: daysSinceLaunch.toFixed(1),
+        screen: { x: roadsterX.toFixed(0), y: roadsterY.toFixed(0) },
         center: { x: centerX, y: centerY }
       });
       
@@ -186,7 +243,7 @@ export default function RoadsterOrbitViewer({ roadsterData }: RoadsterOrbitViewe
 
       // Draw info overlay
       ctx.fillStyle = 'rgba(15, 23, 42, 0.8)'; // slate-900 with transparency
-      ctx.fillRect(10, 10, 280, 80);
+      ctx.fillRect(10, 10, 320, 100);
       
       ctx.fillStyle = '#94a3b8'; // slate-400
       ctx.font = '12px monospace';
@@ -205,6 +262,11 @@ export default function RoadsterOrbitViewer({ roadsterData }: RoadsterOrbitViewe
         `Speed: ${roadsterData.speed_kph.toLocaleString()} km/h`,
         20,
         70
+      );
+      ctx.fillText(
+        `Distance from Sun: ${currentPos.r.toFixed(3)} AU`,
+        20,
+        90
       );
     };
 
