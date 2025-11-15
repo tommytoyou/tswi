@@ -15,6 +15,8 @@ export default function RoadsterOrbitViewer({ roadsterData }: RoadsterOrbitViewe
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    console.log('🎨 Drawing orbit with data:', roadsterData);
+
     // Set canvas size
     const updateSize = () => {
       const rect = canvas.getBoundingClientRect();
@@ -28,7 +30,7 @@ export default function RoadsterOrbitViewer({ roadsterData }: RoadsterOrbitViewe
       const rect = canvas.getBoundingClientRect();
       const centerX = rect.width / 2;
       const centerY = rect.height / 2;
-      const scale = Math.min(rect.width, rect.height) / 4; // Scale factor for AU
+      const scale = Math.min(rect.width, rect.height) / 3.5; // Scale factor for AU
 
       // Clear canvas
       ctx.fillStyle = '#0f172a'; // slate-900
@@ -36,68 +38,97 @@ export default function RoadsterOrbitViewer({ roadsterData }: RoadsterOrbitViewe
 
       // Draw stars background
       ctx.fillStyle = '#ffffff';
-      for (let i = 0; i < 100; i++) {
+      for (let i = 0; i < 150; i++) {
         const x = Math.random() * rect.width;
         const y = Math.random() * rect.height;
-        const size = Math.random() * 1.5;
+        const size = Math.random() * 2;
+        ctx.globalAlpha = Math.random() * 0.8 + 0.2;
         ctx.fillRect(x, y, size, size);
       }
+      ctx.globalAlpha = 1;
 
       // Draw Sun at center
-      ctx.fillStyle = '#fbbf24'; // yellow-400
+      const sunGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 20);
+      sunGradient.addColorStop(0, '#fef08a');
+      sunGradient.addColorStop(0.5, '#fbbf24');
+      sunGradient.addColorStop(1, '#f59e0b');
+      ctx.fillStyle = sunGradient;
       ctx.beginPath();
-      ctx.arc(centerX, centerY, 15, 0, Math.PI * 2);
+      ctx.arc(centerX, centerY, 20, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '12px sans-serif';
-      ctx.fillText('☀️ Sun', centerX - 20, centerY + 30);
+      
+      // Sun label
+      ctx.fillStyle = '#fef3c7';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('☀️ Sun', centerX, centerY + 40);
 
       // Draw Earth's orbit (1 AU)
-      ctx.strokeStyle = '#3b82f6'; // blue-500
-      ctx.lineWidth = 1;
-      ctx.setLineDash([5, 5]);
+      ctx.strokeStyle = '#3b82f680'; // blue with transparency
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 4]);
       ctx.beginPath();
       ctx.arc(centerX, centerY, scale * 1, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
 
       // Draw Earth
+      const earthX = centerX + scale * 1;
+      const earthY = centerY;
       ctx.fillStyle = '#3b82f6';
       ctx.beginPath();
-      ctx.arc(centerX + scale * 1, centerY, 8, 0, Math.PI * 2);
+      ctx.arc(earthX, earthY, 10, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText('🌍 Earth', centerX + scale * 1 - 20, centerY + 20);
+      ctx.strokeStyle = '#60a5fa';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      ctx.fillStyle = '#dbeafe';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('🌍 Earth', earthX + 15, earthY + 5);
 
-      // Draw Mars orbit (~1.5 AU)
-      ctx.strokeStyle = '#ef4444'; // red-500
-      ctx.lineWidth = 1;
-      ctx.setLineDash([5, 5]);
+      // Draw Mars orbit (~1.52 AU)
+      ctx.strokeStyle = '#ef444480'; // red with transparency
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 4]);
       ctx.beginPath();
-      ctx.arc(centerX, centerY, scale * 1.5, 0, Math.PI * 2);
+      ctx.arc(centerX, centerY, scale * 1.52, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
 
       // Draw Mars
+      const marsX = centerX + scale * 1.52;
+      const marsY = centerY;
       ctx.fillStyle = '#ef4444';
       ctx.beginPath();
-      ctx.arc(centerX + scale * 1.5, centerY, 6, 0, Math.PI * 2);
+      ctx.arc(marsX, marsY, 8, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText('🔴 Mars', centerX + scale * 1.5 - 20, centerY + 20);
+      ctx.strokeStyle = '#f87171';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      ctx.fillStyle = '#fecaca';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('♦️ Mars', marsX + 15, marsY + 5);
 
-      // Draw Roadster's elliptical orbit
-      if (roadsterData.trajectory && roadsterData.trajectory.length > 0) {
-        ctx.strokeStyle = '#f97316'; // orange-500
-        ctx.lineWidth = 2;
+      // Draw Roadster's orbit if trajectory exists
+      if (roadsterData.trajectory && roadsterData.trajectory.length > 1) {
+        console.log('✅ Drawing roadster trajectory with', roadsterData.trajectory.length, 'points');
+        
+        ctx.strokeStyle = '#fb923c'; // orange
+        ctx.lineWidth = 3;
         ctx.beginPath();
         
-        roadsterData.trajectory.forEach((point: any, i: number) => {
+        let started = false;
+        roadsterData.trajectory.forEach((point: any) => {
           const x = centerX + point.x * scale;
           const y = centerY + point.y * scale;
           
-          if (i === 0) {
+          if (!started) {
             ctx.moveTo(x, y);
+            started = true;
           } else {
             ctx.lineTo(x, y);
           }
@@ -105,27 +136,54 @@ export default function RoadsterOrbitViewer({ roadsterData }: RoadsterOrbitViewe
         
         ctx.closePath();
         ctx.stroke();
+      } else {
+        console.log('⚠️ No trajectory data available');
       }
 
       // Draw Roadster's current position
-      const roadsterX = centerX + roadsterData.position.x * scale;
-      const roadsterY = centerY + roadsterData.position.y * scale;
+      const roadsterX = centerX + (roadsterData.position.x * scale);
+      const roadsterY = centerY + (roadsterData.position.y * scale);
       
+      console.log('🚗 Roadster position:', { 
+        raw: roadsterData.position, 
+        screen: { x: roadsterX, y: roadsterY },
+        center: { x: centerX, y: centerY }
+      });
+      
+      // Roadster glow effect
+      const roadsterGlow = ctx.createRadialGradient(roadsterX, roadsterY, 0, roadsterX, roadsterY, 20);
+      roadsterGlow.addColorStop(0, '#ef4444ff');
+      roadsterGlow.addColorStop(0.5, '#ef444480');
+      roadsterGlow.addColorStop(1, '#ef444400');
+      ctx.fillStyle = roadsterGlow;
+      ctx.beginPath();
+      ctx.arc(roadsterX, roadsterY, 20, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Roadster dot
       ctx.fillStyle = '#ef4444';
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(roadsterX, roadsterY, 10, 0, Math.PI * 2);
+      ctx.arc(roadsterX, roadsterY, 12, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
       
+      // Roadster label
       ctx.fillStyle = '#ffffff';
-      ctx.font = '14px sans-serif';
-      ctx.fillText('🚗 Roadster', roadsterX - 30, roadsterY - 15);
+      ctx.font = 'bold 15px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🚗', roadsterX, roadsterY - 20);
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText('Roadster', roadsterX, roadsterY - 35);
 
-      // Draw distance info
+      // Draw info overlay
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.8)'; // slate-900 with transparency
+      ctx.fillRect(10, 10, 280, 80);
+      
       ctx.fillStyle = '#94a3b8'; // slate-400
       ctx.font = '12px monospace';
+      ctx.textAlign = 'left';
       ctx.fillText(
         `Distance from Earth: ${(roadsterData.earth_distance_km / 1000000).toFixed(2)} M km`,
         20,
