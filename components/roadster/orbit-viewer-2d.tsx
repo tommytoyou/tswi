@@ -183,7 +183,7 @@ export default function RoadsterOrbitViewer({ roadsterData }: RoadsterOrbitViewe
       console.log('✅ Calculated roadster orbit with', orbitPoints.length, 'points');
       console.log('📊 Orbit params: a=' + semiMajorAxis + ' AU, e=' + eccentricity);
       
-      ctx.strokeStyle = '#ea580c80'; // burnt orange with transparency (matches planet style)
+      ctx.strokeStyle = '#4ade8080'; // light green with transparency
       ctx.lineWidth = 2;
       ctx.setLineDash([8, 4]); // Dashed like Earth and Mars
       ctx.beginPath();
