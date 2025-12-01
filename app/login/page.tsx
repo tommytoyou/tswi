@@ -115,13 +115,6 @@ export default function LoginPage() {
             >
               {isLoading ? 'Signing in...' : 'Sign In'}
             </Button>
-
-            <div className="pt-4 text-center text-sm text-slate-500 border-t border-slate-700">
-              <p>Demo Credentials:</p>
-              <p className="text-slate-400 font-mono text-xs mt-1">
-                multiplanetary / Space2034!
-              </p>
-            </div>
           </form>
         </CardContent>
       </Card>
