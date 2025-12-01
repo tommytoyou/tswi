@@ -64,7 +64,7 @@ export default function LoginPage() {
           <div className="space-y-2 text-center">
             <CardTitle className="text-2xl font-bold text-white">Welcome to TSWI</CardTitle>
             <CardDescription className="text-slate-400">
-              Terrestrial Space Weather Intelligence
+              Tactical Space Weather Intelligence
             </CardDescription>
           </div>
         </CardHeader>
