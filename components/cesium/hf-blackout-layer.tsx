@@ -21,6 +21,8 @@ interface FluxResponse {
 }
 
 // Flare class thresholds and display settings
+// Only M-class and above cause significant HF radio blackouts
+// C-class (R0) does not cause significant blackouts - no overlay shown
 const FLARE_CONFIG = {
   'X-class': {
     color: { r: 255, g: 50, b: 50 },
@@ -35,13 +37,6 @@ const FLARE_CONFIG = {
     label: 'Moderate Blackout',
     description: 'HF Radio degraded on sunlit side',
     severity: 'R1-R2',
-  },
-  'C-class': {
-    color: { r: 255, g: 220, b: 50 },
-    alpha: 0.15,
-    label: 'Minor Degradation',
-    description: 'Minor HF Radio degradation possible',
-    severity: 'R0',
   },
 };
 
@@ -319,12 +314,11 @@ export function HfBlackoutLayer({ viewer, Cesium, visible = true }: HfBlackoutLa
                     className="flex-1 h-3 rounded-sm"
                     style={{
                       background:
-                        'linear-gradient(to right, rgb(255,220,50) 0%, rgb(255,150,50) 50%, rgb(255,50,50) 100%)',
+                        'linear-gradient(to right, rgb(255,150,50) 0%, rgb(255,50,50) 100%)',
                     }}
                   />
                 </div>
                 <div className="flex justify-between text-xs text-slate-500">
-                  <span>C</span>
                   <span>M</span>
                   <span>X</span>
                 </div>

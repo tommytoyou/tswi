@@ -115,13 +115,17 @@ export async function GET(request: NextRequest) {
 
 /**
  * Convert X-ray flux to flare classification
- * Based on NOAA Space Weather Scales
+ * Based on NOAA Space Weather Scales:
+ * - X-class: >= 1e-4 W/m² (R3-R5 radio blackouts)
+ * - M-class: >= 1e-5 W/m² (R1-R2 radio blackouts)
+ * - C-class: >= 1e-6 W/m² (R0 - minor degradation, no significant blackout)
+ * - B-class: >= 1e-7 W/m² (background)
+ * - A-class: < 1e-7 W/m² (background)
  */
 function getFlareClass(flux: number): string {
-  if (flux >= 1e-4) return 'X-class'; // X10+
-  if (flux >= 1e-5) return 'X-class';
-  if (flux >= 1e-6) return 'M-class';
-  if (flux >= 1e-7) return 'C-class';
-  if (flux >= 1e-8) return 'B-class';
+  if (flux >= 1e-4) return 'X-class';
+  if (flux >= 1e-5) return 'M-class';
+  if (flux >= 1e-6) return 'C-class';
+  if (flux >= 1e-7) return 'B-class';
   return 'A-class';
 }
