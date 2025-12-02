@@ -55,9 +55,6 @@ export default function TopNav() {
           <Link href="/aurora" className="text-sm hover:underline">
             Aurora
           </Link>
-          <Link href="/roadster" className="text-sm hover:underline">
-            Roadster
-          </Link>
           <Link href="/agent" className="text-sm hover:underline flex items-center gap-1">
             <span>🤖</span> Agent
           </Link>
