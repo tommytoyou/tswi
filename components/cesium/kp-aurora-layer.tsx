@@ -51,6 +51,7 @@ export function KpAuroraLayer({ viewer, Cesium }: KpAuroraLayerProps) {
   }, []);
 
   // Create aurora oval band at specified latitude for both hemispheres
+  // Uses Cesium's built-in ellipse entities to avoid polygon coordinate issues
   const createAuroraBand = useCallback(
     (latitude: number, color: { r: number; g: number; b: number }, isActive: boolean) => {
       if (!viewer || !Cesium) return [];
@@ -59,32 +60,20 @@ export function KpAuroraLayer({ viewer, Cesium }: KpAuroraLayerProps) {
       const alpha = isActive ? 0.4 : 0.15;
       const bandWidth = isActive ? 5 : 3; // degrees
 
-      // Create positions for an ellipse/oval shape
-      // The aurora oval is not a perfect circle - it's offset toward the night side
-      const createOvalPositions = (centerLat: number, hemisphere: 'north' | 'south') => {
-        const positions: any[] = [];
-        const latSign = hemisphere === 'north' ? 1 : -1;
-        const baseLat = centerLat * latSign;
+      // Calculate ellipse radii from latitude
+      // The aurora band extends from the pole down to the specified latitude
+      // Semi-major axis = distance from pole to aurora latitude
+      const earthRadius = 6371000; // meters
+      const poleToAuroraDistance = (90 - latitude) * (Math.PI / 180) * earthRadius;
+      const innerDistance = (90 - latitude - bandWidth) * (Math.PI / 180) * earthRadius;
 
-        // Create a slightly elliptical shape offset toward night side
-        for (let lon = 0; lon <= 360; lon += 5) {
-          // Vary latitude slightly to create oval effect (wider on night side)
-          const lonRad = Cesium.Math.toRadians(lon);
-          const latOffset = Math.sin(lonRad) * 3; // 3 degree variation
-          const lat = baseLat + latOffset * latSign;
-
-          positions.push(Cesium.Cartesian3.fromDegrees(lon - 180, lat));
-        }
-
-        return positions;
-      };
-
-      // Northern hemisphere aurora band
-      const northPositions = createOvalPositions(latitude, 'north');
+      // Northern hemisphere aurora band (centered at North Pole)
       const northEntity = viewer.entities.add({
         name: `Aurora Band ${latitude}°N`,
-        polygon: {
-          hierarchy: new Cesium.PolygonHierarchy(northPositions),
+        position: Cesium.Cartesian3.fromDegrees(0, 90, 100000),
+        ellipse: {
+          semiMajorAxis: poleToAuroraDistance,
+          semiMinorAxis: poleToAuroraDistance * 0.85, // Slightly elliptical for aurora oval effect
           material: new Cesium.ColorMaterialProperty(
             new Cesium.Color(color.r / 255, color.g / 255, color.b / 255, alpha)
           ),
@@ -92,33 +81,39 @@ export function KpAuroraLayer({ viewer, Cesium }: KpAuroraLayerProps) {
           outlineColor: new Cesium.Color(color.r / 255, color.g / 255, color.b / 255, alpha + 0.2),
           outlineWidth: 1,
           height: 100000, // 100km altitude (ionosphere)
-          extrudedHeight: 100000 + bandWidth * 20000, // Band thickness
+          granularity: Cesium.Math.toRadians(1), // Smooth rendering
         },
       });
       entities.push(northEntity);
 
-      // Create inner edge polygon for band effect (northern)
-      const innerNorthPositions = createOvalPositions(latitude + bandWidth, 'north');
-      const northInnerEntity = viewer.entities.add({
-        name: `Aurora Band Inner ${latitude}°N`,
-        polyline: {
-          positions: innerNorthPositions,
-          width: 2,
-          material: new Cesium.PolylineGlowMaterialProperty({
-            glowPower: 0.3,
-            color: new Cesium.Color(color.r / 255, color.g / 255, color.b / 255, alpha + 0.3),
-          }),
-          clampToGround: false,
-        },
-      });
-      entities.push(northInnerEntity);
+      // Inner edge for band effect (northern) - creates the ring/band appearance
+      if (innerDistance > 0) {
+        const northInnerEntity = viewer.entities.add({
+          name: `Aurora Band Inner ${latitude}°N`,
+          position: Cesium.Cartesian3.fromDegrees(0, 90, 100000),
+          ellipse: {
+            semiMajorAxis: innerDistance,
+            semiMinorAxis: innerDistance * 0.85,
+            material: new Cesium.ColorMaterialProperty(
+              new Cesium.Color(0, 0, 0, 0) // Transparent to cut out the inner portion
+            ),
+            outline: true,
+            outlineColor: new Cesium.Color(color.r / 255, color.g / 255, color.b / 255, alpha + 0.3),
+            outlineWidth: 2,
+            height: 100000,
+            granularity: Cesium.Math.toRadians(1),
+          },
+        });
+        entities.push(northInnerEntity);
+      }
 
-      // Southern hemisphere aurora band
-      const southPositions = createOvalPositions(latitude, 'south');
+      // Southern hemisphere aurora band (centered at South Pole)
       const southEntity = viewer.entities.add({
         name: `Aurora Band ${latitude}°S`,
-        polygon: {
-          hierarchy: new Cesium.PolygonHierarchy(southPositions),
+        position: Cesium.Cartesian3.fromDegrees(0, -90, 100000),
+        ellipse: {
+          semiMajorAxis: poleToAuroraDistance,
+          semiMinorAxis: poleToAuroraDistance * 0.85,
           material: new Cesium.ColorMaterialProperty(
             new Cesium.Color(color.r / 255, color.g / 255, color.b / 255, alpha)
           ),
@@ -126,26 +121,31 @@ export function KpAuroraLayer({ viewer, Cesium }: KpAuroraLayerProps) {
           outlineColor: new Cesium.Color(color.r / 255, color.g / 255, color.b / 255, alpha + 0.2),
           outlineWidth: 1,
           height: 100000,
-          extrudedHeight: 100000 + bandWidth * 20000,
+          granularity: Cesium.Math.toRadians(1),
         },
       });
       entities.push(southEntity);
 
-      // Create inner edge polygon for band effect (southern)
-      const innerSouthPositions = createOvalPositions(latitude + bandWidth, 'south');
-      const southInnerEntity = viewer.entities.add({
-        name: `Aurora Band Inner ${latitude}°S`,
-        polyline: {
-          positions: innerSouthPositions,
-          width: 2,
-          material: new Cesium.PolylineGlowMaterialProperty({
-            glowPower: 0.3,
-            color: new Cesium.Color(color.r / 255, color.g / 255, color.b / 255, alpha + 0.3),
-          }),
-          clampToGround: false,
-        },
-      });
-      entities.push(southInnerEntity);
+      // Inner edge for band effect (southern)
+      if (innerDistance > 0) {
+        const southInnerEntity = viewer.entities.add({
+          name: `Aurora Band Inner ${latitude}°S`,
+          position: Cesium.Cartesian3.fromDegrees(0, -90, 100000),
+          ellipse: {
+            semiMajorAxis: innerDistance,
+            semiMinorAxis: innerDistance * 0.85,
+            material: new Cesium.ColorMaterialProperty(
+              new Cesium.Color(0, 0, 0, 0)
+            ),
+            outline: true,
+            outlineColor: new Cesium.Color(color.r / 255, color.g / 255, color.b / 255, alpha + 0.3),
+            outlineWidth: 2,
+            height: 100000,
+            granularity: Cesium.Math.toRadians(1),
+          },
+        });
+        entities.push(southInnerEntity);
+      }
 
       return entities;
     },
