@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { config } from '@/lib/config';
 import dynamic from 'next/dynamic';
 import { KpAuroraLayer } from './kp-aurora-layer';
+import { HfBlackoutLayer } from './hf-blackout-layer';
 
 function GlobeViewerComponent() {
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -11,6 +12,8 @@ function GlobeViewerComponent() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [cesiumReady, setCesiumReady] = useState(false);
+  const [showHfBlackout, setShowHfBlackout] = useState(true);
+  const [showAurora, setShowAurora] = useState(true);
 
   useEffect(() => {
     if (!viewerRef.current || cesiumViewerRef.current) return;
@@ -116,10 +119,48 @@ function GlobeViewerComponent() {
         </div>
       )}
       <div ref={viewerRef} className="w-full h-full" />
-      {cesiumReady && cesiumViewerRef.current && cesiumModuleRef.current && (
+
+      {/* Map Layers Panel */}
+      {cesiumReady && (
+        <div className="absolute bottom-4 left-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3 min-w-[180px]">
+          <div className="text-sm font-semibold text-white mb-2">Map Layers</div>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showAurora}
+                onChange={(e) => setShowAurora(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-green-500 focus:ring-green-500 focus:ring-offset-0"
+              />
+              <span className="text-sm text-slate-300">Aurora Forecast</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showHfBlackout}
+                onChange={(e) => setShowHfBlackout(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-yellow-500 focus:ring-yellow-500 focus:ring-offset-0"
+              />
+              <span className="text-sm text-slate-300">HF Blackout</span>
+            </label>
+          </div>
+        </div>
+      )}
+
+      {/* Aurora Layer */}
+      {cesiumReady && cesiumViewerRef.current && cesiumModuleRef.current && showAurora && (
         <KpAuroraLayer
           viewer={cesiumViewerRef.current}
           Cesium={cesiumModuleRef.current}
+        />
+      )}
+
+      {/* HF Blackout Layer */}
+      {cesiumReady && cesiumViewerRef.current && cesiumModuleRef.current && (
+        <HfBlackoutLayer
+          viewer={cesiumViewerRef.current}
+          Cesium={cesiumModuleRef.current}
+          visible={showHfBlackout}
         />
       )}
     </div>
