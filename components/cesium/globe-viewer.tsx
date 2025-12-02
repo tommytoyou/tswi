@@ -1,11 +1,12 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { config } from '@/lib/config';
 import dynamic from 'next/dynamic';
 import { KpAuroraLayer } from './kp-aurora-layer';
 import { HfBlackoutLayer } from './hf-blackout-layer';
 import { TecLayer } from './tec-layer';
 import { SatelliteLayer } from './satellite-layer';
+import { VulnerabilityLayer } from './vulnerability-layer';
 
 function GlobeViewerComponent() {
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -18,6 +19,30 @@ function GlobeViewerComponent() {
   const [showAurora, setShowAurora] = useState(true);
   const [showTec, setShowTec] = useState(false);
   const [showSatellites, setShowSatellites] = useState(true);
+  const [showRadiationZones, setShowRadiationZones] = useState(true);
+  const [kpValue, setKpValue] = useState<number>(0);
+
+  // Fetch Kp index for radiation zone calculations
+  const fetchKpIndex = useCallback(async () => {
+    try {
+      const response = await fetch('/api/noaa/kp-index');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.latest) {
+          setKpValue(data.latest.kp || data.latest.kp_index || 0);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch Kp index:', err);
+    }
+  }, []);
+
+  // Fetch Kp on mount and periodically
+  useEffect(() => {
+    fetchKpIndex();
+    const interval = setInterval(fetchKpIndex, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [fetchKpIndex]);
 
   useEffect(() => {
     if (!viewerRef.current || cesiumViewerRef.current) return;
@@ -165,6 +190,15 @@ function GlobeViewerComponent() {
               />
               <span className="text-sm text-slate-300">Satellites</span>
             </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showRadiationZones}
+                onChange={(e) => setShowRadiationZones(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-red-500 focus:ring-red-500 focus:ring-offset-0"
+              />
+              <span className="text-sm text-slate-300">Radiation Zones</span>
+            </label>
           </div>
         </div>
       )}
@@ -201,6 +235,16 @@ function GlobeViewerComponent() {
           viewer={cesiumViewerRef.current}
           Cesium={cesiumModuleRef.current}
           visible={showSatellites}
+          kpValue={kpValue}
+        />
+      )}
+
+      {/* Vulnerability/Radiation Zones Layer */}
+      {cesiumReady && cesiumViewerRef.current && cesiumModuleRef.current && (
+        <VulnerabilityLayer
+          viewer={cesiumViewerRef.current}
+          Cesium={cesiumModuleRef.current}
+          visible={showRadiationZones}
         />
       )}
     </div>

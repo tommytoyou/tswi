@@ -2,11 +2,14 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import * as satellite from 'satellite.js';
+import { checkRadiationZone } from './vulnerability-layer';
 
 interface SatelliteLayerProps {
   viewer: any; // Cesium.Viewer
   Cesium: any; // Cesium module
   visible?: boolean;
+  kpValue?: number;
+  onDangerStatus?: (inDanger: number, zones: Map<string, string[]>) => void;
 }
 
 interface TLEData {
@@ -26,6 +29,9 @@ interface SatellitePosition {
   altitude: number; // km
   velocity: number; // km/s
   satrec: satellite.SatRec;
+  inDanger?: boolean;
+  dangerZone?: string | null;
+  dangerIntensity?: number;
 }
 
 interface SatellitesResponse {
@@ -107,7 +113,10 @@ function generateOrbitPath(
   return points;
 }
 
-export function SatelliteLayer({ viewer, Cesium, visible = true }: SatelliteLayerProps) {
+// Warning color for satellites in radiation zones
+const DANGER_COLOR = { r: 255, g: 50, b: 50 }; // Red
+
+export function SatelliteLayer({ viewer, Cesium, visible = true, kpValue = 0, onDangerStatus }: SatelliteLayerProps) {
   const [satellites, setSatellites] = useState<SatellitePosition[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -145,6 +154,7 @@ export function SatelliteLayer({ viewer, Cesium, visible = true }: SatelliteLaye
 
           const pos = calculatePosition(satrec, now);
           if (pos) {
+            const radiationCheck = checkRadiationZone(pos.latitude, pos.longitude, kpValue);
             positions.push({
               name: sat.name,
               noradId: sat.noradId,
@@ -154,6 +164,9 @@ export function SatelliteLayer({ viewer, Cesium, visible = true }: SatelliteLaye
               altitude: pos.altitude,
               velocity: pos.velocity,
               satrec,
+              inDanger: radiationCheck.inDanger,
+              dangerZone: radiationCheck.zone,
+              dangerIntensity: radiationCheck.intensity,
             });
           }
         } catch (e) {
@@ -184,12 +197,16 @@ export function SatelliteLayer({ viewer, Cesium, visible = true }: SatelliteLaye
       if (satrec) {
         const pos = calculatePosition(satrec, now);
         if (pos) {
+          const radiationCheck = checkRadiationZone(pos.latitude, pos.longitude, kpValue);
           newPositions.push({
             ...sat,
             latitude: pos.latitude,
             longitude: pos.longitude,
             altitude: pos.altitude,
             velocity: pos.velocity,
+            inDanger: radiationCheck.inDanger,
+            dangerZone: radiationCheck.zone,
+            dangerIntensity: radiationCheck.intensity,
           });
         }
       }
@@ -198,7 +215,7 @@ export function SatelliteLayer({ viewer, Cesium, visible = true }: SatelliteLaye
     if (newPositions.length > 0) {
       setSatellites(newPositions);
     }
-  }, [satellites]);
+  }, [satellites, kpValue]);
 
   // Render satellites on the globe
   useEffect(() => {
@@ -245,8 +262,15 @@ export function SatelliteLayer({ viewer, Cesium, visible = true }: SatelliteLaye
 
     // Add satellite entities
     satellites.forEach(sat => {
-      const color = SATELLITE_COLORS[sat.type];
-      const cesiumColor = new Cesium.Color(color.r / 255, color.g / 255, color.b / 255, 1.0);
+      // Use danger color if satellite is in a radiation zone
+      const baseColor = sat.inDanger ? DANGER_COLOR : SATELLITE_COLORS[sat.type];
+      const cesiumColor = new Cesium.Color(baseColor.r / 255, baseColor.g / 255, baseColor.b / 255, 1.0);
+
+      // Build label text - add danger zone indicator
+      let labelText = sat.name;
+      if (sat.inDanger && sat.dangerZone) {
+        labelText = `⚠️ ${sat.name}\n[${sat.dangerZone === 'SAA' ? 'In SAA' : 'High Radiation'}]`;
+      }
 
       // Create satellite point
       const entity = viewer.entities.add({
@@ -257,16 +281,16 @@ export function SatelliteLayer({ viewer, Cesium, visible = true }: SatelliteLaye
           sat.altitude * 1000 // Convert km to meters
         ),
         point: {
-          pixelSize: sat.type === 'station' ? 12 : 8,
+          pixelSize: sat.inDanger ? 14 : (sat.type === 'station' ? 12 : 8),
           color: cesiumColor,
-          outlineColor: Cesium.Color.WHITE,
-          outlineWidth: 2,
+          outlineColor: sat.inDanger ? Cesium.Color.YELLOW : Cesium.Color.WHITE,
+          outlineWidth: sat.inDanger ? 3 : 2,
           scaleByDistance: new Cesium.NearFarScalar(1e6, 1.5, 1e8, 0.5),
         },
         label: {
-          text: sat.name,
-          font: '12px sans-serif',
-          fillColor: Cesium.Color.WHITE,
+          text: labelText,
+          font: sat.inDanger ? '13px sans-serif' : '12px sans-serif',
+          fillColor: sat.inDanger ? Cesium.Color.YELLOW : Cesium.Color.WHITE,
           outlineColor: Cesium.Color.BLACK,
           outlineWidth: 2,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
@@ -280,6 +304,8 @@ export function SatelliteLayer({ viewer, Cesium, visible = true }: SatelliteLaye
           type: sat.type,
           altitude: sat.altitude,
           velocity: sat.velocity,
+          inDanger: sat.inDanger,
+          dangerZone: sat.dangerZone,
         },
       });
 
@@ -303,7 +329,7 @@ export function SatelliteLayer({ viewer, Cesium, visible = true }: SatelliteLaye
             polyline: {
               positions,
               width: 1.5,
-              material: new Cesium.Color(color.r / 255, color.g / 255, color.b / 255, 0.4),
+              material: new Cesium.Color(baseColor.r / 255, baseColor.g / 255, baseColor.b / 255, 0.4),
               clampToGround: false,
             },
           });
@@ -419,6 +445,32 @@ export function SatelliteLayer({ viewer, Cesium, visible = true }: SatelliteLaye
               Tracking {satellites.length} satellites
             </div>
 
+            {/* Danger Status */}
+            {(() => {
+              const dangerSats = satellites.filter(s => s.inDanger);
+              const inSAA = dangerSats.filter(s => s.dangerZone === 'SAA').length;
+              const inPolar = dangerSats.length - inSAA;
+
+              if (dangerSats.length > 0) {
+                return (
+                  <div className="bg-red-900/50 border border-red-600 rounded px-2 py-1.5 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-red-400 text-lg">⚠️</span>
+                      <span className="text-xs text-red-300 font-medium">
+                        {dangerSats.length} in radiation zones
+                      </span>
+                    </div>
+                    <div className="text-xs text-red-400 mt-1">
+                      {inSAA > 0 && <span>SAA: {inSAA}</span>}
+                      {inSAA > 0 && inPolar > 0 && <span> • </span>}
+                      {inPolar > 0 && <span>Polar: {inPolar}</span>}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             {/* Type Legend */}
             <div className="space-y-1.5">
               {Object.entries(SATELLITE_COLORS).map(([type, color]) => {
@@ -436,6 +488,16 @@ export function SatelliteLayer({ viewer, Cesium, visible = true }: SatelliteLaye
                   </div>
                 );
               })}
+              {/* Danger indicator in legend */}
+              {satellites.some(s => s.inDanger) && (
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: `rgb(${DANGER_COLOR.r}, ${DANGER_COLOR.g}, ${DANGER_COLOR.b})` }}
+                  />
+                  <span className="text-xs text-slate-300">In Radiation Zone</span>
+                </div>
+              )}
             </div>
 
             <div className="mt-3 pt-2 border-t border-slate-700">
@@ -447,10 +509,13 @@ export function SatelliteLayer({ viewer, Cesium, visible = true }: SatelliteLaye
 
       {/* Selected Satellite Details */}
       {selectedSatellite && (
-        <div className="absolute bottom-20 right-4 z-20 bg-slate-900/95 backdrop-blur-sm rounded-lg border border-slate-700 p-4 min-w-[240px]">
+        <div className={`absolute bottom-20 right-4 z-20 bg-slate-900/95 backdrop-blur-sm rounded-lg border ${selectedSatellite.inDanger ? 'border-red-600' : 'border-slate-700'} p-4 min-w-[240px]`}>
           <div className="flex justify-between items-start mb-3">
             <div>
-              <h3 className="text-sm font-bold text-white">{selectedSatellite.name}</h3>
+              <h3 className="text-sm font-bold text-white">
+                {selectedSatellite.inDanger && <span className="text-red-400">⚠️ </span>}
+                {selectedSatellite.name}
+              </h3>
               <p className="text-xs text-slate-400">
                 {getTypeLabel(selectedSatellite.type)} • NORAD {selectedSatellite.noradId}
               </p>
@@ -462,6 +527,18 @@ export function SatelliteLayer({ viewer, Cesium, visible = true }: SatelliteLaye
               ×
             </button>
           </div>
+
+          {/* Radiation Warning */}
+          {selectedSatellite.inDanger && selectedSatellite.dangerZone && (
+            <div className="bg-red-900/50 border border-red-600 rounded px-2 py-1.5 mb-3">
+              <div className="text-xs text-red-300 font-medium">
+                {selectedSatellite.dangerZone === 'SAA' ? 'In South Atlantic Anomaly' : `In ${selectedSatellite.dangerZone} Radiation`}
+              </div>
+              <div className="text-xs text-red-400">
+                Radiation intensity: {((selectedSatellite.dangerIntensity || 0) * 100).toFixed(0)}%
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
@@ -486,6 +563,12 @@ export function SatelliteLayer({ viewer, Cesium, visible = true }: SatelliteLaye
               <span className="text-slate-400">Longitude</span>
               <span className="text-white font-mono">
                 {selectedSatellite.longitude.toFixed(4)}°
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">Radiation Status</span>
+              <span className={`font-mono ${selectedSatellite.inDanger ? 'text-red-400' : 'text-green-400'}`}>
+                {selectedSatellite.inDanger ? 'EXPOSED' : 'Safe'}
               </span>
             </div>
           </div>
