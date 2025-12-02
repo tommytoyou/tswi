@@ -24,7 +24,8 @@
       "Bash(python3:*)",
       "Bash(lsof:*)",
       "Bash(ss:*)",
-      "Bash(netstat:*)"
+      "Bash(netstat:*)",
+      "WebFetch(domain:services.swpc.noaa.gov)"
     ],
     "deny": [],
     "ask": []

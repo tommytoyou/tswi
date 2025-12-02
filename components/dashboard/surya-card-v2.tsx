@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Brain } from 'lucide-react';
+import { Brain, Activity, Sun, AlertCircle, Info } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, Legend } from 'recharts';
-import { format, addMinutes } from 'date-fns';
+import { format } from 'date-fns';
 import { CardSkeleton } from './card-skeleton';
 import { chartColors, chartTheme, riskColors } from '@/lib/design-system';
 
@@ -20,17 +20,30 @@ interface Prediction {
   confidence: number;
 }
 
+interface SuryaMetadata {
+  noaa_forecast_date?: string;
+  current_xray_flux?: number | null;
+  active_regions_count?: number;
+  complex_regions?: number;
+  data_sources?: string[];
+  data_points_used?: number;
+  processing_time_ms?: number;
+}
+
 interface SuryaData {
   model: string;
+  model_type: string;
   prediction_time: string;
   predictions: Prediction[];
   source: string;
+  metadata?: SuryaMetadata;
 }
 
 export function SuryaCardV2() {
   const [data, setData] = useState<SuryaData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
@@ -41,6 +54,7 @@ export function SuryaCardV2() {
 
       if (result.success && result.data) {
         setData(result.data);
+        setWarning(result.warning || null);
       } else {
         throw new Error('Invalid data format');
       }
@@ -65,8 +79,8 @@ export function SuryaCardV2() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Sparkles className="h-4 w-4" />
-            Surya AI Flare Predictions
+            <Brain className="h-4 w-4" />
+            Solar Flare Predictions
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -99,7 +113,28 @@ export function SuryaCardV2() {
     xClass: Math.max(0, p.class_probabilities.X * 100),
   }));
 
-  const isRealModel = data.source !== 'mock-prediction' && data.source !== 'statistical-fallback';
+  // Determine model badge info
+  const getModelBadge = () => {
+    switch (data.source) {
+      case 'noaa-swpc-enhanced':
+        return { label: 'NOAA SWPC', color: 'text-green-400 border-green-500/30' };
+      case 'statistical-fallback':
+        return { label: 'Statistical', color: 'text-yellow-400 border-yellow-500/30' };
+      case 'mock-prediction':
+        return { label: 'Mock Data', color: 'text-slate-400 border-slate-500/30' };
+      default:
+        return { label: data.model, color: 'text-purple-400 border-purple-500/30' };
+    }
+  };
+
+  const modelBadge = getModelBadge();
+  const isRealData = data.source === 'noaa-swpc-enhanced';
+
+  // Format X-ray flux for display
+  const formatXRayFlux = (flux: number | null | undefined) => {
+    if (flux === null || flux === undefined) return 'N/A';
+    return flux.toExponential(2) + ' W/m²';
+  };
 
   return (
     <Card className="border-slate-800 bg-slate-900/50 lg:col-span-2">
@@ -107,21 +142,27 @@ export function SuryaCardV2() {
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <Brain className="h-4 w-4 text-purple-400" />
-            Surya AI Flare Predictions
+            Solar Flare Predictions
           </CardTitle>
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-purple-400 border-purple-500/30">
-              {isRealModel ? 'NASA/IBM Surya' : 'Statistical Model'}
+            <Badge variant="outline" className={modelBadge.color}>
+              {modelBadge.label}
             </Badge>
             <Badge className={riskColor.badge}>
               {riskLevel} RISK
             </Badge>
           </div>
         </div>
+        {warning && (
+          <div className="flex items-center gap-2 text-xs text-yellow-400/80 mt-2">
+            <AlertCircle className="h-3 w-3" />
+            <span>{warning}</span>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Key Metrics */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <div className="space-y-1">
             <div className="text-xs text-slate-400">Max Probability</div>
             <div className="text-2xl font-bold font-mono" style={{ color: riskColor.chart }}>
@@ -131,7 +172,7 @@ export function SuryaCardV2() {
           </div>
 
           <div className="space-y-1">
-            <div className="text-xs text-slate-400">Avg Confidence</div>
+            <div className="text-xs text-slate-400">Confidence</div>
             <div className="text-2xl font-bold font-mono text-blue-400">
               {(avgConfidence * 100).toFixed(0)}%
             </div>
@@ -143,9 +184,39 @@ export function SuryaCardV2() {
             <div className="text-2xl font-bold font-mono text-yellow-400">
               {data.predictions[0].class_probabilities.C > data.predictions[0].class_probabilities.M ? 'C' : 'M'}
             </div>
-            <div className="text-xs text-slate-500">Expected flare type</div>
+            <div className="text-xs text-slate-500">Expected type</div>
+          </div>
+
+          <div className="space-y-1">
+            <div className="text-xs text-slate-400">Active Regions</div>
+            <div className="text-2xl font-bold font-mono text-orange-400">
+              {data.metadata?.active_regions_count ?? '-'}
+            </div>
+            <div className="text-xs text-slate-500">
+              {data.metadata?.complex_regions ? `${data.metadata.complex_regions} complex` : 'On sun'}
+            </div>
           </div>
         </div>
+
+        {/* Real-time data indicators */}
+        {isRealData && data.metadata && (
+          <div className="flex flex-wrap gap-3 text-xs">
+            {data.metadata.current_xray_flux !== null && data.metadata.current_xray_flux !== undefined && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-slate-800/50 rounded">
+                <Activity className="h-3 w-3 text-red-400" />
+                <span className="text-slate-400">X-ray:</span>
+                <span className="text-slate-300 font-mono">{formatXRayFlux(data.metadata.current_xray_flux)}</span>
+              </div>
+            )}
+            {data.metadata.noaa_forecast_date && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-slate-800/50 rounded">
+                <Sun className="h-3 w-3 text-yellow-400" />
+                <span className="text-slate-400">NOAA:</span>
+                <span className="text-slate-300">{data.metadata.noaa_forecast_date}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Prediction Timeline - Flare Probability */}
         <div className="space-y-2">
@@ -267,11 +338,22 @@ export function SuryaCardV2() {
 
         {/* Footer Info */}
         <div className="flex justify-between items-center text-xs">
-          <div className="text-slate-500">
-            Model: {data.model} • 2-hour forecast window
+          <div className="text-slate-500 flex items-center gap-1">
+            <Info className="h-3 w-3" />
+            <span>{data.model}</span>
+            {data.metadata?.data_sources && (
+              <span className="text-slate-600">
+                ({data.metadata.data_sources.length} sources)
+              </span>
+            )}
           </div>
           <div className="text-slate-400">
             {format(new Date(data.prediction_time), 'HH:mm:ss')} UTC
+            {data.metadata?.processing_time_ms !== undefined && (
+              <span className="text-slate-600 ml-2">
+                ({data.metadata.processing_time_ms}ms)
+              </span>
+            )}
           </div>
         </div>
       </CardContent>

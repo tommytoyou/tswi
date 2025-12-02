@@ -3,19 +3,22 @@
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Brain, AlertCircle } from 'lucide-react';
 
 interface SuryaPrediction {
   riskLevel: string;
   confidence: number;
   prediction: string;
   timestamp: string;
+  source: string;
+  model: string;
 }
 
 export function SuryaPredictionCard() {
   const [data, setData] = useState<SuryaPrediction | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
@@ -41,7 +44,10 @@ export function SuryaPredictionCard() {
           confidence: avgConfidence,
           prediction: predictionText,
           timestamp: result.data.prediction_time || new Date().toISOString(),
+          source: result.data.source || 'unknown',
+          model: result.data.model || 'Unknown Model',
         });
+        setWarning(result.warning || null);
       } else {
         throw new Error('Invalid data format');
       }
@@ -65,13 +71,26 @@ export function SuryaPredictionCard() {
     return 'bg-green-500';
   };
 
+  const getSourceLabel = (source: string) => {
+    switch (source) {
+      case 'noaa-swpc-enhanced':
+        return 'NOAA SWPC';
+      case 'statistical-fallback':
+        return 'Statistical';
+      case 'mock-prediction':
+        return 'Mock';
+      default:
+        return source;
+    }
+  };
+
   if (loading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Sparkles className="h-4 w-4" />
-            Surya AI Predictions
+            <Brain className="h-4 w-4" />
+            Solar Flare Predictions
           </CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-32">
@@ -86,8 +105,8 @@ export function SuryaPredictionCard() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Sparkles className="h-4 w-4" />
-            Surya AI Predictions
+            <Brain className="h-4 w-4" />
+            Solar Flare Predictions
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -101,8 +120,8 @@ export function SuryaPredictionCard() {
     <Card>
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
-          <Sparkles className="h-4 w-4" />
-          Surya AI Predictions
+          <Brain className="h-4 w-4" />
+          Solar Flare Predictions
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -110,15 +129,24 @@ export function SuryaPredictionCard() {
           <Badge className={getRiskColor(data.riskLevel)}>
             {data.riskLevel} RISK
           </Badge>
+          <Badge variant="outline" className="text-slate-400 border-slate-600">
+            {getSourceLabel(data.source)}
+          </Badge>
           <span className="text-sm text-slate-400">
             {Math.round(data.confidence * 100)}% confidence
           </span>
         </div>
+        {warning && (
+          <div className="flex items-center gap-1 text-xs text-yellow-400/80">
+            <AlertCircle className="h-3 w-3" />
+            <span>{warning}</span>
+          </div>
+        )}
         <p className="text-sm text-slate-300 leading-relaxed">
           {data.prediction}
         </p>
         <div className="text-xs text-slate-500">
-          Generated: {new Date(data.timestamp).toLocaleString()}
+          {data.model} • {new Date(data.timestamp).toLocaleString()}
         </div>
       </CardContent>
     </Card>
