@@ -52,6 +52,9 @@ export default function TopNav() {
           <Link href="/map" className="text-sm hover:underline">
             Globe
           </Link>
+          <Link href="/aurora" className="text-sm hover:underline">
+            Aurora
+          </Link>
           <Link href="/roadster" className="text-sm hover:underline">
             Roadster
           </Link>
