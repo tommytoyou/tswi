@@ -352,3 +352,65 @@ export const WebSocketMessageSchema = z.object({
   timestamp: z.date(),
 });
 export type WebSocketMessage = z.infer<typeof WebSocketMessageSchema>;
+
+// ============================================================================
+// ALERT RULES ENGINE TYPES
+// ============================================================================
+
+// Available metrics for alert rules
+export const AlertMetricSchema = z.enum([
+  'kp_index',
+  'bz_value',
+  'solar_wind_speed',
+  'xray_flux',
+  'proton_flux',
+]);
+export type AlertMetric = z.infer<typeof AlertMetricSchema>;
+
+// Comparison operators
+export const AlertOperatorSchema = z.enum(['gt', 'gte', 'lt', 'lte', 'eq']);
+export type AlertOperator = z.infer<typeof AlertOperatorSchema>;
+
+// Severity levels
+export const AlertSeveritySchema = z.enum(['low', 'medium', 'high', 'critical']);
+export type AlertSeverity = z.infer<typeof AlertSeveritySchema>;
+
+// Single condition in a rule
+export const AlertRuleConditionSchema = z.object({
+  metric: AlertMetricSchema,
+  operator: AlertOperatorSchema,
+  value: z.number(),
+});
+export type AlertRuleCondition = z.infer<typeof AlertRuleConditionSchema>;
+
+// Alert Rule (stored in alert_rules collection)
+export const AlertRuleSchema = z.object({
+  _id: z.string().optional(),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  conditions: z.array(AlertRuleConditionSchema).min(1),
+  severity: AlertSeveritySchema,
+  enabled: z.boolean().default(true),
+  created_at: z.date(),
+  updated_at: z.date(),
+});
+export type AlertRule = z.infer<typeof AlertRuleSchema>;
+
+// Triggered Alert (stored in alert_history collection)
+export const TriggeredAlertSchema = z.object({
+  _id: z.string().optional(),
+  rule_id: z.string(),
+  rule_name: z.string(),
+  severity: AlertSeveritySchema,
+  conditions_met: z.array(z.object({
+    metric: AlertMetricSchema,
+    operator: AlertOperatorSchema,
+    threshold: z.number(),
+    actual_value: z.number(),
+  })),
+  data_snapshot: z.record(z.any()),
+  triggered_at: z.date(),
+  acknowledged: z.boolean().default(false),
+  acknowledged_at: z.date().optional(),
+});
+export type TriggeredAlert = z.infer<typeof TriggeredAlertSchema>;
