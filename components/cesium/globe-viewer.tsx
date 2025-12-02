@@ -4,6 +4,7 @@ import { config } from '@/lib/config';
 import dynamic from 'next/dynamic';
 import { KpAuroraLayer } from './kp-aurora-layer';
 import { HfBlackoutLayer } from './hf-blackout-layer';
+import { TecLayer } from './tec-layer';
 
 function GlobeViewerComponent() {
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -14,6 +15,7 @@ function GlobeViewerComponent() {
   const [cesiumReady, setCesiumReady] = useState(false);
   const [showHfBlackout, setShowHfBlackout] = useState(true);
   const [showAurora, setShowAurora] = useState(true);
+  const [showTec, setShowTec] = useState(false);
 
   useEffect(() => {
     if (!viewerRef.current || cesiumViewerRef.current) return;
@@ -143,6 +145,15 @@ function GlobeViewerComponent() {
               />
               <span className="text-sm text-slate-300">HF Blackout</span>
             </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showTec}
+                onChange={(e) => setShowTec(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+              />
+              <span className="text-sm text-slate-300">TEC (Ionosphere)</span>
+            </label>
           </div>
         </div>
       )}
@@ -161,6 +172,15 @@ function GlobeViewerComponent() {
           viewer={cesiumViewerRef.current}
           Cesium={cesiumModuleRef.current}
           visible={showHfBlackout}
+        />
+      )}
+
+      {/* TEC Layer */}
+      {cesiumReady && cesiumViewerRef.current && cesiumModuleRef.current && (
+        <TecLayer
+          viewer={cesiumViewerRef.current}
+          Cesium={cesiumModuleRef.current}
+          visible={showTec}
         />
       )}
     </div>
