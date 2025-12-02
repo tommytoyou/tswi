@@ -75,6 +75,11 @@ function getCellAverage(points: AuroraDataPoint[]): number {
   return sum / points.length;
 }
 
+// Normalize longitude from 0-360 to -180 to 180 (Cesium format)
+function normalizeLongitude(lon: number): number {
+  return lon > 180 ? lon - 360 : lon;
+}
+
 export function KpAuroraLayer({ viewer, Cesium }: KpAuroraLayerProps) {
   const [auroraData, setAuroraData] = useState<AuroraData | null>(null);
   const [kpValue, setKpValue] = useState<number | null>(null);
@@ -154,14 +159,21 @@ export function KpAuroraLayer({ viewer, Cesium }: KpAuroraLayerProps) {
 
       const color = getAuroraColor(avgProbability);
 
+      // Normalize longitude from 0-360 to -180 to 180 for Cesium
+      const westLon = normalizeLongitude(cellLon);
+      const eastLon = normalizeLongitude(cellLon + cellSize);
+
+      // Skip cells that cross the antimeridian (would have west > east)
+      if (westLon > eastLon) return;
+
       // Create rectangle for this cell
       const entity = viewer.entities.add({
         name: `Aurora Cell ${cellLat},${cellLon}`,
         rectangle: {
           coordinates: Cesium.Rectangle.fromDegrees(
-            cellLon,
+            westLon,
             cellLat,
-            cellLon + cellSize,
+            eastLon,
             cellLat + cellSize
           ),
           material: new Cesium.ColorMaterialProperty(
@@ -190,8 +202,12 @@ export function KpAuroraLayer({ viewer, Cesium }: KpAuroraLayerProps) {
       latBands.forEach((points, lat) => {
         if (points.length < 5) return;
 
-        // Sort by longitude to create a path
-        const sorted = [...points].sort((a, b) => a.Longitude - b.Longitude);
+        // Normalize longitudes and sort to create a path
+        const normalized = points.map((p) => ({
+          ...p,
+          Longitude: normalizeLongitude(p.Longitude),
+        }));
+        const sorted = [...normalized].sort((a, b) => a.Longitude - b.Longitude);
 
         // Find the outer edge (equatorward)
         const positions = sorted.map((p) =>
