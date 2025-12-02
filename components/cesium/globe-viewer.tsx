@@ -2,12 +2,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { config } from '@/lib/config';
 import dynamic from 'next/dynamic';
+import { KpAuroraLayer } from './kp-aurora-layer';
 
 function GlobeViewerComponent() {
   const viewerRef = useRef<HTMLDivElement>(null);
   const cesiumViewerRef = useRef<any>(null);
+  const cesiumModuleRef = useRef<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [cesiumReady, setCesiumReady] = useState(false);
 
   useEffect(() => {
     if (!viewerRef.current || cesiumViewerRef.current) return;
@@ -63,8 +66,10 @@ function GlobeViewerComponent() {
         });
 
         cesiumViewerRef.current = viewer;
+        cesiumModuleRef.current = Cesium;
         setIsLoading(false);
         setError(null);
+        setCesiumReady(true);
 
         console.log('✅ Cesium initialized successfully');
       } catch (err: any) {
@@ -101,7 +106,7 @@ function GlobeViewerComponent() {
   }
 
   return (
-    <>
+    <div className="relative w-full h-full">
       {isLoading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900">
           <div className="text-center">
@@ -111,7 +116,13 @@ function GlobeViewerComponent() {
         </div>
       )}
       <div ref={viewerRef} className="w-full h-full" />
-    </>
+      {cesiumReady && cesiumViewerRef.current && cesiumModuleRef.current && (
+        <KpAuroraLayer
+          viewer={cesiumViewerRef.current}
+          Cesium={cesiumModuleRef.current}
+        />
+      )}
+    </div>
   );
 }
 
