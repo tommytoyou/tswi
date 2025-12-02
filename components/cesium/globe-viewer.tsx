@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { KpAuroraLayer } from './kp-aurora-layer';
 import { HfBlackoutLayer } from './hf-blackout-layer';
 import { TecLayer } from './tec-layer';
+import { SatelliteLayer } from './satellite-layer';
 
 function GlobeViewerComponent() {
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -16,6 +17,7 @@ function GlobeViewerComponent() {
   const [showHfBlackout, setShowHfBlackout] = useState(true);
   const [showAurora, setShowAurora] = useState(true);
   const [showTec, setShowTec] = useState(false);
+  const [showSatellites, setShowSatellites] = useState(true);
 
   useEffect(() => {
     if (!viewerRef.current || cesiumViewerRef.current) return;
@@ -154,6 +156,15 @@ function GlobeViewerComponent() {
               />
               <span className="text-sm text-slate-300">TEC (Ionosphere)</span>
             </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showSatellites}
+                onChange={(e) => setShowSatellites(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-yellow-500 focus:ring-yellow-500 focus:ring-offset-0"
+              />
+              <span className="text-sm text-slate-300">Satellites</span>
+            </label>
           </div>
         </div>
       )}
@@ -181,6 +192,15 @@ function GlobeViewerComponent() {
           viewer={cesiumViewerRef.current}
           Cesium={cesiumModuleRef.current}
           visible={showTec}
+        />
+      )}
+
+      {/* Satellite Layer */}
+      {cesiumReady && cesiumViewerRef.current && cesiumModuleRef.current && (
+        <SatelliteLayer
+          viewer={cesiumViewerRef.current}
+          Cesium={cesiumModuleRef.current}
+          visible={showSatellites}
         />
       )}
     </div>

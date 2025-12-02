@@ -6,7 +6,7 @@ import { KpCardV2 } from '@/components/dashboard/kp-card-v2';
 import { XRayFluxCardV2 } from '@/components/dashboard/xray-flux-card-v2';
 import { SuryaCardV2 } from '@/components/dashboard/surya-card-v2';
 import { SolarEventsCard } from '@/components/dashboard/solar-events-card';
-import { RoadsterCard } from '@/components/dashboard/roadster-card';
+
 import { StatusBar } from '@/components/dashboard/status-bar';
 import { Satellite } from 'lucide-react';
 
@@ -149,7 +149,7 @@ export default function DashboardPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <SolarEventsCard key={`events-${refreshTrigger}`} />
-            <RoadsterCard />
+            
           </div>
         </div>
 
