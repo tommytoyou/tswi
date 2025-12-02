@@ -20,30 +20,40 @@ interface AuroraData {
   count: number;
 }
 
-// Color gradient for aurora probability
+// Color gradient for aurora probability - VIBRANT colors matching NOAA
 // Returns RGBA values based on probability (0-100)
 function getAuroraColor(probability: number): { r: number; g: number; b: number; a: number } {
   if (probability < 5) {
     return { r: 0, g: 0, b: 0, a: 0 }; // Transparent
   } else if (probability < 15) {
-    // Dim green
-    return { r: 0, g: 80, b: 40, a: 0.2 };
+    // Bright blue
+    return { r: 0, g: 100, b: 255, a: 0.5 };
   } else if (probability < 30) {
-    // Green
-    return { r: 0, g: 140, b: 60, a: 0.35 };
+    // Blue-green (cyan)
+    return { r: 0, g: 200, b: 200, a: 0.6 };
   } else if (probability < 50) {
-    // Brighter green
-    return { r: 50, g: 200, b: 80, a: 0.5 };
+    // Bright green
+    return { r: 0, g: 255, b: 100, a: 0.7 };
   } else if (probability < 70) {
     // Green-yellow
-    return { r: 150, g: 230, b: 100, a: 0.6 };
-  } else if (probability < 85) {
-    // Bright green-white
-    return { r: 180, g: 255, b: 150, a: 0.7 };
+    return { r: 150, g: 255, b: 0, a: 0.8 };
   } else {
-    // Intense white-green
-    return { r: 220, g: 255, b: 220, a: 0.85 };
+    // Yellow-red (intense)
+    return { r: 255, g: 200, b: 0, a: 0.9 };
   }
+}
+
+// Get glow layer color (slightly different for bloom effect)
+function getGlowColor(probability: number, layer: number): { r: number; g: number; b: number; a: number } {
+  const baseColor = getAuroraColor(probability);
+  // Each layer is more transparent and slightly larger
+  const alphaMultiplier = 1 - (layer * 0.25);
+  return {
+    r: Math.min(255, baseColor.r + 30),
+    g: Math.min(255, baseColor.g + 30),
+    b: Math.min(255, baseColor.b + 30),
+    a: baseColor.a * alphaMultiplier * 0.4
+  };
 }
 
 // Group nearby points into cells for efficient rendering
@@ -142,63 +152,81 @@ export function KpAuroraLayer({ viewer, Cesium }: KpAuroraLayerProps) {
 
     if (coordinates.length === 0) return;
 
-    // Group points into cells for more efficient rendering
-    const cellSize = 3; // 3-degree cells
+    // Use larger cells (5 degrees) for smoother appearance
+    const cellSize = 5;
     const cells = groupPointsIntoCells(coordinates, cellSize);
 
-    // Create a primitive collection for better performance
-    const instances: any[] = [];
+    // Number of glow layers for bloom effect
+    const glowLayers = 3;
+    const baseAltitude = 110000; // Aurora altitude ~110km
 
-    cells.forEach((points, key) => {
-      const [latStr, lonStr] = key.split(',');
-      const cellLat = parseFloat(latStr);
-      const cellLon = parseFloat(lonStr);
-      const avgProbability = getCellAverage(points);
+    // Render multiple layers for glow/bloom effect (outer layers first)
+    for (let layer = glowLayers - 1; layer >= 0; layer--) {
+      const altitudeOffset = layer * 5000; // Each layer slightly higher
+      const sizeExpansion = layer * 0.5; // Each outer layer slightly larger
 
-      if (avgProbability < 5) return; // Skip low probability cells
+      cells.forEach((points, key) => {
+        const [latStr, lonStr] = key.split(',');
+        const cellLat = parseFloat(latStr);
+        const cellLon = parseFloat(lonStr);
+        const avgProbability = getCellAverage(points);
 
-      const color = getAuroraColor(avgProbability);
+        if (avgProbability < 5) return; // Skip low probability cells
 
-      // Normalize longitude from 0-360 to -180 to 180 for Cesium
-      const westLon = normalizeLongitude(cellLon);
-      const eastLon = normalizeLongitude(cellLon + cellSize);
+        // For outer glow layers, only render higher probability areas
+        if (layer > 0 && avgProbability < 15) return;
 
-      // Skip cells that cross the antimeridian (would have west > east)
-      if (westLon > eastLon) return;
+        const color = layer === 0
+          ? getAuroraColor(avgProbability)
+          : getGlowColor(avgProbability, layer);
 
-      // Create rectangle for this cell
-      const entity = viewer.entities.add({
-        name: `Aurora Cell ${cellLat},${cellLon}`,
-        rectangle: {
-          coordinates: Cesium.Rectangle.fromDegrees(
-            westLon,
-            cellLat,
-            eastLon,
-            cellLat + cellSize
-          ),
-          material: new Cesium.ColorMaterialProperty(
-            new Cesium.Color(color.r / 255, color.g / 255, color.b / 255, color.a)
-          ),
-          height: 110000, // Aurora altitude ~110km
-          outline: false,
-        },
+        // Skip if color is essentially transparent
+        if (color.a < 0.05) return;
+
+        // Normalize longitude from 0-360 to -180 to 180 for Cesium
+        // Expand cells slightly for outer glow layers
+        const westLon = normalizeLongitude(cellLon - sizeExpansion);
+        const eastLon = normalizeLongitude(cellLon + cellSize + sizeExpansion);
+        const southLat = cellLat - sizeExpansion;
+        const northLat = cellLat + cellSize + sizeExpansion;
+
+        // Skip cells that cross the antimeridian (would have west > east)
+        if (westLon > eastLon) return;
+
+        // Create rectangle for this cell
+        const entity = viewer.entities.add({
+          name: `Aurora Cell ${cellLat},${cellLon} L${layer}`,
+          rectangle: {
+            coordinates: Cesium.Rectangle.fromDegrees(
+              westLon,
+              Math.max(-90, southLat),
+              eastLon,
+              Math.min(90, northLat)
+            ),
+            material: new Cesium.ColorMaterialProperty(
+              new Cesium.Color(color.r / 255, color.g / 255, color.b / 255, color.a)
+            ),
+            height: baseAltitude + altitudeOffset,
+            outline: false,
+          },
+        });
+        newEntities.push(entity);
       });
-      newEntities.push(entity);
-    });
+    }
 
     // Add glowing edge polylines for high-probability aurora regions
     // Find contours of high aurora probability
-    const highProbPoints = coordinates.filter((p) => p.Aurora >= 30);
+    const highProbPoints = coordinates.filter((p) => p.Aurora >= 25);
     if (highProbPoints.length > 0) {
       // Group by latitude bands for edge detection
       const latBands = new Map<number, AuroraDataPoint[]>();
       highProbPoints.forEach((p) => {
-        const band = Math.round(p.Latitude / 2) * 2;
+        const band = Math.round(p.Latitude / 3) * 3; // Larger bands for smoother lines
         if (!latBands.has(band)) latBands.set(band, []);
         latBands.get(band)!.push(p);
       });
 
-      // Create glow polylines along the aurora edge
+      // Create multiple glow polylines along the aurora edge for bloom effect
       latBands.forEach((points, lat) => {
         if (points.length < 5) return;
 
@@ -209,33 +237,40 @@ export function KpAuroraLayer({ viewer, Cesium }: KpAuroraLayerProps) {
         }));
         const sorted = [...normalized].sort((a, b) => a.Longitude - b.Longitude);
 
-        // Find the outer edge (equatorward)
-        const positions = sorted.map((p) =>
-          Cesium.Cartesian3.fromDegrees(p.Longitude, p.Latitude, 115000)
-        );
+        const avgProb = getCellAverage(sorted);
+        const glowColor = getAuroraColor(avgProb);
 
-        if (positions.length > 2) {
-          const avgProb = getCellAverage(sorted);
-          const glowColor = getAuroraColor(avgProb);
+        // Create multiple polyline layers for enhanced glow
+        for (let glowLayer = 0; glowLayer < 3; glowLayer++) {
+          const layerAltitude = 115000 + (glowLayer * 3000);
+          const positions = sorted.map((p) =>
+            Cesium.Cartesian3.fromDegrees(p.Longitude, p.Latitude, layerAltitude)
+          );
 
-          const glowEntity = viewer.entities.add({
-            name: `Aurora Edge ${lat}`,
-            polyline: {
-              positions: positions,
-              width: Math.max(2, avgProb / 20),
-              material: new Cesium.PolylineGlowMaterialProperty({
-                glowPower: 0.3,
-                color: new Cesium.Color(
-                  glowColor.r / 255,
-                  glowColor.g / 255,
-                  glowColor.b / 255,
-                  Math.min(0.8, glowColor.a + 0.2)
-                ),
-              }),
-              clampToGround: false,
-            },
-          });
-          newEntities.push(glowEntity);
+          if (positions.length > 2) {
+            const glowPower = 0.5 - (glowLayer * 0.1);
+            const lineWidth = Math.max(3, avgProb / 10) - glowLayer;
+            const alpha = Math.min(0.9, glowColor.a + 0.3) - (glowLayer * 0.2);
+
+            const glowEntity = viewer.entities.add({
+              name: `Aurora Edge ${lat} L${glowLayer}`,
+              polyline: {
+                positions: positions,
+                width: lineWidth,
+                material: new Cesium.PolylineGlowMaterialProperty({
+                  glowPower: glowPower,
+                  color: new Cesium.Color(
+                    glowColor.r / 255,
+                    glowColor.g / 255,
+                    glowColor.b / 255,
+                    alpha
+                  ),
+                }),
+                clampToGround: false,
+              },
+            });
+            newEntities.push(glowEntity);
+          }
         }
       });
     }
@@ -332,7 +367,7 @@ export function KpAuroraLayer({ viewer, Cesium }: KpAuroraLayerProps) {
                 className="flex-1 h-3 rounded-sm"
                 style={{
                   background:
-                    'linear-gradient(to right, transparent 0%, rgb(0,80,40) 15%, rgb(0,140,60) 30%, rgb(50,200,80) 50%, rgb(150,230,100) 70%, rgb(220,255,220) 100%)',
+                    'linear-gradient(to right, transparent 0%, rgb(0,100,255) 15%, rgb(0,200,200) 30%, rgb(0,255,100) 50%, rgb(150,255,0) 70%, rgb(255,200,0) 100%)',
                 }}
               />
             </div>
