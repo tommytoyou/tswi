@@ -73,6 +73,13 @@ function interpolateColor(
   };
 }
 
+// Normalize longitude to -180 to 180 range (GloTEC may use 0-360 format)
+function normalizeLon(lon: number): number {
+  while (lon > 180) lon -= 360;
+  while (lon < -180) lon += 360;
+  return lon;
+}
+
 // Helper to check if viewer is valid and not destroyed
 function isViewerValid(viewer: any): boolean {
   return viewer && !viewer.isDestroyed() && viewer.scene && viewer.scene.primitives;
@@ -199,13 +206,31 @@ export function TecLayer({ viewer, Cesium, visible = true }: TecLayerProps) {
       // Check mounted state periodically during heavy loop
       if (!isMountedRef.current) return;
 
-      const color = getTecColor(point.tec);
+      // Normalize longitude from potential 0-360 to -180 to 180 range
+      const normalizedLon = normalizeLon(point.lon);
 
       // Create rectangle for each grid point
-      const west = point.lon - halfGrid;
-      const east = point.lon + halfGrid;
+      let west = normalizeLon(normalizedLon - halfGrid);
+      let east = normalizeLon(normalizedLon + halfGrid);
       const south = Math.max(-90, point.lat - halfGrid);
       const north = Math.min(90, point.lat + halfGrid);
+
+      // Validate coordinates are in valid range
+      if (west < -180 || west > 180 || east < -180 || east > 180) {
+        continue; // Skip invalid coordinates
+      }
+
+      // Skip rectangles that cross the antimeridian (west > east after normalization)
+      if (west >= east) {
+        continue;
+      }
+
+      // Skip invalid latitude ranges
+      if (south >= north || south < -90 || north > 90) {
+        continue;
+      }
+
+      const color = getTecColor(point.tec);
 
       instances.push(
         new Cesium.GeometryInstance({
