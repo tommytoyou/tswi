@@ -9,6 +9,7 @@ import { ProtonFluxCard } from '@/components/dashboard/proton-flux-card';
 import { DstCard } from '@/components/dashboard/dst-card';
 import { SuryaCardV2 } from '@/components/dashboard/surya-card-v2';
 import { SolarEventsCard } from '@/components/dashboard/solar-events-card';
+import { CmeCard } from '@/components/dashboard/cme-card';
 
 import { StatusBar } from '@/components/dashboard/status-bar';
 import { Satellite } from 'lucide-react';
@@ -171,7 +172,7 @@ export default function DashboardPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <SolarEventsCard key={`events-${refreshTrigger}`} />
-            
+            <CmeCard key={`cme-${refreshTrigger}`} />
           </div>
         </div>
 

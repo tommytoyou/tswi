@@ -414,3 +414,71 @@ export const TriggeredAlertSchema = z.object({
   acknowledged_at: z.date().optional(),
 });
 export type TriggeredAlert = z.infer<typeof TriggeredAlertSchema>;
+
+// ============================================================================
+// NASA DONKI CME TYPES
+// ============================================================================
+
+// CME Analysis from NASA DONKI
+export const CmeAnalysisSchema = z.object({
+  time21_5: z.string().optional(), // Time when CME reaches 21.5 solar radii
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  halfAngle: z.number().optional(), // Half-width of the CME in degrees
+  speed: z.number().optional(), // Speed in km/s
+  type: z.string().optional(), // S (slow), C (common), O (operator)
+  isMostAccurate: z.boolean().optional(),
+  note: z.string().optional(),
+  levelOfData: z.number().optional(),
+  enlilList: z.array(z.object({
+    modelCompletionTime: z.string().optional(),
+    au: z.number().optional(),
+    estimatedShockArrivalTime: z.string().optional(),
+    estimatedDuration: z.number().optional(),
+    rmin_re: z.number().optional(),
+    kp_18: z.number().optional(),
+    kp_90: z.number().optional(),
+    kp_135: z.number().optional(),
+    kp_180: z.number().optional(),
+    isEarthGB: z.boolean().optional(),
+    link: z.string().optional(),
+  })).optional(),
+});
+export type CmeAnalysis = z.infer<typeof CmeAnalysisSchema>;
+
+// CME Event from NASA DONKI
+export const CmeEventSchema = z.object({
+  activityID: z.string(),
+  catalog: z.string(),
+  startTime: z.string(),
+  sourceLocation: z.string().optional(),
+  activeRegionNum: z.number().nullable().optional(),
+  link: z.string().optional(),
+  note: z.string().optional(),
+  instruments: z.array(z.object({
+    displayName: z.string(),
+  })).optional(),
+  cmeAnalyses: z.array(CmeAnalysisSchema).nullable().optional(),
+  linkedEvents: z.array(z.object({
+    activityID: z.string(),
+  })).nullable().optional(),
+});
+export type CmeEvent = z.infer<typeof CmeEventSchema>;
+
+// Processed CME for frontend display
+export const ProcessedCmeSchema = z.object({
+  id: z.string(),
+  startTime: z.date(),
+  sourceLocation: z.string().optional(),
+  activeRegion: z.number().nullable().optional(),
+  speed: z.number().optional(), // km/s
+  halfAngle: z.number().optional(), // degrees
+  isEarthDirected: z.boolean(),
+  estimatedArrival: z.date().nullable().optional(),
+  arrivalHours: z.number().nullable().optional(), // hours until arrival
+  speedCategory: z.enum(['slow', 'moderate', 'fast', 'extreme']),
+  linkedFlare: z.string().nullable().optional(),
+  note: z.string().optional(),
+  enlilModelUrl: z.string().optional(),
+});
+export type ProcessedCme = z.infer<typeof ProcessedCmeSchema>;
