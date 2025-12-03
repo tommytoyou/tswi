@@ -18,8 +18,9 @@ interface TecResponse {
   success: boolean;
   data: TecGridPoint[];
   timestamp: string;
-  kpIndex: number;
   source: string;
+  featureCount?: number;
+  cached?: boolean;
 }
 
 // TEC color scale thresholds
@@ -214,7 +215,10 @@ export function TecLayer({ viewer, Cesium, visible = true }: TecLayerProps) {
     <div className="absolute top-4 left-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3 min-w-[200px]">
       <div className="flex items-center gap-2 mb-3">
         <div className="w-3 h-3 rounded-full bg-blue-500" />
-        <span className="text-sm font-semibold text-white">Total Electron Content</span>
+        <div>
+          <span className="text-sm font-semibold text-white">Total Electron Content</span>
+          <span className="text-xs text-slate-500 ml-2">(GloTEC)</span>
+        </div>
       </div>
 
       {loading ? (
@@ -304,13 +308,17 @@ export function TecLayer({ viewer, Cesium, visible = true }: TecLayerProps) {
             </div>
           </div>
 
-          {/* Kp Index */}
+          {/* Data Source */}
           <div className="mt-3 pt-2 border-t border-slate-700">
             <div className="flex justify-between text-xs">
-              <span className="text-slate-500">Kp Index</span>
-              <span className="text-slate-400">{tecData?.kpIndex?.toFixed(1) || '--'}</span>
+              <span className="text-slate-500">Source</span>
+              <span className="text-slate-400">NOAA GloTEC</span>
             </div>
-            <div className="text-xs text-slate-600 mt-1">Updates every 5 min</div>
+            <div className="flex justify-between text-xs mt-1">
+              <span className="text-slate-500">Data Points</span>
+              <span className="text-slate-400">{tecData?.featureCount || tecData?.data?.length || '--'}</span>
+            </div>
+            <div className="text-xs text-slate-600 mt-1">Updates every 10 min</div>
           </div>
         </>
       )}
