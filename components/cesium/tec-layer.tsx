@@ -73,45 +73,102 @@ function interpolateColor(
   };
 }
 
+// Helper to check if viewer is valid and not destroyed
+function isViewerValid(viewer: any): boolean {
+  return viewer && !viewer.isDestroyed() && viewer.scene && viewer.scene.primitives;
+}
+
 export function TecLayer({ viewer, Cesium, visible = true }: TecLayerProps) {
   const [tecData, setTecData] = useState<TecResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const entitiesRef = useRef<any[]>([]);
   const primitiveCollectionRef = useRef<any>(null);
+  const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Fetch TEC data
+  // Cleanup primitive safely
+  const cleanupPrimitive = useCallback(() => {
+    if (primitiveCollectionRef.current && isViewerValid(viewer)) {
+      try {
+        viewer.scene.primitives.remove(primitiveCollectionRef.current);
+      } catch (e) {
+        // Ignore cleanup errors - viewer may be destroyed
+      }
+    }
+    primitiveCollectionRef.current = null;
+  }, [viewer]);
+
+  // Fetch TEC data with abort support
   const fetchTecData = useCallback(async () => {
+    // Abort any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller
+    abortControllerRef.current = new AbortController();
+
     try {
-      const response = await fetch('/api/noaa/tec?resolution=medium');
+      const response = await fetch('/api/noaa/tec?resolution=low', {
+        signal: abortControllerRef.current.signal,
+      });
+
+      // Check if component is still mounted before processing
+      if (!isMountedRef.current) return;
 
       if (response.ok) {
         const result: TecResponse = await response.json();
+
+        // Check again after parsing JSON
+        if (!isMountedRef.current) return;
+
         if (result.success) {
           setTecData(result);
           setError(null);
         }
       }
     } catch (err: any) {
+      // Ignore abort errors
+      if (err.name === 'AbortError') return;
+
+      // Check if still mounted
+      if (!isMountedRef.current) return;
+
       console.error('TEC fetch error:', err);
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
+  // Component mount/unmount tracking
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      // Set unmounted FIRST before any cleanup
+      isMountedRef.current = false;
+
+      // Abort any pending fetch
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // Clean up primitives
+      cleanupPrimitive();
+    };
+  }, [cleanupPrimitive]);
+
   // Render TEC grid when data changes
   useEffect(() => {
-    if (!viewer || !Cesium || !visible) {
-      // Clean up if not visible
-      if (primitiveCollectionRef.current && viewer?.scene?.primitives) {
-        try {
-          viewer.scene.primitives.remove(primitiveCollectionRef.current);
-        } catch (e) {
-          // Ignore cleanup errors
-        }
-      }
-      primitiveCollectionRef.current = null;
+    // Early exit if component unmounted or viewer destroyed
+    if (!isMountedRef.current) return;
+    if (!isViewerValid(viewer) || !Cesium) return;
+
+    if (!visible) {
+      cleanupPrimitive();
       return;
     }
 
@@ -119,23 +176,29 @@ export function TecLayer({ viewer, Cesium, visible = true }: TecLayerProps) {
       return;
     }
 
+    // Check again before any viewer operations
+    if (!isMountedRef.current || !isViewerValid(viewer)) return;
+
     // Remove existing primitive collection
-    if (primitiveCollectionRef.current && viewer.scene.primitives) {
-      try {
-        viewer.scene.primitives.remove(primitiveCollectionRef.current);
-      } catch (e) {
-        // Ignore cleanup errors
-      }
-    }
+    cleanupPrimitive();
+
+    // Double-check after cleanup
+    if (!isMountedRef.current || !isViewerValid(viewer)) return;
 
     // Create new primitive collection for better performance
     const instances: any[] = [];
 
+    // Use low resolution data - limit to ~500 points max for performance
+    const dataToRender = tecData.data.slice(0, 500);
+
     // Determine grid spacing from data
-    const gridSpacing = tecData.data.length > 1000 ? 5 : tecData.data.length > 300 ? 10 : 20;
+    const gridSpacing = dataToRender.length > 300 ? 10 : 20;
     const halfGrid = gridSpacing / 2;
 
-    for (const point of tecData.data) {
+    for (const point of dataToRender) {
+      // Check mounted state periodically during heavy loop
+      if (!isMountedRef.current) return;
+
       const color = getTecColor(point.tec);
 
       // Create rectangle for each grid point
@@ -159,6 +222,9 @@ export function TecLayer({ viewer, Cesium, visible = true }: TecLayerProps) {
       );
     }
 
+    // Final check before adding to scene
+    if (!isMountedRef.current || !isViewerValid(viewer)) return;
+
     // Create ground primitive for all rectangles
     const groundPrimitive = new Cesium.GroundPrimitive({
       geometryInstances: instances,
@@ -169,25 +235,31 @@ export function TecLayer({ viewer, Cesium, visible = true }: TecLayerProps) {
       asynchronous: true,
     });
 
-    viewer.scene.primitives.add(groundPrimitive);
-    primitiveCollectionRef.current = groundPrimitive;
+    // Final check before adding
+    if (!isMountedRef.current || !isViewerValid(viewer)) return;
+
+    try {
+      viewer.scene.primitives.add(groundPrimitive);
+      primitiveCollectionRef.current = groundPrimitive;
+    } catch (e) {
+      // Viewer may have been destroyed between check and add
+      console.warn('Failed to add TEC primitive:', e);
+    }
 
     return () => {
-      if (primitiveCollectionRef.current && viewer.scene?.primitives) {
-        try {
-          viewer.scene.primitives.remove(primitiveCollectionRef.current);
-        } catch (e) {
-          // Ignore cleanup errors
-        }
-      }
-      primitiveCollectionRef.current = null;
+      cleanupPrimitive();
     };
-  }, [viewer, Cesium, tecData, visible]);
+  }, [viewer, Cesium, tecData, visible, cleanupPrimitive]);
 
-  // Fetch data on mount and refresh every 5 minutes
+  // Fetch data on mount and refresh every 10 minutes
   useEffect(() => {
     fetchTecData();
-    const interval = setInterval(fetchTecData, 5 * 60 * 1000); // 5 minutes
+    const interval = setInterval(() => {
+      if (isMountedRef.current) {
+        fetchTecData();
+      }
+    }, 10 * 60 * 1000); // 10 minutes
+
     return () => clearInterval(interval);
   }, [fetchTecData]);
 
