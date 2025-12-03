@@ -2,8 +2,11 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { SolarWindCardV2 } from '@/components/dashboard/solar-wind-card-v2';
+import { SolarWindPlasmaCard } from '@/components/dashboard/solar-wind-plasma-card';
 import { KpCardV2 } from '@/components/dashboard/kp-card-v2';
 import { XRayFluxCardV2 } from '@/components/dashboard/xray-flux-card-v2';
+import { ProtonFluxCard } from '@/components/dashboard/proton-flux-card';
+import { DstCard } from '@/components/dashboard/dst-card';
 import { SuryaCardV2 } from '@/components/dashboard/surya-card-v2';
 import { SolarEventsCard } from '@/components/dashboard/solar-events-card';
 
@@ -37,10 +40,13 @@ export default function DashboardPage() {
   const handleExport = useCallback(async () => {
     try {
       // Fetch all current data
-      const [solarWind, kpIndex, xrayFlux, suryaPrediction] = await Promise.all([
+      const [solarWind, solarWindPlasma, kpIndex, xrayFlux, protonFlux, dst, suryaPrediction] = await Promise.all([
         fetch('/api/noaa/solar-wind?limit=60').then(r => r.json()),
+        fetch('/api/noaa/solar-wind-plasma?limit=60').then(r => r.json()),
         fetch('/api/noaa/kp-index?limit=60').then(r => r.json()),
         fetch('/api/noaa/xray-flux?limit=60').then(r => r.json()),
+        fetch('/api/noaa/proton-flux?limit=60').then(r => r.json()),
+        fetch('/api/noaa/dst?limit=60').then(r => r.json()),
         fetch('/api/ai/surya-prediction').then(r => r.json()),
       ]);
 
@@ -54,6 +60,11 @@ export default function DashboardPage() {
         solarWind.data?.[solarWind.data.length - 1] ?
           `${solarWind.data[solarWind.data.length - 1].bx_gsm},${solarWind.data[solarWind.data.length - 1].by_gsm},${solarWind.data[solarWind.data.length - 1].bz_gsm},${solarWind.data[solarWind.data.length - 1].bt}` : '',
         '',
+        'Solar Wind Plasma (Latest)',
+        'Speed (km/s),Density (/cm³),Temperature (K)',
+        solarWindPlasma.data?.[solarWindPlasma.data.length - 1] ?
+          `${solarWindPlasma.data[solarWindPlasma.data.length - 1].speed_kms},${solarWindPlasma.data[solarWindPlasma.data.length - 1].density_cm3},${solarWindPlasma.data[solarWindPlasma.data.length - 1].temp_k}` : '',
+        '',
         'Kp Index',
         'Timestamp,Kp Value',
         ...(kpIndex.data?.slice(-10).map((d: any) => `${d.ts},${d.kp}`) || []),
@@ -61,6 +72,14 @@ export default function DashboardPage() {
         'X-ray Flux',
         'Timestamp,Flux (W/m²)',
         ...(xrayFlux.data?.slice(-10).map((d: any) => `${d.ts},${d.flux}`) || []),
+        '',
+        'Proton Flux',
+        'Timestamp,>10 MeV (pfu),>50 MeV (pfu),>100 MeV (pfu),S-Scale',
+        ...(protonFlux.data?.slice(-10).map((d: any) => `${d.ts},${d.p10_pfu},${d.p50_pfu},${d.p100_pfu},${d.s_scale}`) || []),
+        '',
+        'Dst Index',
+        'Timestamp,Dst (nT),Storm Level',
+        ...(dst.data?.slice(-10).map((d: any) => `${d.ts},${d.dst_nt},${d.storm_level}`) || []),
         '',
         'Surya AI Predictions',
         'Time,Flare Probability,C-Class,M-Class,X-Class,Confidence',
@@ -135,8 +154,11 @@ export default function DashboardPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <SolarWindCardV2 key={`sw-${refreshTrigger}`} />
+            <SolarWindPlasmaCard key={`plasma-${refreshTrigger}`} />
             <KpCardV2 key={`kp-${refreshTrigger}`} />
             <XRayFluxCardV2 key={`xray-${refreshTrigger}`} />
+            <ProtonFluxCard key={`proton-${refreshTrigger}`} />
+            <DstCard key={`dst-${refreshTrigger}`} />
           </div>
         </div>
 
