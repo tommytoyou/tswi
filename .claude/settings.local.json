@@ -25,7 +25,10 @@
       "Bash(lsof:*)",
       "Bash(ss:*)",
       "Bash(netstat:*)",
-      "WebFetch(domain:services.swpc.noaa.gov)"
+      "WebFetch(domain:services.swpc.noaa.gov)",
+      "mcp__ide__getDiagnostics",
+      "WebFetch(domain:www.tswi-ai.com)",
+      "Bash(curl.exe:*)"
     ],
     "deny": [],
     "ask": []
