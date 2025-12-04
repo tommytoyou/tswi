@@ -97,6 +97,40 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .toArray();
 
+    // If cache is empty, fetch live data directly
+    if (data.length === 0) {
+      console.log('Solar wind plasma cache empty, fetching from NOAA directly...');
+      const noaaUrl = 'https://services.swpc.noaa.gov/products/solar-wind/plasma-5-minute.json';
+      const response = await fetch(noaaUrl, { cache: 'no-store' });
+
+      if (!response.ok) {
+        throw new Error(`NOAA API returned ${response.status}`);
+      }
+
+      const rawData = await response.json();
+      console.log('NOAA plasma response:', JSON.stringify(rawData.slice(0, 3)));
+
+      const documents: SolarWindPlasmaDoc[] = [];
+      for (let i = 1; i < rawData.length; i++) {
+        const item = rawData[i];
+        if (!item[0] || item[1] === null || item[2] === null) continue;
+
+        documents.push({
+          ts: new Date(item[0]),
+          density_cm3: parseFloat(item[1]) || 0,
+          speed_kms: parseFloat(item[2]) || 0,
+          temp_k: parseFloat(item[3]) || 0,
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: documents.slice(-limit),
+        count: documents.length,
+        source: 'noaa-live-fallback',
+      });
+    }
+
     return NextResponse.json({
       success: true,
       data: data.reverse(), // Return chronological order

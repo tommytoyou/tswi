@@ -112,6 +112,41 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .toArray();
 
+    // If cache is empty, fetch live data directly
+    if (data.length === 0) {
+      console.log('DST cache empty, fetching from NOAA directly...');
+      const noaaUrl = 'https://services.swpc.noaa.gov/products/kyoto-dst.json';
+      const response = await fetch(noaaUrl, { cache: 'no-store' });
+
+      if (!response.ok) {
+        throw new Error(`NOAA API returned ${response.status}`);
+      }
+
+      const rawData = await response.json();
+      console.log('NOAA DST response sample:', JSON.stringify(rawData.slice(0, 3)));
+
+      const documents: DstDoc[] = [];
+      // Skip header row
+      for (let i = 1; i < rawData.length; i++) {
+        const item = rawData[i];
+        if (!item[0] || item[1] === null) continue;
+
+        const dst = parseInt(item[1]) || 0;
+        documents.push({
+          ts: new Date(item[0]),
+          dst_nt: dst,
+          storm_level: getStormLevel(dst),
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: documents.slice(-limit),
+        count: documents.length,
+        source: 'noaa-live-fallback',
+      });
+    }
+
     return NextResponse.json({
       success: true,
       data: data.reverse(), // Return chronological order

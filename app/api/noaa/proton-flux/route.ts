@@ -138,6 +138,63 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .toArray();
 
+    // If cache is empty, fetch live data directly
+    if (data.length === 0) {
+      console.log('Proton flux cache empty, fetching from NOAA directly...');
+      const noaaUrl = 'https://services.swpc.noaa.gov/json/goes/primary/integral-protons-1-day.json';
+      const response = await fetch(noaaUrl, { cache: 'no-store' });
+
+      if (!response.ok) {
+        throw new Error(`NOAA API returned ${response.status}`);
+      }
+
+      const rawData = await response.json();
+      console.log('NOAA proton response sample:', JSON.stringify(rawData.slice(0, 3)));
+
+      // Group data by timestamp to combine different energy levels
+      const timestampMap = new Map<string, { p10: number; p50: number; p100: number }>();
+
+      for (const item of rawData) {
+        if (!item.time_tag || item.flux === null) continue;
+
+        const ts = item.time_tag;
+        if (!timestampMap.has(ts)) {
+          timestampMap.set(ts, { p10: 0, p50: 0, p100: 0 });
+        }
+
+        const entry = timestampMap.get(ts)!;
+        const energy = item.energy;
+
+        if (energy === '>=10 MeV') {
+          entry.p10 = parseFloat(item.flux) || 0;
+        } else if (energy === '>=50 MeV') {
+          entry.p50 = parseFloat(item.flux) || 0;
+        } else if (energy === '>=100 MeV') {
+          entry.p100 = parseFloat(item.flux) || 0;
+        }
+      }
+
+      const documents: ProtonFluxDoc[] = [];
+      for (const [ts, values] of timestampMap) {
+        documents.push({
+          ts: new Date(ts),
+          p10_pfu: values.p10,
+          p50_pfu: values.p50,
+          p100_pfu: values.p100,
+          s_scale: calculateSScale(values.p10),
+        });
+      }
+
+      documents.sort((a, b) => a.ts.getTime() - b.ts.getTime());
+
+      return NextResponse.json({
+        success: true,
+        data: documents.slice(-limit),
+        count: documents.length,
+        source: 'noaa-live-fallback',
+      });
+    }
+
     return NextResponse.json({
       success: true,
       data: data.reverse(), // Return chronological order

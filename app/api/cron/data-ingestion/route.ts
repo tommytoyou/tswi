@@ -19,16 +19,22 @@ export async function GET(request: NextRequest) {
       kpIndex: { success: false, records: 0 },
       xrayFlux: { success: false, records: 0 },
       solarEvents: { success: false, records: 0 },
+      solarWindPlasma: { success: false, records: 0 },
+      protonFlux: { success: false, records: 0 },
+      dst: { success: false, records: 0 },
     };
 
     // Fetch all NOAA data sources in parallel
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5000';
 
-    const [solarWindRes, kpIndexRes, xrayFluxRes, solarEventsRes] = await Promise.allSettled([
+    const [solarWindRes, kpIndexRes, xrayFluxRes, solarEventsRes, plasmaRes, protonRes, dstRes] = await Promise.allSettled([
       fetch(`${baseUrl}/api/noaa/solar-wind?fetch=latest`),
       fetch(`${baseUrl}/api/noaa/kp-index?fetch=latest`),
       fetch(`${baseUrl}/api/noaa/xray-flux?fetch=latest`),
       fetch(`${baseUrl}/api/noaa/solar-events?fetch=latest`),
+      fetch(`${baseUrl}/api/noaa/solar-wind-plasma?fetch=latest`),
+      fetch(`${baseUrl}/api/noaa/proton-flux?fetch=latest`),
+      fetch(`${baseUrl}/api/noaa/dst?fetch=latest`),
     ]);
 
     // Process solar wind data
@@ -53,6 +59,24 @@ export async function GET(request: NextRequest) {
     if (solarEventsRes.status === 'fulfilled' && solarEventsRes.value.ok) {
       const data = await solarEventsRes.value.json();
       results.solarEvents = { success: true, records: data.data?.length || 0 };
+    }
+
+    // Process solar wind plasma data
+    if (plasmaRes.status === 'fulfilled' && plasmaRes.value.ok) {
+      const data = await plasmaRes.value.json();
+      results.solarWindPlasma = { success: true, records: data.data?.length || 0 };
+    }
+
+    // Process proton flux data
+    if (protonRes.status === 'fulfilled' && protonRes.value.ok) {
+      const data = await protonRes.value.json();
+      results.protonFlux = { success: true, records: data.data?.length || 0 };
+    }
+
+    // Process DST data
+    if (dstRes.status === 'fulfilled' && dstRes.value.ok) {
+      const data = await dstRes.value.json();
+      results.dst = { success: true, records: data.data?.length || 0 };
     }
 
     // Log ingestion results
