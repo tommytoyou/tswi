@@ -6,6 +6,9 @@ import { sendAlertRuleNotifications } from '@/lib/notifications';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// Vercel Cron configuration - runs every 5 minutes
+// Add to vercel.json: { "crons": [{ "path": "/api/cron/check-alerts", "schedule": "*/5 * * * *" }] }
+
 interface CurrentMetrics {
   kp_index: number | null;
   bz_value: number | null;
@@ -29,58 +32,53 @@ async function getCurrentMetrics(): Promise<CurrentMetrics> {
   };
 
   try {
-    // Get Kp index
     const kpCollection = await getTimeSeriesCollection('timeseries_noaa_kp_index');
     const kpData = await kpCollection.findOne({}, { sort: { ts: -1 } });
     if (kpData && 'kp_index' in kpData) {
       metrics.kp_index = kpData.kp_index as number;
     }
   } catch (e) {
-    console.error('Error fetching Kp index:', e);
+    console.error('[Cron] Error fetching Kp index:', e);
   }
 
   try {
-    // Get Bz value from solar wind magnetic field
     const magCollection = await getTimeSeriesCollection('timeseries_noaa_solarwind_mag');
     const magData = await magCollection.findOne({}, { sort: { ts: -1 } });
     if (magData && 'bz_gsm' in magData) {
       metrics.bz_value = magData.bz_gsm as number;
     }
   } catch (e) {
-    console.error('Error fetching Bz value:', e);
+    console.error('[Cron] Error fetching Bz value:', e);
   }
 
   try {
-    // Get solar wind speed from plasma data
     const plasmaCollection = await getTimeSeriesCollection('timeseries_solarwind_plasma');
     const plasmaData = await plasmaCollection.findOne({}, { sort: { ts: -1 } });
     if (plasmaData && 'speed_kms' in plasmaData) {
       metrics.solar_wind_speed = plasmaData.speed_kms as number;
     }
   } catch (e) {
-    console.error('Error fetching solar wind speed:', e);
+    console.error('[Cron] Error fetching solar wind speed:', e);
   }
 
   try {
-    // Get X-ray flux
     const xrayCollection = await getTimeSeriesCollection('timeseries_noaa_xray_flux');
     const xrayData = await xrayCollection.findOne({}, { sort: { ts: -1 } });
     if (xrayData && 'flux' in xrayData) {
       metrics.xray_flux = xrayData.flux as number;
     }
   } catch (e) {
-    console.error('Error fetching X-ray flux:', e);
+    console.error('[Cron] Error fetching X-ray flux:', e);
   }
 
   try {
-    // Get proton flux
     const protonCollection = await getTimeSeriesCollection('timeseries_goes_protons');
     const protonData = await protonCollection.findOne({}, { sort: { ts: -1 } });
     if (protonData && 'p10_pfu' in protonData) {
       metrics.proton_flux = protonData.p10_pfu as number;
     }
   } catch (e) {
-    console.error('Error fetching proton flux:', e);
+    console.error('[Cron] Error fetching proton flux:', e);
   }
 
   return metrics;
@@ -139,52 +137,58 @@ async function wasRecentlyTriggered(ruleId: string, cooldownMinutes: number = 60
 }
 
 /**
- * GET /api/alerts/check
+ * GET /api/cron/check-alerts
  *
- * Evaluates all enabled alert rules against current space weather data
- * and logs any triggered alerts to the alert_history collection.
+ * Cron endpoint to check all enabled alert rules.
+ * Can be called by Vercel Cron, external cron services, or manually.
  *
  * Query params:
- * - dry_run: 'true' to check without saving to history
  * - cooldown: minutes to wait before re-triggering same rule (default: 60)
+ * - secret: optional secret for authentication (CRON_SECRET env var)
  */
 export async function GET(request: Request) {
+  const startTime = Date.now();
+
   try {
+    // Optional authentication via secret
     const url = new URL(request.url);
-    const dryRun = url.searchParams.get('dry_run') === 'true';
+    const secret = url.searchParams.get('secret');
+    const cronSecret = process.env.CRON_SECRET;
+
+    if (cronSecret && secret !== cronSecret) {
+      // Check for Vercel cron header as alternative
+      const authHeader = request.headers.get('authorization');
+      if (authHeader !== `Bearer ${cronSecret}`) {
+        return NextResponse.json(
+          { success: false, error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+    }
+
     const cooldownMinutes = parseInt(url.searchParams.get('cooldown') || '60');
 
     // Fetch current metrics
     const metrics = await getCurrentMetrics();
+    console.log('[Cron] Current metrics:', metrics);
 
     // Get all enabled rules
     const rulesCollection = await getCollection('alert_rules');
     const rules = await rulesCollection.find({ enabled: true }).toArray() as unknown as AlertRule[];
 
-    const results: {
-      rule_id: string;
-      rule_name: string;
-      triggered: boolean;
-      conditions_met: Array<{
-        metric: AlertMetric;
-        operator: AlertOperator;
-        threshold: number;
-        actual_value: number | null;
-        met: boolean;
-      }>;
-      saved: boolean;
-      skipped_cooldown: boolean;
-      notifications?: {
-        channels_attempted: string[];
-        channels_succeeded: string[];
-        errors: Record<string, string>;
-      };
-    }[] = [];
+    console.log(`[Cron] Checking ${rules.length} enabled rules`);
 
     const historyCollection = await getCollection('alert_history');
 
+    let triggeredCount = 0;
+    let savedCount = 0;
+    let notificationsSentCount = 0;
+    const errors: string[] = [];
+
     for (const rule of rules) {
       const ruleId = rule._id?.toString() || '';
+
+      // Evaluate all conditions
       const conditionsResults = rule.conditions.map((condition) => {
         const result = evaluateCondition(
           condition.metric,
@@ -204,16 +208,9 @@ export async function GET(request: Request) {
       // All conditions must be met (AND logic)
       const allConditionsMet = conditionsResults.every((c) => c.met);
 
-      let saved = false;
-      let skippedCooldown = false;
+      if (allConditionsMet) {
+        triggeredCount++;
 
-      let notificationResult: {
-        channels_attempted: string[];
-        channels_succeeded: string[];
-        errors: Record<string, string>;
-      } | undefined;
-
-      if (allConditionsMet && !dryRun) {
         // Check cooldown
         const recentlyTriggered = await wasRecentlyTriggered(ruleId, cooldownMinutes);
 
@@ -235,119 +232,74 @@ export async function GET(request: Request) {
           };
 
           await historyCollection.insertOne(triggeredAlert as any);
-          saved = true;
+          savedCount++;
+
+          console.log(`[Cron] Alert triggered: ${rule.name} (${rule.severity})`);
 
           // Send notifications if configured
           const channels = rule.notification_channels || [];
           if (channels.length > 0) {
-            notificationResult = await sendAlertRuleNotifications(
-              rule,
-              triggeredAlert,
-              metrics as unknown as Record<string, number | null>
-            );
-            console.log(`[Alert Check] Rule "${rule.name}" notifications:`, notificationResult);
+            try {
+              const notificationResult = await sendAlertRuleNotifications(
+                rule,
+                triggeredAlert,
+                metrics as unknown as Record<string, number | null>
+              );
+
+              if (notificationResult.channels_succeeded.length > 0) {
+                notificationsSentCount++;
+                console.log(`[Cron] Notifications sent for "${rule.name}":`, notificationResult.channels_succeeded);
+              }
+
+              if (Object.keys(notificationResult.errors).length > 0) {
+                errors.push(`${rule.name}: ${JSON.stringify(notificationResult.errors)}`);
+              }
+            } catch (notifyError: any) {
+              errors.push(`${rule.name}: ${notifyError.message}`);
+              console.error(`[Cron] Notification error for "${rule.name}":`, notifyError);
+            }
           }
         } else {
-          skippedCooldown = true;
+          console.log(`[Cron] Alert "${rule.name}" skipped (cooldown)`);
         }
       }
-
-      results.push({
-        rule_id: ruleId,
-        rule_name: rule.name,
-        triggered: allConditionsMet,
-        conditions_met: conditionsResults,
-        saved,
-        skipped_cooldown: skippedCooldown,
-        notifications: notificationResult,
-      });
     }
 
-    const triggeredRules = results.filter((r) => r.triggered);
-    const savedAlerts = results.filter((r) => r.saved);
-    const notificationsSent = results.filter((r) => r.notifications && r.notifications.channels_succeeded.length > 0);
+    const duration = Date.now() - startTime;
 
     return NextResponse.json({
       success: true,
+      message: 'Alert check completed',
+      stats: {
+        rules_checked: rules.length,
+        triggered_count: triggeredCount,
+        saved_count: savedCount,
+        notifications_sent: notificationsSentCount,
+        cooldown_minutes: cooldownMinutes,
+        duration_ms: duration,
+      },
       current_metrics: metrics,
-      rules_checked: rules.length,
-      triggered_count: triggeredRules.length,
-      saved_count: savedAlerts.length,
-      notifications_sent: notificationsSent.length,
-      dry_run: dryRun,
-      results,
+      errors: errors.length > 0 ? errors : undefined,
+      checked_at: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error('Error checking alerts:', error);
+    console.error('[Cron] Error checking alerts:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to check alerts' },
+      {
+        success: false,
+        error: error.message || 'Failed to check alerts',
+        duration_ms: Date.now() - startTime,
+      },
       { status: 500 }
     );
   }
 }
 
 /**
- * POST /api/alerts/check
+ * POST /api/cron/check-alerts
  *
- * Force check with custom metric values (useful for testing rules)
+ * Alternative POST endpoint for services that prefer POST for webhooks
  */
 export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const { metrics: customMetrics, rule_ids } = body;
-
-    // Use custom metrics or fetch current
-    const metrics: CurrentMetrics = customMetrics || await getCurrentMetrics();
-    metrics.fetched_at = new Date();
-
-    // Get rules to check
-    const rulesCollection = await getCollection('alert_rules');
-    const filter: any = { enabled: true };
-    if (rule_ids && rule_ids.length > 0) {
-      const { ObjectId } = await import('mongodb');
-      filter._id = { $in: rule_ids.map((id: string) => new ObjectId(id)) };
-    }
-
-    const rules = await rulesCollection.find(filter).toArray() as unknown as AlertRule[];
-
-    const results = rules.map((rule) => {
-      const conditionsResults = rule.conditions.map((condition) => {
-        const result = evaluateCondition(
-          condition.metric,
-          condition.operator,
-          condition.value,
-          metrics
-        );
-        return {
-          metric: condition.metric,
-          operator: condition.operator,
-          threshold: condition.value,
-          actual_value: result.actual_value,
-          met: result.met,
-        };
-      });
-
-      return {
-        rule_id: rule._id?.toString(),
-        rule_name: rule.name,
-        severity: rule.severity,
-        triggered: conditionsResults.every((c) => c.met),
-        conditions_met: conditionsResults,
-      };
-    });
-
-    return NextResponse.json({
-      success: true,
-      test_mode: true,
-      metrics_used: metrics,
-      rules_checked: rules.length,
-      results,
-    });
-  } catch (error: any) {
-    console.error('Error testing alerts:', error);
-    return NextResponse.json(
-      { success: false, error: error.message || 'Failed to test alerts' },
-      { status: 500 }
-    );
-  }
+  return GET(request);
 }

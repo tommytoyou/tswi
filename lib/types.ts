@@ -383,6 +383,10 @@ export const AlertRuleConditionSchema = z.object({
 });
 export type AlertRuleCondition = z.infer<typeof AlertRuleConditionSchema>;
 
+// Notification channel types
+export const NotificationChannelSchema = z.enum(['email', 'webhook']);
+export type NotificationChannel = z.infer<typeof NotificationChannelSchema>;
+
 // Alert Rule (stored in alert_rules collection)
 export const AlertRuleSchema = z.object({
   _id: z.string().optional(),
@@ -391,6 +395,10 @@ export const AlertRuleSchema = z.object({
   conditions: z.array(AlertRuleConditionSchema).min(1),
   severity: AlertSeveritySchema,
   enabled: z.boolean().default(true),
+  // Notification settings
+  notification_channels: z.array(NotificationChannelSchema).default([]),
+  webhook_url: z.string().url().optional(),
+  email: z.string().email().optional(),
   created_at: z.date(),
   updated_at: z.date(),
 });

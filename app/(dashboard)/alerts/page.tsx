@@ -26,9 +26,13 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
+  Mail,
+  Webhook,
 } from 'lucide-react';
 
 // Types
+type NotificationChannel = 'email' | 'webhook';
+
 interface AlertCondition {
   metric: 'kp_index' | 'bz_value' | 'solar_wind_speed' | 'xray_flux' | 'proton_flux';
   operator: 'gt' | 'gte' | 'lt' | 'lte' | 'eq';
@@ -42,6 +46,9 @@ interface AlertRule {
   conditions: AlertCondition[];
   severity: 'low' | 'medium' | 'high' | 'critical';
   enabled: boolean;
+  notification_channels: NotificationChannel[];
+  webhook_url?: string;
+  email?: string;
   created_at: string;
   updated_at: string;
 }
@@ -146,6 +153,9 @@ export default function AlertsPage() {
     conditions: [{ metric: 'kp_index' as const, operator: 'gte' as const, value: 5 }],
     severity: 'medium' as const,
     enabled: true,
+    notification_channels: [] as NotificationChannel[],
+    webhook_url: '',
+    email: '',
   });
 
   // Fetch rules
@@ -253,14 +263,41 @@ export default function AlertsPage() {
     }
   };
 
+  // Toggle notification channel
+  const toggleNotificationChannel = (channel: NotificationChannel) => {
+    setNewRule(prev => ({
+      ...prev,
+      notification_channels: prev.notification_channels.includes(channel)
+        ? prev.notification_channels.filter(c => c !== channel)
+        : [...prev.notification_channels, channel],
+    }));
+  };
+
   // Create rule
   const createRule = async () => {
     if (!newRule.name.trim()) return;
+
+    // Validate notification settings
+    if (newRule.notification_channels.includes('webhook') && !newRule.webhook_url.trim()) {
+      alert('Please provide a webhook URL');
+      return;
+    }
+    if (newRule.notification_channels.includes('email') && !newRule.email.trim()) {
+      alert('Please provide an email address');
+      return;
+    }
+
     try {
+      const payload = {
+        ...newRule,
+        webhook_url: newRule.webhook_url.trim() || undefined,
+        email: newRule.email.trim() || undefined,
+      };
+
       const res = await fetch('/api/alerts/rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newRule),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
@@ -272,6 +309,9 @@ export default function AlertsPage() {
           conditions: [{ metric: 'kp_index', operator: 'gte', value: 5 }],
           severity: 'medium',
           enabled: true,
+          notification_channels: [],
+          webhook_url: '',
+          email: '',
         });
       }
     } catch (error) {
@@ -478,6 +518,73 @@ export default function AlertsPage() {
               ))}
             </div>
 
+            {/* Notification Settings */}
+            <div className="space-y-4 pt-4 border-t border-slate-700">
+              <div className="flex items-center justify-between">
+                <Label>Notification Channels (optional)</Label>
+                <p className="text-xs text-slate-500">Get notified when this rule triggers</p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => toggleNotificationChannel('webhook')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                    newRule.notification_channels.includes('webhook')
+                      ? 'bg-blue-500/20 border-blue-500/50 text-blue-400'
+                      : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
+                  }`}
+                >
+                  <Webhook className="h-4 w-4" />
+                  Webhook
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleNotificationChannel('email')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                    newRule.notification_channels.includes('email')
+                      ? 'bg-blue-500/20 border-blue-500/50 text-blue-400'
+                      : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
+                  }`}
+                >
+                  <Mail className="h-4 w-4" />
+                  Email
+                </button>
+              </div>
+
+              {newRule.notification_channels.includes('webhook') && (
+                <div className="space-y-2">
+                  <Label htmlFor="webhook_url">Webhook URL</Label>
+                  <Input
+                    id="webhook_url"
+                    type="url"
+                    placeholder="https://your-server.com/webhook"
+                    value={newRule.webhook_url}
+                    onChange={(e) => setNewRule({ ...newRule, webhook_url: e.target.value })}
+                  />
+                  <p className="text-xs text-slate-500">
+                    We&apos;ll POST a JSON payload when this alert triggers
+                  </p>
+                </div>
+              )}
+
+              {newRule.notification_channels.includes('email') && (
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={newRule.email}
+                    onChange={(e) => setNewRule({ ...newRule, email: e.target.value })}
+                  />
+                  <p className="text-xs text-slate-500">
+                    Requires RESEND_API_KEY to be configured
+                  </p>
+                </div>
+              )}
+            </div>
+
             <div className="flex items-center justify-between pt-4">
               <div className="flex items-center gap-2">
                 <Switch
@@ -541,26 +648,61 @@ export default function AlertsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-2 text-sm text-slate-400">
+                <div className="flex items-center gap-2 text-sm text-slate-400 flex-wrap">
                   {rule.conditions.map((c, i) => (
                     <span key={i} className="bg-slate-800 px-2 py-1 rounded font-mono">
                       {METRICS.find(m => m.value === c.metric)?.label} {formatOperator(c.operator)} {c.metric === 'xray_flux' ? c.value.toExponential(0) : c.value}
                     </span>
                   ))}
+                  {/* Notification indicators */}
+                  {rule.notification_channels && rule.notification_channels.length > 0 && (
+                    <span className="ml-2 flex items-center gap-1 text-xs text-slate-500">
+                      {rule.notification_channels.includes('webhook') && (
+                        <span className="flex items-center gap-1 bg-slate-800/50 px-2 py-1 rounded" title={rule.webhook_url}>
+                          <Webhook className="h-3 w-3" />
+                        </span>
+                      )}
+                      {rule.notification_channels.includes('email') && (
+                        <span className="flex items-center gap-1 bg-slate-800/50 px-2 py-1 rounded" title={rule.email}>
+                          <Mail className="h-3 w-3" />
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </div>
                 {expandedRule === rule._id && (
-                  <div className="mt-4 pt-4 border-t border-slate-700 flex items-center justify-between">
-                    <div className="text-xs text-slate-500">
-                      Created: {new Date(rule.created_at).toLocaleString()}
+                  <div className="mt-4 pt-4 border-t border-slate-700 space-y-3">
+                    {/* Notification details */}
+                    {rule.notification_channels && rule.notification_channels.length > 0 && (
+                      <div className="text-xs text-slate-400 space-y-1">
+                        <p className="text-slate-500 font-medium">Notifications:</p>
+                        {rule.notification_channels.includes('webhook') && rule.webhook_url && (
+                          <p className="flex items-center gap-2">
+                            <Webhook className="h-3 w-3" />
+                            <span className="font-mono truncate max-w-xs">{rule.webhook_url}</span>
+                          </p>
+                        )}
+                        {rule.notification_channels.includes('email') && rule.email && (
+                          <p className="flex items-center gap-2">
+                            <Mail className="h-3 w-3" />
+                            <span>{rule.email}</span>
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-slate-500">
+                        Created: {new Date(rule.created_at).toLocaleString()}
+                      </div>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteRule(rule._id)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </Button>
                     </div>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => deleteRule(rule._id)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
-                    </Button>
                   </div>
                 )}
               </CardContent>

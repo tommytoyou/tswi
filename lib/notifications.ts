@@ -3,7 +3,7 @@
  * Handles email, SMS, webhook, and WebSocket notifications
  */
 
-import type { Alert, AlertHistory } from './types';
+import type { Alert, AlertHistory, AlertRule, TriggeredAlert, AlertSeverity, NotificationChannel } from './types';
 
 // ============================================================================
 // EMAIL NOTIFICATIONS
@@ -348,4 +348,251 @@ export async function sendAlertNotification(
     console.error('[Notification] Send failed:', error);
     return false;
   }
+}
+
+// ============================================================================
+// ALERT RULE NOTIFICATIONS (New system with multi-channel support)
+// ============================================================================
+
+export interface AlertRuleWebhookPayload {
+  alert_name: string;
+  rule_id: string;
+  severity: AlertSeverity;
+  triggered_at: string;
+  conditions_met: Array<{
+    metric: string;
+    operator: string;
+    threshold: number;
+    actual_value: number;
+  }>;
+  current_values: Record<string, number | null>;
+  dashboard_url: string;
+}
+
+/**
+ * Send webhook notification for AlertRule
+ */
+export async function sendAlertRuleWebhook(
+  webhookUrl: string,
+  payload: AlertRuleWebhookPayload
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'TSWI-Alert-System/1.0',
+        'X-TSWI-Event': 'alert.triggered',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 100)}`);
+    }
+
+    console.log(`[Webhook] Successfully sent to ${webhookUrl}`);
+    return { success: true };
+
+  } catch (error: any) {
+    console.error('[Webhook] Send failed:', error);
+    return { success: false, error: error.message || 'Unknown error' };
+  }
+}
+
+/**
+ * Generate email HTML for AlertRule notification
+ */
+export function generateAlertRuleEmail(
+  rule: AlertRule,
+  triggeredAlert: Omit<TriggeredAlert, '_id'>,
+  currentMetrics: Record<string, number | null>
+): string {
+  const severityColors: Record<string, string> = {
+    critical: '#ef4444',
+    high: '#f97316',
+    medium: '#eab308',
+    low: '#3b82f6',
+  };
+
+  const color = severityColors[rule.severity] || '#3b82f6';
+  const dashboardUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+  const metricLabels: Record<string, string> = {
+    kp_index: 'Kp Index',
+    bz_value: 'Bz (nT)',
+    solar_wind_speed: 'Solar Wind Speed (km/s)',
+    xray_flux: 'X-Ray Flux (W/m²)',
+    proton_flux: 'Proton Flux (pfu)',
+  };
+
+  const operatorLabels: Record<string, string> = {
+    gt: '>',
+    gte: '≥',
+    lt: '<',
+    lte: '≤',
+    eq: '=',
+  };
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Space Weather Alert</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8fafc;">
+
+  <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+    <h1 style="margin: 0; font-size: 28px;">🛰️ Space Weather Alert</h1>
+    <p style="margin: 10px 0 0; opacity: 0.9;">TSWI Monitoring System</p>
+  </div>
+
+  <div style="background: white; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px; padding: 30px;">
+
+    <!-- Severity Badge -->
+    <div style="margin-bottom: 20px;">
+      <span style="background: ${color}; color: white; padding: 8px 16px; border-radius: 20px; font-weight: bold; text-transform: uppercase; font-size: 12px; letter-spacing: 1px;">
+        ${rule.severity} Severity
+      </span>
+    </div>
+
+    <!-- Alert Name -->
+    <h2 style="color: #111827; margin: 20px 0 10px;">${rule.name}</h2>
+    ${rule.description ? `<p style="color: #6b7280; margin: 0 0 20px;">${rule.description}</p>` : ''}
+
+    <!-- Conditions Met -->
+    <h3 style="color: #374151; font-size: 16px; margin: 25px 0 15px;">Triggered Conditions:</h3>
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+      ${triggeredAlert.conditions_met.map(c => `
+        <tr style="border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 12px 8px; color: #6b7280; font-size: 14px;">${metricLabels[c.metric] || c.metric}</td>
+          <td style="padding: 12px 8px; color: #111827; font-weight: 600; text-align: right;">
+            ${c.metric === 'xray_flux' ? c.actual_value.toExponential(2) : c.actual_value.toFixed(1)}
+            <span style="color: #9ca3af; font-weight: normal;"> (threshold: ${operatorLabels[c.operator]} ${c.metric === 'xray_flux' ? c.threshold.toExponential(0) : c.threshold})</span>
+          </td>
+        </tr>
+      `).join('')}
+    </table>
+
+    <!-- Current Conditions -->
+    <h3 style="color: #374151; font-size: 16px; margin: 25px 0 15px;">Current Space Weather:</h3>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+      ${Object.entries(currentMetrics).filter(([k]) => k !== 'fetched_at').map(([metric, value]) => `
+        <div style="background: #f8fafc; padding: 12px; border-radius: 8px;">
+          <div style="color: #6b7280; font-size: 12px;">${metricLabels[metric] || metric}</div>
+          <div style="color: #111827; font-size: 16px; font-weight: 600; margin-top: 4px;">
+            ${value === null ? 'N/A' : (metric === 'xray_flux' ? value.toExponential(2) : value.toFixed(1))}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+
+    <!-- Timestamp -->
+    <p style="color: #9ca3af; font-size: 13px; margin: 25px 0 0;">
+      Triggered at: ${new Date(triggeredAlert.triggered_at).toLocaleString('en-US', {
+        dateStyle: 'full',
+        timeStyle: 'long',
+      })}
+    </p>
+
+    <!-- Action Buttons -->
+    <div style="margin-top: 30px; text-align: center;">
+      <a href="${dashboardUrl}"
+         style="display: inline-block; background: #3b82f6; color: white; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+        View Dashboard
+      </a>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div style="text-align: center; margin-top: 30px; padding: 20px; color: #9ca3af; font-size: 12px;">
+    <p>You received this alert because you configured "${rule.name}" to notify via email.</p>
+    <p style="margin: 10px 0;">
+      <a href="${dashboardUrl}/alerts" style="color: #3b82f6; text-decoration: none;">Manage Alert Rules</a>
+    </p>
+    <p style="margin: 10px 0 0;">TSWI Space Weather Intelligence Platform</p>
+  </div>
+
+</body>
+</html>
+  `.trim();
+}
+
+/**
+ * Send email notification for AlertRule
+ */
+export async function sendAlertRuleEmail(
+  email: string,
+  rule: AlertRule,
+  triggeredAlert: Omit<TriggeredAlert, '_id'>,
+  currentMetrics: Record<string, number | null>
+): Promise<{ success: boolean; error?: string }> {
+  const html = generateAlertRuleEmail(rule, triggeredAlert, currentMetrics);
+
+  const success = await sendEmail({
+    to: email,
+    subject: `[${rule.severity.toUpperCase()}] Space Weather Alert: ${rule.name}`,
+    html,
+    text: `${rule.name} - ${rule.severity} severity alert triggered. ${triggeredAlert.conditions_met.map(c => `${c.metric}: ${c.actual_value}`).join(', ')}`,
+  });
+
+  return { success };
+}
+
+/**
+ * Send notifications for a triggered AlertRule through all configured channels
+ */
+export async function sendAlertRuleNotifications(
+  rule: AlertRule,
+  triggeredAlert: Omit<TriggeredAlert, '_id'>,
+  currentMetrics: Record<string, number | null>
+): Promise<{
+  channels_attempted: NotificationChannel[];
+  channels_succeeded: NotificationChannel[];
+  errors: Record<string, string>;
+}> {
+  const channels = rule.notification_channels || [];
+  const channelsAttempted: NotificationChannel[] = [];
+  const channelsSucceeded: NotificationChannel[] = [];
+  const errors: Record<string, string> = {};
+
+  const dashboardUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+  for (const channel of channels) {
+    channelsAttempted.push(channel);
+
+    if (channel === 'webhook' && rule.webhook_url) {
+      const payload: AlertRuleWebhookPayload = {
+        alert_name: rule.name,
+        rule_id: rule._id || '',
+        severity: rule.severity,
+        triggered_at: triggeredAlert.triggered_at.toISOString(),
+        conditions_met: triggeredAlert.conditions_met,
+        current_values: currentMetrics,
+        dashboard_url: dashboardUrl,
+      };
+
+      const result = await sendAlertRuleWebhook(rule.webhook_url, payload);
+      if (result.success) {
+        channelsSucceeded.push('webhook');
+      } else {
+        errors['webhook'] = result.error || 'Unknown error';
+      }
+    }
+
+    if (channel === 'email' && rule.email) {
+      const result = await sendAlertRuleEmail(rule.email, rule, triggeredAlert, currentMetrics);
+      if (result.success) {
+        channelsSucceeded.push('email');
+      } else {
+        errors['email'] = result.error || 'Email service unavailable';
+      }
+    }
+  }
+
+  return { channels_attempted: channelsAttempted, channels_succeeded: channelsSucceeded, errors };
 }
