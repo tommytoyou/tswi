@@ -10,6 +10,7 @@ import { DstCard } from '@/components/dashboard/dst-card';
 import { SuryaCardV2 } from '@/components/dashboard/surya-card-v2';
 import { SolarEventsCard } from '@/components/dashboard/solar-events-card';
 import { CmeCard } from '@/components/dashboard/cme-card';
+import { RsgScalesCard } from '@/components/dashboard/rsg-scales-card';
 
 import { StatusBar } from '@/components/dashboard/status-bar';
 import { Satellite } from 'lucide-react';
@@ -135,6 +136,16 @@ export default function DashboardPage() {
           autoRefresh={autoRefresh}
           onAutoRefreshToggle={() => setAutoRefresh(!autoRefresh)}
         />
+
+        {/* NOAA R/S/G Space Weather Scales - Prominent at top */}
+        <div>
+          <div className="mb-4">
+            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+              Current Conditions
+            </h2>
+          </div>
+          <RsgScalesCard key={`rsg-${refreshTrigger}`} />
+        </div>
 
         {/* AI Predictions Section */}
         <div>
