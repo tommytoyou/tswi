@@ -80,12 +80,26 @@ function GlobeViewerComponent() {
           navigationHelpButton: true,
         });
 
+        // Configure clock for real-time sun position
+        viewer.clock.currentTime = Cesium.JulianDate.now();
+        viewer.clock.shouldAnimate = true;
+        viewer.clock.clockRange = Cesium.ClockRange.UNBOUNDED;
+        viewer.clock.multiplier = 1; // Real-time (1 second = 1 second)
+
         // Enable lighting for realistic day/night visualization
         viewer.scene.globe.enableLighting = true;
         viewer.scene.globe.showGroundAtmosphere = true;
         if (viewer.scene.skyAtmosphere) {
           viewer.scene.skyAtmosphere.show = true;
         }
+
+        // Debug: Log current time info
+        const cesiumTime = Cesium.JulianDate.toDate(viewer.clock.currentTime);
+        console.log('🌍 Cesium clock initialized:');
+        console.log('   Cesium time (UTC):', cesiumTime.toISOString());
+        console.log('   Browser UTC:', new Date().toISOString());
+        console.log('   Clock multiplier:', viewer.clock.multiplier);
+        console.log('   Globe lighting enabled:', viewer.scene.globe.enableLighting);
 
         // Set initial camera position (centered over US)
         viewer.camera.setView({
