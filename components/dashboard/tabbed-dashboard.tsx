@@ -53,8 +53,8 @@ interface TabConfig {
 }
 
 const tabs: TabConfig[] = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'solar-wind', label: 'Solar Wind', icon: Wind },
+  { id: 'predictive-modelling', label: 'Predictive Modelling', icon: LayoutDashboard },
   { id: 'events', label: 'Events', icon: Flame },
   { id: 'globe', label: 'Globe', icon: Globe2 },
   { id: 'aurora', label: 'Aurora', icon: Sparkles },
@@ -65,7 +65,7 @@ export function TabbedDashboard() {
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
   const validTabs = tabs.map(t => t.id);
-  const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'overview';
+  const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'solar-wind';
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -112,8 +112,8 @@ export function TabbedDashboard() {
 
         {/* Tab Content - fills remaining space */}
         <div className="flex-1 min-h-0 overflow-hidden">
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="h-full m-0 p-4 overflow-hidden">
+          {/* Predictive Modelling Tab */}
+          <TabsContent value="predictive-modelling" className="h-full m-0 p-4 overflow-hidden">
             <div className="h-full flex flex-col gap-4">
               {/* RSG Scales - fits content */}
               <div className="flex-shrink-0">
