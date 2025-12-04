@@ -9,42 +9,35 @@ export default function HomePage() {
           TSWI
         </h1>
         <p className="text-2xl text-slate-300 mb-2">
-          Space Weather Intelligence Platform
+          Tactical Space Weather Intelligence
         </p>
         <p className="text-lg text-slate-400 mb-12">
-          Real-time monitoring of solar wind, geomagnetic indices, TEC, flares, and SEP events
+          Real-time monitoring of solar wind, geomagnetic indices, aurora forecasts, and AI-powered predictions
         </p>
 
-        <div className="flex gap-4 justify-center">
-          <Link href="/dashboard">
-            <Button size="lg" className="text-lg">
-              Launch Dashboard
-            </Button>
-          </Link>
-          <Link href="/map">
-            <Button size="lg" variant="outline" className="text-lg">
-              View Globe
-            </Button>
-          </Link>
-        </div>
+        <Link href="/dashboard">
+          <Button size="lg" className="text-lg px-8">
+            Launch Dashboard
+          </Button>
+        </Link>
 
         <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
           <div className="p-6 bg-slate-800/50 rounded-lg">
             <h3 className="text-xl font-semibold text-white mb-2">Real-Time Data</h3>
             <p className="text-slate-400">
-              Monitor Kp, Dst, solar wind plasma & magnetic field, GOES protons, and TEC with sub-minute cadence
+              Monitor Kp, Dst, solar wind plasma & magnetic field, GOES protons, and X-ray flux with minute cadence
             </p>
           </div>
           <div className="p-6 bg-slate-800/50 rounded-lg">
-            <h3 className="text-xl font-semibold text-white mb-2">Smart Alerts</h3>
+            <h3 className="text-xl font-semibold text-white mb-2">AI Predictions</h3>
             <p className="text-slate-400">
-              Custom alert rules for storm conditions, flares, SEP events, and TEC gradients
+              Solar flare probability forecasts powered by IBM/NASA Surya AI model with confidence metrics
             </p>
           </div>
           <div className="p-6 bg-slate-800/50 rounded-lg">
-            <h3 className="text-xl font-semibold text-white mb-2">3D Visualization</h3>
+            <h3 className="text-xl font-semibold text-white mb-2">Custom Alerts</h3>
             <p className="text-slate-400">
-              Cesium globe with Kp belts, TEC overlays, satellite tracking, and SuperMAG stations
+              Set up alert rules for storm conditions, flares, and SEP events with webhook and email notifications
             </p>
           </div>
         </div>

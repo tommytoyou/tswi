@@ -28,7 +28,8 @@
       "WebFetch(domain:services.swpc.noaa.gov)",
       "mcp__ide__getDiagnostics",
       "WebFetch(domain:www.tswi-ai.com)",
-      "Bash(curl.exe:*)"
+      "Bash(curl.exe:*)",
+      "Bash(dir \"C:\\Users\\tommy\\tswi\\components\\ui\" /b)"
     ],
     "deny": [],
     "ask": []
