@@ -179,7 +179,7 @@ export function RsgScalesCard() {
   // Fetch X-ray flux for R-Scale
   const fetchRScale = async () => {
     try {
-      const response = await fetch('/api/noaa/xray-flux?limit=1440'); // 24 hours of data
+      const response = await fetch('/api/noaa/xray-flux?fetch=latest&limit=1440'); // 24 hours of data
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
 
@@ -208,7 +208,7 @@ export function RsgScalesCard() {
   // Fetch proton flux for S-Scale
   const fetchSScale = async () => {
     try {
-      const response = await fetch('/api/noaa/proton-flux?limit=288'); // 24 hours
+      const response = await fetch('/api/noaa/proton-flux?fetch=latest&limit=288'); // 24 hours
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
 
@@ -237,7 +237,7 @@ export function RsgScalesCard() {
   // Fetch Kp index for G-Scale
   const fetchGScale = async () => {
     try {
-      const response = await fetch('/api/noaa/kp-index?limit=1440'); // 24 hours
+      const response = await fetch('/api/noaa/kp-index?fetch=latest&limit=1440'); // 24 hours
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
 

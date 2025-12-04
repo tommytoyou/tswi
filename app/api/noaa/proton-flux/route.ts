@@ -34,6 +34,59 @@ function calculateSScale(p10: number): number {
 }
 
 /**
+ * Helper function to fetch and parse NOAA proton flux data
+ */
+async function fetchFromNOAA(limit: number): Promise<{ data: ProtonFluxDoc[]; source: string }> {
+  const noaaUrl = 'https://services.swpc.noaa.gov/json/goes/primary/integral-protons-1-day.json';
+  const response = await fetch(noaaUrl, { cache: 'no-store' });
+
+  if (!response.ok) {
+    throw new Error(`NOAA API returned ${response.status}`);
+  }
+
+  const rawData = await response.json();
+  // Data format: {"time_tag":"2025-12-02T02:05:00Z","satellite":18,"flux":1.809,"energy":">=10 MeV"}
+
+  // Group data by timestamp to combine different energy levels
+  const timestampMap = new Map<string, { p10: number; p50: number; p100: number }>();
+
+  for (const item of rawData) {
+    if (!item.time_tag || item.flux === null) continue;
+
+    const ts = item.time_tag;
+    if (!timestampMap.has(ts)) {
+      timestampMap.set(ts, { p10: 0, p50: 0, p100: 0 });
+    }
+
+    const entry = timestampMap.get(ts)!;
+    const energy = item.energy;
+
+    if (energy === '>=10 MeV') {
+      entry.p10 = parseFloat(item.flux) || 0;
+    } else if (energy === '>=50 MeV') {
+      entry.p50 = parseFloat(item.flux) || 0;
+    } else if (energy === '>=100 MeV') {
+      entry.p100 = parseFloat(item.flux) || 0;
+    }
+  }
+
+  const documents: ProtonFluxDoc[] = [];
+  for (const [ts, values] of timestampMap) {
+    documents.push({
+      ts: new Date(ts),
+      p10_pfu: values.p10,
+      p50_pfu: values.p50,
+      p100_pfu: values.p100,
+      s_scale: calculateSScale(values.p10),
+    });
+  }
+
+  documents.sort((a, b) => a.ts.getTime() - b.ts.getTime());
+
+  return { data: documents.slice(-limit), source: 'noaa-live' };
+}
+
+/**
  * GET /api/noaa/proton-flux
  *
  * Fetches NOAA GOES integral proton flux data
@@ -44,93 +97,43 @@ function calculateSScale(p10: number): number {
  * - limit: number (default: 288, max: 1440 for 5 days at 5-min intervals)
  */
 export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const fetchMode = searchParams.get('fetch') || 'cached';
-    const limit = Math.min(parseInt(searchParams.get('limit') || '288'), 1440);
+  const { searchParams } = new URL(request.url);
+  const fetchMode = searchParams.get('fetch') || 'cached';
+  const limit = Math.min(parseInt(searchParams.get('limit') || '288'), 1440);
 
-    // If fetch=latest, get from NOAA and store in DB
-    if (fetchMode === 'latest') {
-      const noaaUrl = 'https://services.swpc.noaa.gov/json/goes/primary/integral-protons-1-day.json';
+  // If fetch=latest, always fetch from NOAA directly
+  if (fetchMode === 'latest') {
+    try {
+      const result = await fetchFromNOAA(limit);
 
-      try {
-        const response = await fetch(noaaUrl, {
-          next: { revalidate: 300 }, // Cache for 5 minutes
-        });
+      // Try to store in MongoDB (non-blocking, ignore errors)
+      getTimeSeriesCollection<ProtonFluxDoc>('timeseries_noaa_proton_flux')
+        .then(collection => {
+          const docsWithMeta = result.data.map(d => ({
+            ...d,
+            meta: { source: 'NOAA-SWPC-GOES', fetched_at: new Date() }
+          }));
+          return collection.insertMany(docsWithMeta, { ordered: false });
+        })
+        .catch(() => { /* Ignore MongoDB errors */ });
 
-        if (!response.ok) {
-          throw new Error(`NOAA API returned ${response.status}`);
-        }
-
-        const rawData = await response.json();
-
-        // Transform NOAA data to our schema
-        // Data format: {"time_tag":"2025-12-02T02:05:00Z","satellite":18,"flux":1.809,"energy":">=10 MeV"}
-        const collection = await getTimeSeriesCollection<ProtonFluxDoc>('timeseries_noaa_proton_flux');
-
-        // Group data by timestamp to combine different energy levels
-        const timestampMap = new Map<string, { p10: number; p50: number; p100: number }>();
-
-        for (const item of rawData) {
-          if (!item.time_tag || item.flux === null) continue;
-
-          const ts = item.time_tag;
-          if (!timestampMap.has(ts)) {
-            timestampMap.set(ts, { p10: 0, p50: 0, p100: 0 });
-          }
-
-          const entry = timestampMap.get(ts)!;
-          const energy = item.energy;
-
-          // Map energy levels
-          if (energy === '>=10 MeV') {
-            entry.p10 = parseFloat(item.flux) || 0;
-          } else if (energy === '>=50 MeV') {
-            entry.p50 = parseFloat(item.flux) || 0;
-          } else if (energy === '>=100 MeV') {
-            entry.p100 = parseFloat(item.flux) || 0;
-          }
-        }
-
-        // Convert to documents
-        const documents: ProtonFluxDoc[] = [];
-        for (const [ts, values] of timestampMap) {
-          documents.push({
-            ts: new Date(ts),
-            p10_pfu: values.p10,
-            p50_pfu: values.p50,
-            p100_pfu: values.p100,
-            s_scale: calculateSScale(values.p10),
-            meta: {
-              source: 'NOAA-SWPC-GOES',
-              fetched_at: new Date(),
-            },
-          });
-        }
-
-        // Sort by timestamp
-        documents.sort((a, b) => a.ts.getTime() - b.ts.getTime());
-
-        // Insert new data (upsert by timestamp)
-        if (documents.length > 0) {
-          await collection.insertMany(documents, { ordered: false }).catch(() => {
-            // Ignore duplicate key errors
-          });
-        }
-
-        return NextResponse.json({
-          success: true,
-          data: documents.slice(-limit),
-          count: documents.length,
-          source: 'noaa-live',
-        });
-      } catch (fetchError: any) {
-        console.error('NOAA proton flux fetch error:', fetchError);
-        // Fall back to cached data
-      }
+      return NextResponse.json({
+        success: true,
+        data: result.data,
+        count: result.data.length,
+        source: result.source,
+      });
+    } catch (error: any) {
+      console.error('NOAA proton flux fetch error:', error);
+      return NextResponse.json(
+        { success: false, error: error.message || 'Failed to fetch from NOAA' },
+        { status: 500 }
+      );
     }
+  }
 
-    // Return cached data from MongoDB
+  // For cached mode, try MongoDB first, then fallback to NOAA
+  try {
     const collection = await getTimeSeriesCollection<ProtonFluxDoc>('timeseries_noaa_proton_flux');
     const data = await collection
       .find({})
@@ -138,68 +141,26 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .toArray();
 
-    // If cache is empty, fetch live data directly
-    if (data.length === 0) {
-      console.log('Proton flux cache empty, fetching from NOAA directly...');
-      const noaaUrl = 'https://services.swpc.noaa.gov/json/goes/primary/integral-protons-1-day.json';
-      const response = await fetch(noaaUrl, { cache: 'no-store' });
-
-      if (!response.ok) {
-        throw new Error(`NOAA API returned ${response.status}`);
-      }
-
-      const rawData = await response.json();
-      console.log('NOAA proton response sample:', JSON.stringify(rawData.slice(0, 3)));
-
-      // Group data by timestamp to combine different energy levels
-      const timestampMap = new Map<string, { p10: number; p50: number; p100: number }>();
-
-      for (const item of rawData) {
-        if (!item.time_tag || item.flux === null) continue;
-
-        const ts = item.time_tag;
-        if (!timestampMap.has(ts)) {
-          timestampMap.set(ts, { p10: 0, p50: 0, p100: 0 });
-        }
-
-        const entry = timestampMap.get(ts)!;
-        const energy = item.energy;
-
-        if (energy === '>=10 MeV') {
-          entry.p10 = parseFloat(item.flux) || 0;
-        } else if (energy === '>=50 MeV') {
-          entry.p50 = parseFloat(item.flux) || 0;
-        } else if (energy === '>=100 MeV') {
-          entry.p100 = parseFloat(item.flux) || 0;
-        }
-      }
-
-      const documents: ProtonFluxDoc[] = [];
-      for (const [ts, values] of timestampMap) {
-        documents.push({
-          ts: new Date(ts),
-          p10_pfu: values.p10,
-          p50_pfu: values.p50,
-          p100_pfu: values.p100,
-          s_scale: calculateSScale(values.p10),
-        });
-      }
-
-      documents.sort((a, b) => a.ts.getTime() - b.ts.getTime());
-
+    if (data.length > 0) {
       return NextResponse.json({
         success: true,
-        data: documents.slice(-limit),
-        count: documents.length,
-        source: 'noaa-live-fallback',
+        data: data.reverse(), // Return chronological order
+        count: data.length,
+        source: 'mongodb-cache',
       });
     }
+  } catch (dbError) {
+    console.log('MongoDB unavailable, falling back to NOAA direct fetch');
+  }
 
+  // Fallback to NOAA if cache is empty or MongoDB unavailable
+  try {
+    const result = await fetchFromNOAA(limit);
     return NextResponse.json({
       success: true,
-      data: data.reverse(), // Return chronological order
-      count: data.length,
-      source: 'mongodb-cache',
+      data: result.data,
+      count: result.data.length,
+      source: 'noaa-live-fallback',
     });
   } catch (error: any) {
     console.error('Proton flux API error:', error);

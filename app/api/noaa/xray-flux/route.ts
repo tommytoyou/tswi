@@ -6,6 +6,37 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
+ * Helper function to fetch and parse NOAA X-ray flux data
+ */
+async function fetchFromNOAA(limit: number): Promise<{ data: any[]; source: string }> {
+  const noaaUrl = 'https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json';
+  const response = await fetch(noaaUrl, { cache: 'no-store' });
+
+  if (!response.ok) {
+    throw new Error(`NOAA API returned ${response.status}`);
+  }
+
+  const rawData = await response.json();
+  const documents: any[] = [];
+
+  for (const item of rawData) {
+    if (!item.time_tag || item.flux === null) continue;
+
+    documents.push({
+      ts: new Date(item.time_tag),
+      satellite: parseInt(item.satellite) || 0,
+      flux: parseFloat(item.flux) || 0,
+      observed_flux: parseFloat(item.observed_flux) || 0,
+      electron_correction: parseFloat(item.electron_correction) || 0,
+      electron_contamination: item.electron_contamination || 'false',
+      energy: item.energy || '0.05-0.4nm',
+    });
+  }
+
+  return { data: documents.slice(-limit), source: 'noaa-live' };
+}
+
+/**
  * GET /api/noaa/xray-flux
  *
  * Fetches NOAA GOES X-ray flux data from SWPC (6-hour rolling data)
@@ -16,76 +47,48 @@ export const dynamic = 'force-dynamic';
  * - limit: number (default: 360, max: 720 for full 6 hours)
  */
 export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const fetchMode = searchParams.get('fetch') || 'cached';
-    const limit = Math.min(parseInt(searchParams.get('limit') || '360'), 720);
+  const { searchParams } = new URL(request.url);
+  const fetchMode = searchParams.get('fetch') || 'cached';
+  const limit = Math.min(parseInt(searchParams.get('limit') || '360'), 720);
 
-    // If fetch=latest, get from NOAA and store in DB
-    if (fetchMode === 'latest') {
-      const noaaUrl = 'https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json';
+  // If fetch=latest, always fetch from NOAA directly
+  if (fetchMode === 'latest') {
+    try {
+      const result = await fetchFromNOAA(limit);
 
-      try {
-        const response = await fetch(noaaUrl, {
-          next: { revalidate: 60 }, // Cache for 1 minute
-        });
+      // Try to store in MongoDB (non-blocking, ignore errors)
+      getTimeSeriesCollection<NoaaXrayFlux>('timeseries_noaa_xray_flux')
+        .then(collection => {
+          const docsWithMeta = result.data.map(d => ({
+            ...d,
+            meta: { source: 'NOAA-GOES', fetched_at: new Date() }
+          }));
+          return collection.insertMany(docsWithMeta, { ordered: false });
+        })
+        .catch(() => { /* Ignore MongoDB errors */ });
 
-        if (!response.ok) {
-          throw new Error(`NOAA API returned ${response.status}`);
-        }
+      const latest = result.data[result.data.length - 1] || null;
+      const flareClass = latest ? getFlareClass(latest.flux) : null;
 
-        const rawData = await response.json();
-
-        // Transform NOAA data to our schema
-        const collection = await getTimeSeriesCollection<NoaaXrayFlux>('timeseries_noaa_xray_flux');
-        const documents: any[] = [];
-
-        for (const item of rawData) {
-          if (!item.time_tag || item.flux === null) continue;
-
-          const doc = {
-            ts: new Date(item.time_tag),
-            satellite: parseInt(item.satellite) || 0,
-            flux: parseFloat(item.flux) || 0,
-            observed_flux: parseFloat(item.observed_flux) || 0,
-            electron_correction: parseFloat(item.electron_correction) || 0,
-            electron_contamination: item.electron_contamination || 'false',
-            energy: item.energy || '0.05-0.4nm',
-            meta: {
-              source: 'NOAA-GOES',
-              fetched_at: new Date(),
-            },
-          };
-
-          documents.push(doc);
-        }
-
-        // Insert new data (upsert by timestamp)
-        if (documents.length > 0) {
-          await collection.insertMany(documents, { ordered: false }).catch(() => {
-            // Ignore duplicate key errors
-          });
-        }
-
-        // Calculate flare classification from latest flux
-        const latest = documents[documents.length - 1];
-        const flareClass = latest ? getFlareClass(latest.flux) : null;
-
-        return NextResponse.json({
-          success: true,
-          data: documents.slice(-limit),
-          count: documents.length,
-          source: 'noaa-live',
-          latest,
-          flareClass,
-        });
-      } catch (fetchError: any) {
-        console.error('NOAA fetch error:', fetchError);
-        // Fall back to cached data
-      }
+      return NextResponse.json({
+        success: true,
+        data: result.data,
+        count: result.data.length,
+        source: result.source,
+        latest,
+        flareClass,
+      });
+    } catch (error: any) {
+      console.error('NOAA X-ray flux fetch error:', error);
+      return NextResponse.json(
+        { success: false, error: error.message || 'Failed to fetch from NOAA' },
+        { status: 500 }
+      );
     }
+  }
 
-    // Return cached data from MongoDB
+  // For cached mode, try MongoDB first, then fallback to NOAA
+  try {
     const collection = await getTimeSeriesCollection<NoaaXrayFlux>('timeseries_noaa_xray_flux');
     const data = await collection
       .find({})
@@ -93,14 +96,34 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .toArray();
 
-    const latest = data[0] || null;
+    if (data.length > 0) {
+      const latest = data[0] || null;
+      const flareClass = latest ? getFlareClass(latest.flux) : null;
+
+      return NextResponse.json({
+        success: true,
+        data: data.reverse(), // Return chronological order
+        count: data.length,
+        source: 'mongodb-cache',
+        latest,
+        flareClass,
+      });
+    }
+  } catch (dbError) {
+    console.log('MongoDB unavailable, falling back to NOAA direct fetch');
+  }
+
+  // Fallback to NOAA if cache is empty or MongoDB unavailable
+  try {
+    const result = await fetchFromNOAA(limit);
+    const latest = result.data[result.data.length - 1] || null;
     const flareClass = latest ? getFlareClass(latest.flux) : null;
 
     return NextResponse.json({
       success: true,
-      data: data.reverse(), // Return chronological order
-      count: data.length,
-      source: 'mongodb-cache',
+      data: result.data,
+      count: result.data.length,
+      source: 'noaa-live-fallback',
       latest,
       flareClass,
     });

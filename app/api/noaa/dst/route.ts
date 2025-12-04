@@ -31,6 +31,37 @@ function getStormLevel(dst: number): string {
 }
 
 /**
+ * Helper function to fetch and parse NOAA DST data
+ */
+async function fetchFromNOAA(limit: number): Promise<{ data: DstDoc[]; source: string }> {
+  const noaaUrl = 'https://services.swpc.noaa.gov/products/kyoto-dst.json';
+  const response = await fetch(noaaUrl, { cache: 'no-store' });
+
+  if (!response.ok) {
+    throw new Error(`NOAA API returned ${response.status}`);
+  }
+
+  const rawData = await response.json();
+  // Data format: [["time_tag","dst"], ["2025-11-26 03:00:00","-22"], ...]
+
+  const documents: DstDoc[] = [];
+  // Skip header row
+  for (let i = 1; i < rawData.length; i++) {
+    const item = rawData[i];
+    if (!item[0] || item[1] === null) continue;
+
+    const dst = parseInt(item[1]) || 0;
+    documents.push({
+      ts: new Date(item[0]),
+      dst_nt: dst,
+      storm_level: getStormLevel(dst),
+    });
+  }
+
+  return { data: documents.slice(-limit), source: 'noaa-live' };
+}
+
+/**
  * GET /api/noaa/dst
  *
  * Fetches NOAA Kyoto Dst index data
@@ -41,70 +72,43 @@ function getStormLevel(dst: number): string {
  * - limit: number (default: 168, max: 720 for 30 days hourly)
  */
 export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const fetchMode = searchParams.get('fetch') || 'cached';
-    const limit = Math.min(parseInt(searchParams.get('limit') || '168'), 720);
+  const { searchParams } = new URL(request.url);
+  const fetchMode = searchParams.get('fetch') || 'cached';
+  const limit = Math.min(parseInt(searchParams.get('limit') || '168'), 720);
 
-    // If fetch=latest, get from NOAA and store in DB
-    if (fetchMode === 'latest') {
-      const noaaUrl = 'https://services.swpc.noaa.gov/products/kyoto-dst.json';
+  // If fetch=latest, always fetch from NOAA directly
+  if (fetchMode === 'latest') {
+    try {
+      const result = await fetchFromNOAA(limit);
 
-      try {
-        const response = await fetch(noaaUrl, {
-          next: { revalidate: 3600 }, // Cache for 1 hour (data is hourly)
-        });
+      // Try to store in MongoDB (non-blocking, ignore errors)
+      getTimeSeriesCollection<DstDoc>('timeseries_noaa_dst')
+        .then(collection => {
+          const docsWithMeta = result.data.map(d => ({
+            ...d,
+            meta: { source: 'NOAA-SWPC-Kyoto', fetched_at: new Date() }
+          }));
+          return collection.insertMany(docsWithMeta, { ordered: false });
+        })
+        .catch(() => { /* Ignore MongoDB errors */ });
 
-        if (!response.ok) {
-          throw new Error(`NOAA API returned ${response.status}`);
-        }
-
-        const rawData = await response.json();
-
-        // Transform NOAA data to our schema
-        // Data format: [["time_tag","dst"], ["2025-11-26 03:00:00","-22"], ...]
-        const collection = await getTimeSeriesCollection<DstDoc>('timeseries_noaa_dst');
-        const documents: DstDoc[] = [];
-
-        // Skip header row
-        for (let i = 1; i < rawData.length; i++) {
-          const item = rawData[i];
-          if (!item[0] || item[1] === null) continue;
-
-          const dst = parseInt(item[1]) || 0;
-          const doc: DstDoc = {
-            ts: new Date(item[0]),
-            dst_nt: dst,
-            storm_level: getStormLevel(dst),
-            meta: {
-              source: 'NOAA-SWPC-Kyoto',
-              fetched_at: new Date(),
-            },
-          };
-
-          documents.push(doc);
-        }
-
-        // Insert new data (upsert by timestamp)
-        if (documents.length > 0) {
-          await collection.insertMany(documents, { ordered: false }).catch(() => {
-            // Ignore duplicate key errors
-          });
-        }
-
-        return NextResponse.json({
-          success: true,
-          data: documents.slice(-limit),
-          count: documents.length,
-          source: 'noaa-live',
-        });
-      } catch (fetchError: any) {
-        console.error('NOAA DST fetch error:', fetchError);
-        // Fall back to cached data
-      }
+      return NextResponse.json({
+        success: true,
+        data: result.data,
+        count: result.data.length,
+        source: result.source,
+      });
+    } catch (error: any) {
+      console.error('NOAA DST fetch error:', error);
+      return NextResponse.json(
+        { success: false, error: error.message || 'Failed to fetch from NOAA' },
+        { status: 500 }
+      );
     }
+  }
 
-    // Return cached data from MongoDB
+  // For cached mode, try MongoDB first, then fallback to NOAA
+  try {
     const collection = await getTimeSeriesCollection<DstDoc>('timeseries_noaa_dst');
     const data = await collection
       .find({})
@@ -112,46 +116,26 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .toArray();
 
-    // If cache is empty, fetch live data directly
-    if (data.length === 0) {
-      console.log('DST cache empty, fetching from NOAA directly...');
-      const noaaUrl = 'https://services.swpc.noaa.gov/products/kyoto-dst.json';
-      const response = await fetch(noaaUrl, { cache: 'no-store' });
-
-      if (!response.ok) {
-        throw new Error(`NOAA API returned ${response.status}`);
-      }
-
-      const rawData = await response.json();
-      console.log('NOAA DST response sample:', JSON.stringify(rawData.slice(0, 3)));
-
-      const documents: DstDoc[] = [];
-      // Skip header row
-      for (let i = 1; i < rawData.length; i++) {
-        const item = rawData[i];
-        if (!item[0] || item[1] === null) continue;
-
-        const dst = parseInt(item[1]) || 0;
-        documents.push({
-          ts: new Date(item[0]),
-          dst_nt: dst,
-          storm_level: getStormLevel(dst),
-        });
-      }
-
+    if (data.length > 0) {
       return NextResponse.json({
         success: true,
-        data: documents.slice(-limit),
-        count: documents.length,
-        source: 'noaa-live-fallback',
+        data: data.reverse(), // Return chronological order
+        count: data.length,
+        source: 'mongodb-cache',
       });
     }
+  } catch (dbError) {
+    console.log('MongoDB unavailable, falling back to NOAA direct fetch');
+  }
 
+  // Fallback to NOAA if cache is empty or MongoDB unavailable
+  try {
+    const result = await fetchFromNOAA(limit);
     return NextResponse.json({
       success: true,
-      data: data.reverse(), // Return chronological order
-      count: data.length,
-      source: 'mongodb-cache',
+      data: result.data,
+      count: result.data.length,
+      source: 'noaa-live-fallback',
     });
   } catch (error: any) {
     console.error('DST API error:', error);

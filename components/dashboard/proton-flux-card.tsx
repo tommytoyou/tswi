@@ -34,7 +34,7 @@ export function ProtonFluxCard() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/noaa/proton-flux?limit=288'); // 24 hours
+      const response = await fetch('/api/noaa/proton-flux?fetch=latest&limit=288'); // 24 hours
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
 

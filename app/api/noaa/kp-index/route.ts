@@ -6,6 +6,35 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
+ * Helper function to fetch and parse NOAA Kp index data
+ */
+async function fetchFromNOAA(limit: number): Promise<{ data: any[]; source: string }> {
+  const noaaUrl = 'https://services.swpc.noaa.gov/json/planetary_k_index_1m.json';
+  const response = await fetch(noaaUrl, { cache: 'no-store' });
+
+  if (!response.ok) {
+    throw new Error(`NOAA API returned ${response.status}`);
+  }
+
+  const rawData = await response.json();
+  const documents: any[] = [];
+
+  for (const item of rawData) {
+    if (!item.time_tag || item.kp_index === null) continue;
+
+    documents.push({
+      ts: new Date(item.time_tag),
+      kp: parseFloat(item.kp_index) || 0,
+      kp_index: parseFloat(item.kp_index) || 0,
+      a_running: parseFloat(item.a_running) || 0,
+      station_count: parseInt(item.station_count) || 0,
+    });
+  }
+
+  return { data: documents.slice(-limit), source: 'noaa-live' };
+}
+
+/**
  * GET /api/noaa/kp-index
  *
  * Fetches NOAA real-time planetary K-index data from SWPC
@@ -16,69 +45,44 @@ export const dynamic = 'force-dynamic';
  * - limit: number (default: 60, max: 1440 for 24 hours)
  */
 export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const fetchMode = searchParams.get('fetch') || 'cached';
-    const limit = Math.min(parseInt(searchParams.get('limit') || '60'), 1440);
+  const { searchParams } = new URL(request.url);
+  const fetchMode = searchParams.get('fetch') || 'cached';
+  const limit = Math.min(parseInt(searchParams.get('limit') || '60'), 1440);
 
-    // If fetch=latest, get from NOAA and store in DB
-    if (fetchMode === 'latest') {
-      const noaaUrl = 'https://services.swpc.noaa.gov/json/planetary_k_index_1m.json';
+  // If fetch=latest, always fetch from NOAA directly
+  if (fetchMode === 'latest') {
+    try {
+      const result = await fetchFromNOAA(limit);
 
-      try {
-        const response = await fetch(noaaUrl, {
-          next: { revalidate: 60 }, // Cache for 1 minute
-        });
+      // Try to store in MongoDB (non-blocking, ignore errors)
+      getTimeSeriesCollection<NoaaKpIndex>('timeseries_noaa_kp_index')
+        .then(collection => {
+          const docsWithMeta = result.data.map(d => ({
+            ...d,
+            meta: { source: 'NOAA-SWPC', fetched_at: new Date() }
+          }));
+          return collection.insertMany(docsWithMeta, { ordered: false });
+        })
+        .catch(() => { /* Ignore MongoDB errors */ });
 
-        if (!response.ok) {
-          throw new Error(`NOAA API returned ${response.status}`);
-        }
-
-        const rawData = await response.json();
-
-        // Transform NOAA data to our schema
-        const collection = await getTimeSeriesCollection<NoaaKpIndex>('timeseries_noaa_kp_index');
-        const documents: any[] = [];
-
-        for (const item of rawData) {
-          if (!item.time_tag || item.kp_index === null) continue;
-
-          const doc = {
-            ts: new Date(item.time_tag),
-            kp: parseFloat(item.kp_index) || 0,
-            kp_index: parseFloat(item.kp_index) || 0,
-            a_running: parseFloat(item.a_running) || 0,
-            station_count: parseInt(item.station_count) || 0,
-            meta: {
-              source: 'NOAA-SWPC',
-              fetched_at: new Date(),
-            },
-          };
-
-          documents.push(doc);
-        }
-
-        // Insert new data (upsert by timestamp)
-        if (documents.length > 0) {
-          await collection.insertMany(documents, { ordered: false }).catch(() => {
-            // Ignore duplicate key errors
-          });
-        }
-
-        return NextResponse.json({
-          success: true,
-          data: documents.slice(-limit),
-          count: documents.length,
-          source: 'noaa-live',
-          latest: documents[documents.length - 1] || null,
-        });
-      } catch (fetchError: any) {
-        console.error('NOAA fetch error:', fetchError);
-        // Fall back to cached data
-      }
+      return NextResponse.json({
+        success: true,
+        data: result.data,
+        count: result.data.length,
+        source: result.source,
+        latest: result.data[result.data.length - 1] || null,
+      });
+    } catch (error: any) {
+      console.error('NOAA Kp index fetch error:', error);
+      return NextResponse.json(
+        { success: false, error: error.message || 'Failed to fetch from NOAA' },
+        { status: 500 }
+      );
     }
+  }
 
-    // Return cached data from MongoDB
+  // For cached mode, try MongoDB first, then fallback to NOAA
+  try {
     const collection = await getTimeSeriesCollection<NoaaKpIndex>('timeseries_noaa_kp_index');
     const data = await collection
       .find({})
@@ -86,12 +90,28 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .toArray();
 
+    if (data.length > 0) {
+      return NextResponse.json({
+        success: true,
+        data: data.reverse(), // Return chronological order
+        count: data.length,
+        source: 'mongodb-cache',
+        latest: data[data.length - 1] || null,
+      });
+    }
+  } catch (dbError) {
+    console.log('MongoDB unavailable, falling back to NOAA direct fetch');
+  }
+
+  // Fallback to NOAA if cache is empty or MongoDB unavailable
+  try {
+    const result = await fetchFromNOAA(limit);
     return NextResponse.json({
       success: true,
-      data: data.reverse(), // Return chronological order
-      count: data.length,
-      source: 'mongodb-cache',
-      latest: data[data.length - 1] || null,
+      data: result.data,
+      count: result.data.length,
+      source: 'noaa-live-fallback',
+      latest: result.data[result.data.length - 1] || null,
     });
   } catch (error: any) {
     console.error('Kp index API error:', error);

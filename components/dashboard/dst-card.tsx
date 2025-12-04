@@ -31,7 +31,7 @@ export function DstCard() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/noaa/dst?limit=168'); // 7 days hourly
+      const response = await fetch('/api/noaa/dst?fetch=latest&limit=168'); // 7 days hourly
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
 
