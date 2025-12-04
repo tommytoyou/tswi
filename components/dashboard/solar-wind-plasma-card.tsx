@@ -27,14 +27,23 @@ export function SolarWindPlasmaCard() {
       const response = await fetch('/api/noaa/solar-wind-plasma?fetch=latest&limit=1440'); // 24 hours
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
+      console.log('[SolarWindPlasmaCard] API response:', result);
 
       if (result.success && result.data && result.data.length > 0) {
-        setData(result.data);
+        // Filter out entries with null/undefined values that would break rendering
+        const validData = result.data.filter((d: SolarWindPlasmaDataPoint) =>
+          d.speed_kms != null && d.density_cm3 != null && d.temp_k != null
+        );
+        if (validData.length === 0) {
+          throw new Error('No valid data points');
+        }
+        setData(validData);
       } else {
         throw new Error('No data available');
       }
       setError(null);
     } catch (err) {
+      console.error('[SolarWindPlasmaCard] Fetch error:', err);
       setError('Failed to load data');
     } finally {
       setLoading(false);
