@@ -103,10 +103,10 @@ export function SolarWindPlasmaCard() {
   };
 
   return (
-    <Card className="border-slate-800 bg-slate-900/50">
-      <CardHeader>
+    <Card className="border-slate-800 bg-slate-900/50 h-full flex flex-col overflow-hidden">
+      <CardHeader className="flex-shrink-0 py-2 px-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-sm flex items-center gap-2">
             <Wind className="h-4 w-4 text-cyan-400" />
             Solar Wind Plasma
           </CardTitle>
@@ -115,7 +115,7 @@ export function SolarWindPlasmaCard() {
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex-1 flex flex-col min-h-0 py-2 px-3 gap-2">
         {/* Current Values */}
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1">
@@ -154,14 +154,14 @@ export function SolarWindPlasmaCard() {
         </div>
 
         {/* Speed indicator bar */}
-        <div className="space-y-1">
-          <div className="flex justify-between text-xs text-slate-500">
+        <div className="space-y-0.5 flex-shrink-0">
+          <div className="flex justify-between text-[10px] text-slate-500">
             <span>300</span>
             <span>500</span>
             <span>700</span>
             <span>900+</span>
           </div>
-          <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
             <div
               className={`h-full transition-all duration-500 ${
                 latest.speed_kms < 400 ? 'bg-green-500' :
@@ -174,7 +174,7 @@ export function SolarWindPlasmaCard() {
         </div>
 
         {/* Time Series Chart */}
-        <div className="h-[140px] w-full">
+        <div className="flex-1 min-h-0 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
               <CartesianGrid
@@ -247,12 +247,12 @@ export function SolarWindPlasmaCard() {
         </div>
 
         {/* Footer Info */}
-        <div className="flex justify-between items-center text-xs">
+        <div className="flex justify-between items-center text-xs flex-shrink-0">
           <div className="text-slate-500">
-            Last 3 hours • NOAA SWPC
+            3h • NOAA SWPC
           </div>
           <div className="text-slate-400">
-            {format(new Date(latest.ts), 'HH:mm:ss')} UTC
+            {format(new Date(latest.ts), 'HH:mm')} UTC
           </div>
         </div>
       </CardContent>

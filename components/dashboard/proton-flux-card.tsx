@@ -101,10 +101,10 @@ export function ProtonFluxCard() {
   };
 
   return (
-    <Card className="border-slate-800 bg-slate-900/50">
-      <CardHeader>
+    <Card className="border-slate-800 bg-slate-900/50 h-full flex flex-col overflow-hidden">
+      <CardHeader className="flex-shrink-0 py-2 px-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-sm flex items-center gap-2">
             <Radiation className="h-4 w-4 text-orange-400" />
             Proton Flux
           </CardTitle>
@@ -116,7 +116,7 @@ export function ProtonFluxCard() {
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex-1 flex flex-col min-h-0 py-2 px-3 gap-2">
         {/* Current Values */}
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1">
@@ -152,19 +152,19 @@ export function ProtonFluxCard() {
         </div>
 
         {/* S-Scale Threshold Indicator */}
-        <div className="space-y-1">
-          <div className="flex justify-between text-xs text-slate-500">
-            <span>S1 (10)</span>
-            <span>S2 (100)</span>
-            <span>S3 (1K)</span>
-            <span>S4 (10K)</span>
+        <div className="space-y-0.5 flex-shrink-0">
+          <div className="flex justify-between text-[10px] text-slate-500">
+            <span>S1</span>
+            <span>S2</span>
+            <span>S3</span>
+            <span>S4</span>
             <span>S5</span>
           </div>
-          <div className="grid grid-cols-5 gap-1">
+          <div className="grid grid-cols-5 gap-0.5">
             {[1, 2, 3, 4, 5].map((level) => (
               <div
                 key={level}
-                className={`h-2 rounded ${
+                className={`h-1.5 rounded ${
                   level <= latest.s_scale
                     ? level <= 1
                       ? 'bg-yellow-500'
@@ -181,7 +181,7 @@ export function ProtonFluxCard() {
         </div>
 
         {/* Time Series Chart - Log Scale */}
-        <div className="h-[140px] w-full">
+        <div className="flex-1 min-h-0 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
               <CartesianGrid
@@ -253,9 +253,9 @@ export function ProtonFluxCard() {
         </div>
 
         {/* Footer Info */}
-        <div className="flex justify-between items-center text-xs">
+        <div className="flex justify-between items-center text-xs flex-shrink-0">
           <div className="text-slate-500">
-            Last 12 hours • GOES SWPC
+            12h • GOES SWPC
           </div>
           <div className="text-slate-400">
             {format(new Date(latest.ts), 'HH:mm')} UTC

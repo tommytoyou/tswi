@@ -89,10 +89,10 @@ export function KpCardV2() {
   const chartData = groupedData.slice(-8); // Last 24 hours (8 x 3-hour periods)
 
   return (
-    <Card className="border-slate-800 bg-slate-900/50">
-      <CardHeader>
+    <Card className="border-slate-800 bg-slate-900/50 h-full flex flex-col overflow-hidden">
+      <CardHeader className="flex-shrink-0 py-2 px-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-sm flex items-center gap-2">
             <Zap className="h-4 w-4 text-yellow-400" />
             Kp Index
           </CardTitle>
@@ -103,31 +103,30 @@ export function KpCardV2() {
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex-1 flex flex-col min-h-0 py-2 px-3 gap-2">
         {/* Current Value */}
-        <div className="flex items-baseline gap-3">
-          <div className="text-4xl font-bold font-mono" style={{ color: kpLevel.color }}>
+        <div className="flex items-baseline gap-2 flex-shrink-0">
+          <div className="text-3xl font-bold font-mono" style={{ color: kpLevel.color }}>
             {currentKp}
           </div>
           <div className="flex items-center gap-2">
             <TrendIcon
-              className={`h-5 w-5 ${
+              className={`h-4 w-4 ${
                 trend === 'up' ? 'text-red-400' : trend === 'down' ? 'text-green-400' : 'text-slate-400'
               }`}
             />
             <div className="text-xs text-slate-400">
-              <div>3-hour Kp Index</div>
-              <div className="text-slate-500">Geomagnetic activity</div>
+              <div>3-hour Kp</div>
             </div>
           </div>
         </div>
 
         {/* Storm Level Indicator */}
-        <div className="grid grid-cols-5 gap-1">
-          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].slice(0, 10).map((level) => (
+        <div className="grid grid-cols-10 gap-0.5 flex-shrink-0">
+          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((level) => (
             <div
               key={level}
-              className={`h-2 rounded ${
+              className={`h-1.5 rounded ${
                 level <= currentKp
                   ? level < 4
                     ? 'bg-green-500'
@@ -143,7 +142,7 @@ export function KpCardV2() {
         </div>
 
         {/* 24-Hour History Bar Chart */}
-        <div className="h-[160px] w-full">
+        <div className="flex-1 min-h-0 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
               <CartesianGrid
@@ -187,9 +186,9 @@ export function KpCardV2() {
         </div>
 
         {/* Footer Info */}
-        <div className="flex justify-between items-center text-xs">
+        <div className="flex justify-between items-center text-xs flex-shrink-0">
           <div className="text-slate-500">
-            Last 24 hours • NOAA SWPC
+            24h • NOAA SWPC
           </div>
           <div className="text-slate-400">
             {format(new Date(latest.ts), 'HH:mm')} UTC

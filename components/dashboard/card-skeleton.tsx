@@ -3,17 +3,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export function CardSkeleton() {
   return (
-    <Card>
-      <CardHeader>
-        <Skeleton className="h-5 w-32" />
+    <Card className="h-full flex flex-col overflow-hidden border-slate-800 bg-slate-900/50">
+      <CardHeader className="flex-shrink-0 py-2 px-3">
+        <Skeleton className="h-4 w-32" />
       </CardHeader>
-      <CardContent className="space-y-4">
-        <Skeleton className="h-8 w-24" />
-        <Skeleton className="h-32 w-full" />
-        <div className="flex gap-2">
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-4 w-16" />
+      <CardContent className="flex-1 flex flex-col min-h-0 py-2 px-3 gap-2">
+        <Skeleton className="h-6 w-24 flex-shrink-0" />
+        <Skeleton className="flex-1 w-full min-h-0" />
+        <div className="flex gap-2 flex-shrink-0">
+          <Skeleton className="h-3 w-12" />
+          <Skeleton className="h-3 w-12" />
         </div>
       </CardContent>
     </Card>

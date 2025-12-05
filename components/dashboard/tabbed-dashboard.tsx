@@ -126,9 +126,9 @@ export function TabbedDashboard() {
             </div>
           </TabsContent>
 
-          {/* Solar Wind Tab */}
-          <TabsContent value="solar-wind" className="h-full m-0 p-4 overflow-hidden">
-            <div className="h-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
+          {/* Solar Wind Tab - 3x2 grid that fills viewport */}
+          <TabsContent value="solar-wind" className="h-full m-0 p-3 overflow-hidden">
+            <div className="h-full grid grid-cols-3 grid-rows-2 gap-3">
               <SolarWindCardV2 key={`sw-${refreshTrigger}`} />
               <SolarWindPlasmaCard key={`plasma-${refreshTrigger}`} />
               <KpCardV2 key={`kp-${refreshTrigger}`} />

@@ -92,10 +92,10 @@ export function DstCard() {
   const minDst = Math.min(...chartData.map(d => d.Dst));
 
   return (
-    <Card className="border-slate-800 bg-slate-900/50">
-      <CardHeader>
+    <Card className="border-slate-800 bg-slate-900/50 h-full flex flex-col overflow-hidden">
+      <CardHeader className="flex-shrink-0 py-2 px-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-sm flex items-center gap-2">
             <Compass className="h-4 w-4 text-purple-400" />
             Dst Index
           </CardTitle>
@@ -107,10 +107,10 @@ export function DstCard() {
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex-1 flex flex-col min-h-0 py-2 px-3 gap-2">
         {/* Current Value */}
-        <div className="flex items-baseline gap-4">
-          <div className="space-y-1">
+        <div className="flex items-baseline gap-3 flex-shrink-0">
+          <div className="space-y-0.5">
             <div className="flex items-center gap-1">
               <span className="text-xs text-slate-400">Current</span>
               <TrendIcon className={`h-3 w-3 ${
@@ -118,42 +118,40 @@ export function DstCard() {
                 latest.dst_nt > previous.dst_nt ? 'text-green-400' : 'text-slate-400'
               }`} />
             </div>
-            <div className={`text-3xl font-bold font-mono ${
+            <div className={`text-2xl font-bold font-mono ${
               latest.dst_nt > -20 ? 'text-green-400' :
               latest.dst_nt > -50 ? 'text-yellow-400' :
               latest.dst_nt > -100 ? 'text-orange-400' : 'text-red-400'
             }`}>
-              {latest.dst_nt}
+              {latest.dst_nt} <span className="text-xs text-slate-500 font-normal">nT</span>
             </div>
-            <div className="text-xs text-slate-500">nT</div>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             <span className="text-xs text-slate-400">72h Min</span>
             <div className="text-lg font-bold font-mono text-slate-300">
-              {minDst}
+              {minDst} <span className="text-xs text-slate-500 font-normal">nT</span>
             </div>
-            <div className="text-xs text-slate-500">nT</div>
           </div>
         </div>
 
         {/* Storm Level Indicator */}
-        <div className="space-y-1">
-          <div className="flex justify-between text-xs text-slate-500">
+        <div className="space-y-0.5 flex-shrink-0">
+          <div className="flex justify-between text-[10px] text-slate-500">
             <span>Quiet</span>
             <span>-20</span>
             <span>-50</span>
             <span>-100</span>
             <span>-200</span>
           </div>
-          <div className="grid grid-cols-5 gap-1">
+          <div className="grid grid-cols-5 gap-0.5">
             {['quiet', 'minor', 'moderate', 'intense', 'super-storm'].map((level, idx) => {
               const thresholds = [0, -20, -50, -100, -200];
               const isActive = latest.dst_nt <= thresholds[idx];
               return (
                 <div
                   key={level}
-                  className={`h-2 rounded ${
+                  className={`h-1.5 rounded ${
                     isActive
                       ? idx === 0
                         ? 'bg-green-500'
@@ -173,7 +171,7 @@ export function DstCard() {
         </div>
 
         {/* Time Series Chart */}
-        <div className="h-[140px] w-full">
+        <div className="flex-1 min-h-0 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
               <defs>
@@ -228,9 +226,9 @@ export function DstCard() {
         </div>
 
         {/* Footer Info */}
-        <div className="flex justify-between items-center text-xs">
+        <div className="flex justify-between items-center text-xs flex-shrink-0">
           <div className="text-slate-500">
-            Last 72 hours • Kyoto WDC
+            72h • Kyoto WDC
           </div>
           <div className="text-slate-400">
             {format(new Date(latest.ts), 'MMM d HH:mm')} UTC

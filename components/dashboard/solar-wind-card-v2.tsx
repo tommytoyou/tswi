@@ -89,10 +89,10 @@ export function SolarWindCardV2() {
   const TrendIcon = bzTrend === 'up' ? TrendingUp : bzTrend === 'down' ? TrendingDown : Minus;
 
   return (
-    <Card className="border-slate-800 bg-slate-900/50">
-      <CardHeader>
+    <Card className="border-slate-800 bg-slate-900/50 h-full flex flex-col overflow-hidden">
+      <CardHeader className="flex-shrink-0 py-2 px-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-sm flex items-center gap-2">
             <Activity className="h-4 w-4 text-blue-400" />
             Solar Wind Magnetic Field
           </CardTitle>
@@ -101,7 +101,7 @@ export function SolarWindCardV2() {
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex-1 flex flex-col min-h-0 py-2 px-3 gap-2">
         {/* Current Values */}
         <div className="grid grid-cols-4 gap-3">
           <div className="space-y-1">
@@ -148,7 +148,7 @@ export function SolarWindCardV2() {
         </div>
 
         {/* Time Series Chart */}
-        <div className="h-[180px] w-full">
+        <div className="flex-1 min-h-0 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
               <CartesianGrid
@@ -214,12 +214,12 @@ export function SolarWindCardV2() {
         </div>
 
         {/* Footer Info */}
-        <div className="flex justify-between items-center text-xs">
+        <div className="flex justify-between items-center text-xs flex-shrink-0">
           <div className="text-slate-500">
-            Last 3 hours • NOAA SWPC
+            Last 3h • NOAA SWPC
           </div>
           <div className="text-slate-400">
-            {format(new Date(latest.ts), 'HH:mm:ss')} UTC
+            {format(new Date(latest.ts), 'HH:mm')} UTC
           </div>
         </div>
       </CardContent>

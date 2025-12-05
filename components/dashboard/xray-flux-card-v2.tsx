@@ -84,10 +84,10 @@ export function XRayFluxCardV2() {
   const flareLevel = flareClass.charAt(0);
 
   return (
-    <Card className="border-slate-800 bg-slate-900/50">
-      <CardHeader>
+    <Card className="border-slate-800 bg-slate-900/50 h-full flex flex-col overflow-hidden">
+      <CardHeader className="flex-shrink-0 py-2 px-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-sm flex items-center gap-2">
             <Sun className="h-4 w-4 text-orange-400" />
             X-ray Flux
           </CardTitle>
@@ -99,27 +99,26 @@ export function XRayFluxCardV2() {
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex-1 flex flex-col min-h-0 py-2 px-3 gap-2">
         {/* Current Value */}
-        <div className="flex items-baseline gap-3">
-          <div className="text-3xl font-bold font-mono" style={{ color: flareColor }}>
+        <div className="flex items-baseline gap-2 flex-shrink-0">
+          <div className="text-2xl font-bold font-mono" style={{ color: flareColor }}>
             {flareLevel}
           </div>
           <div className="flex items-center gap-2">
             <TrendIcon
-              className={`h-5 w-5 ${
+              className={`h-4 w-4 ${
                 trend === 'up' ? 'text-red-400' : trend === 'down' ? 'text-green-400' : 'text-slate-400'
               }`}
             />
             <div className="text-xs text-slate-400">
-              <div>Solar X-ray flux</div>
-              <div className="text-slate-500">{latest.flux.toExponential(2)} W/m²</div>
+              <div>{latest.flux.toExponential(2)} W/m²</div>
             </div>
           </div>
         </div>
 
         {/* Flare Class Reference Bar */}
-        <div className="space-y-1">
+        <div className="space-y-0.5 flex-shrink-0">
           <div className="flex justify-between text-[10px] text-slate-500">
             <span>A</span>
             <span>B</span>
@@ -127,7 +126,7 @@ export function XRayFluxCardV2() {
             <span>M</span>
             <span>X</span>
           </div>
-          <div className="relative h-3 rounded-full overflow-hidden bg-slate-800">
+          <div className="relative h-2 rounded-full overflow-hidden bg-slate-800">
             <div className="absolute inset-0 flex">
               <div className="flex-1 bg-green-900/30" />
               <div className="flex-1 bg-green-700/30" />
@@ -151,7 +150,7 @@ export function XRayFluxCardV2() {
         </div>
 
         {/* Area Chart (Log Scale) */}
-        <div className="h-[160px] w-full">
+        <div className="flex-1 min-h-0 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
               <defs>
@@ -215,12 +214,12 @@ export function XRayFluxCardV2() {
         </div>
 
         {/* Footer Info */}
-        <div className="flex justify-between items-center text-xs">
+        <div className="flex justify-between items-center text-xs flex-shrink-0">
           <div className="text-slate-500">
-            Last 6 hours • GOES-{data.find(d => d.satellite !== undefined)?.satellite ?? 18}
+            6h • GOES-{data.find(d => d.satellite !== undefined)?.satellite ?? 18}
           </div>
           <div className="text-slate-400">
-            {format(new Date(latest.ts), 'HH:mm:ss')} UTC
+            {format(new Date(latest.ts), 'HH:mm')} UTC
           </div>
         </div>
       </CardContent>
