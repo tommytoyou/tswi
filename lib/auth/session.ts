@@ -1,21 +1,19 @@
 import { User } from '@/lib/types';
 
-// Session storage utilities for client-side auth
-const SESSION_KEY = 'tswi_session';
+// DEPRECATED: This file is kept for backwards compatibility
+// Real authentication is now handled by NextAuth.js in lib/auth/config.ts
+// Client session is now managed by next-auth/react
 
-// Hardcoded credentials for MVP
-const VALID_CREDENTIALS = {
-  username: 'multiplanetary',
-  password: 'Space2034!',
-};
+const SESSION_KEY = 'tswi_session';
 
 export const AUTHENTICATED_USER: User = {
   _id: 'user_multiplanetary_001',
   email: 'multiplanetary@tswi.space',
   name: 'Multiplanetary',
-  plan: 'pro',
-  apiKey: 'tswi_multiplanetary_key_12345',
+  company: 'TSWI',
+  role: 'user_ai',
   created_at: new Date('2025-01-15T00:00:00Z'),
+  last_login: new Date(),
 };
 
 export interface SessionData {
@@ -23,7 +21,7 @@ export interface SessionData {
   expiresAt: number;
 }
 
-// Client-side session management
+// DEPRECATED: Use useSession from next-auth/react instead
 export function getClientSession(): User | null {
   if (typeof window === 'undefined') return null;
 
@@ -33,7 +31,6 @@ export function getClientSession(): User | null {
 
     const session: SessionData = JSON.parse(sessionData);
 
-    // Check if session is expired (24 hours)
     if (Date.now() > session.expiresAt) {
       sessionStorage.removeItem(SESSION_KEY);
       return null;
@@ -45,26 +42,30 @@ export function getClientSession(): User | null {
   }
 }
 
+// DEPRECATED: Session is now managed by next-auth
 export function setClientSession(user: User): void {
   if (typeof window === 'undefined') return;
 
   const sessionData: SessionData = {
     user,
-    expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
+    expiresAt: Date.now() + 24 * 60 * 60 * 1000,
   };
 
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
 }
 
+// DEPRECATED: Use signOut from next-auth/react instead
 export function clearClientSession(): void {
   if (typeof window === 'undefined') return;
   sessionStorage.removeItem(SESSION_KEY);
 }
 
+// DEPRECATED: No longer used
 export function validateCredentials(username: string, password: string): boolean {
-  return username === VALID_CREDENTIALS.username && password === VALID_CREDENTIALS.password;
+  return false;
 }
 
+// DEPRECATED: Use useSession from next-auth/react instead
 export function isClientAuthenticated(): boolean {
   return getClientSession() !== null;
 }

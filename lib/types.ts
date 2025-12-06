@@ -216,10 +216,55 @@ export const GroundStationSchema = z.object({
 export type GroundStation = z.infer<typeof GroundStationSchema>;
 
 // ============================================================================
-// USER TYPES (Mock Auth)
+// USER TYPES (Invite-Only Auth System)
 // ============================================================================
 
+// User roles for access control
+export const UserRoleSchema = z.enum(['user', 'user_ai', 'admin']);
+export type UserRole = z.infer<typeof UserRoleSchema>;
+
+// Access request status
+export const AccessRequestStatusSchema = z.enum(['pending', 'approved', 'rejected']);
+export type AccessRequestStatus = z.infer<typeof AccessRequestStatusSchema>;
+
+// Access Request (stored in access_requests collection)
+export const AccessRequestSchema = z.object({
+  _id: z.string().optional(),
+  email: z.string().email(),
+  name: z.string().min(1),
+  company: z.string().min(1),
+  use_case: z.string().min(10),
+  status: AccessRequestStatusSchema.default('pending'),
+  created_at: z.date(),
+  reviewed_at: z.date().nullable().optional(),
+  reviewed_by: z.string().nullable().optional(),
+});
+export type AccessRequest = z.infer<typeof AccessRequestSchema>;
+
+// User (stored in users collection - approved beta testers)
 export const UserSchema = z.object({
+  _id: z.string().optional(),
+  email: z.string().email(),
+  name: z.string(),
+  company: z.string(),
+  role: UserRoleSchema.default('user'),
+  created_at: z.date(),
+  last_login: z.date(),
+});
+export type User = z.infer<typeof UserSchema>;
+
+// Admin (stored in admins collection - password-based auth)
+export const AdminSchema = z.object({
+  _id: z.string().optional(),
+  email: z.string().email(),
+  password_hash: z.string(),
+  name: z.string(),
+  created_at: z.date(),
+});
+export type Admin = z.infer<typeof AdminSchema>;
+
+// Legacy User Schema for backwards compatibility
+export const LegacyUserSchema = z.object({
   _id: z.string(),
   email: z.string().email(),
   name: z.string(),
@@ -227,7 +272,7 @@ export const UserSchema = z.object({
   apiKey: z.string(),
   created_at: z.date(),
 });
-export type User = z.infer<typeof UserSchema>;
+export type LegacyUser = z.infer<typeof LegacyUserSchema>;
 
 // ============================================================================
 // API RESPONSE TYPES

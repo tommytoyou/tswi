@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { requireAIAccess } from '@/lib/auth/api';
 
 /**
  * AGENT METRICS API
  * Fetch agent performance metrics over time
  */
 export async function GET(request: NextRequest) {
+  // Check if user has AI access
+  const authError = await requireAIAccess();
+  if (authError) return authError;
+
   try {
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || 'daily';

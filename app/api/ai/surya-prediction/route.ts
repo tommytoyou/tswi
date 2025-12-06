@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTimeSeriesCollection } from '@/lib/db';
+import { requireAIAccess } from '@/lib/auth/api';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -65,6 +66,10 @@ interface PredictionResult {
  * This implementation uses NOAA's operational forecasts enhanced with real-time data.
  */
 export async function GET(request: NextRequest) {
+  // Check if user has AI access
+  const authError = await requireAIAccess();
+  if (authError) return authError;
+
   const startTime = Date.now();
 
   try {

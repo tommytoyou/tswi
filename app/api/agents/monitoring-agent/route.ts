@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { analyzeSpaceWeather } from '@/lib/agent';
+import { requireAIAccess } from '@/lib/auth/api';
 
 /**
  * MONITORING AGENT API
@@ -13,6 +14,10 @@ import { analyzeSpaceWeather } from '@/lib/agent';
  *   - limit=N: Number of recent decisions to return
  */
 export async function GET(request: NextRequest) {
+  // Check if user has AI access
+  const authError = await requireAIAccess();
+  if (authError) return authError;
+
   try {
     const { searchParams } = new URL(request.url);
     const shouldAnalyze = searchParams.get('analyze') === 'true';
@@ -84,6 +89,10 @@ export async function GET(request: NextRequest) {
  * - Provide feedback on decisions
  */
 export async function POST(request: NextRequest) {
+  // Check if user has AI access
+  const authError = await requireAIAccess();
+  if (authError) return authError;
+
   try {
     const body = await request.json();
     const { action, decision_id, feedback } = body;

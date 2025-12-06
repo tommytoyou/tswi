@@ -151,6 +151,19 @@ export async function initializeCollections(): Promise<void> {
   const forecasts = database.collection('forecasts');
   await forecasts.createIndex({ kind: 1, ts: -1 });
 
+  // Auth collections indexes
+  const accessRequests = database.collection('access_requests');
+  await accessRequests.createIndex({ email: 1 }, { unique: true });
+  await accessRequests.createIndex({ status: 1 });
+  await accessRequests.createIndex({ created_at: -1 });
+
+  const users = database.collection('users');
+  await users.createIndex({ email: 1 }, { unique: true });
+  await users.createIndex({ role: 1 });
+
+  const admins = database.collection('admins');
+  await admins.createIndex({ email: 1 }, { unique: true });
+
   console.log('✅ Indexes created');
 }
 

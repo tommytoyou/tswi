@@ -7,8 +7,7 @@ import { User } from '@/lib/types';
 
 interface AuthState {
   user: User | null;
-  apiKey: string | null;
-  plan: 'free' | 'pro' | 'enterprise' | null;
+  role: 'user' | 'user_ai' | 'admin' | null;
   setAuth: (user: User) => void;
   clearAuth: () => void;
 }
@@ -85,10 +84,9 @@ interface AppStore
 export const useStore = create<AppStore>((set) => ({
   // Auth
   user: null,
-  apiKey: null,
-  plan: null,
-  setAuth: (user) => set({ user, apiKey: user.apiKey, plan: user.plan }),
-  clearAuth: () => set({ user: null, apiKey: null, plan: null }),
+  role: null,
+  setAuth: (user) => set({ user, role: user.role }),
+  clearAuth: () => set({ user: null, role: null }),
 
   // Time Window
   windowHours: 24,

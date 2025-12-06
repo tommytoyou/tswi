@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { requireAIAccess } from '@/lib/auth/api';
 
 /**
  * PREDICTION ACCURACY API
  * Compare Surya predictions vs actual events
  */
 export async function GET(request: NextRequest) {
+  // Check if user has AI access
+  const authError = await requireAIAccess();
+  if (authError) return authError;
+
   try {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '50');

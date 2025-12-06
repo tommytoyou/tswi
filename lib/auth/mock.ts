@@ -1,19 +1,20 @@
 import { User } from '@/lib/types';
 
-// TODO: Replace with real authentication (NextAuth.js, Clerk, Auth0, etc.)
-// This is a mock implementation for MVP development
+// DEPRECATED: This file is kept for backwards compatibility
+// Real authentication is now handled by NextAuth.js in lib/auth/config.ts
 
 export const MOCK_USER: User = {
   _id: 'user_demo_001',
   email: 'operator@tswi.space',
   name: 'Demo Operator',
-  plan: 'pro',
-  apiKey: 'tswi_demo_key_12345',
+  company: 'TSWI',
+  role: 'user_ai',
   created_at: new Date('2025-01-15T00:00:00Z'),
+  last_login: new Date(),
 };
 
 export async function getSession(): Promise<User | null> {
-  // TODO: Implement real session check
+  // DEPRECATED: Use getServerSession from next-auth instead
   return MOCK_USER;
 }
 
@@ -26,6 +27,6 @@ export async function requireSession(): Promise<User> {
 }
 
 export function isAuthenticated(): boolean {
-  // TODO: Check real auth token
+  // DEPRECATED: Use session check from next-auth instead
   return true;
 }

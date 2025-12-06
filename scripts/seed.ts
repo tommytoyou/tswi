@@ -1,4 +1,5 @@
 import { MongoClient } from 'mongodb';
+import bcrypt from 'bcryptjs';
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
 const DB_NAME = process.env.MONGODB_DB || 'tswi';
@@ -396,6 +397,45 @@ async function seed() {
 
     await stationsCollection.insertMany(stations);
     console.log(`✅ ${stations.length} ground stations created`);
+
+    // SEED FIRST ADMIN
+    console.log('👤 Seeding first admin...');
+    const adminsCollection = db.collection('admins');
+
+    // Check if admin already exists
+    const existingAdmin = await adminsCollection.findOne({
+      email: 'tom.erickson@deepspacedynamics.us'
+    });
+
+    if (!existingAdmin) {
+      const passwordHash = await bcrypt.hash('Opus2568System2025!', 12);
+
+      await adminsCollection.insertOne({
+        email: 'tom.erickson@deepspacedynamics.us',
+        password_hash: passwordHash,
+        name: 'Tom Erickson',
+        created_at: new Date(),
+      });
+      console.log('✅ First admin created: tom.erickson@deepspacedynamics.us');
+    } else {
+      console.log('ℹ️ Admin already exists, skipping...');
+    }
+
+    // Create indexes for auth collections
+    console.log('📇 Creating auth collection indexes...');
+
+    const accessRequestsCollection = db.collection('access_requests');
+    await accessRequestsCollection.createIndex({ email: 1 }, { unique: true });
+    await accessRequestsCollection.createIndex({ status: 1 });
+    await accessRequestsCollection.createIndex({ created_at: -1 });
+
+    const authUsersCollection = db.collection('users');
+    await authUsersCollection.createIndex({ email: 1 }, { unique: true });
+    await authUsersCollection.createIndex({ role: 1 });
+
+    await adminsCollection.createIndex({ email: 1 }, { unique: true });
+
+    console.log('✅ Auth collection indexes created');
 
     console.log('\n✅ Seed completed successfully!');
   } catch (error) {
