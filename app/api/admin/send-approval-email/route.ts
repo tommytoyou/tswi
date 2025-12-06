@@ -4,21 +4,39 @@ import { sendEmail } from '@/lib/notifications';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  console.log('[SendApprovalEmail] Received request');
+
   try {
     const body = await request.json();
     const { email, name } = body;
+    console.log(`[SendApprovalEmail] Processing for: ${email}, name: ${name}`);
 
     if (!email || !name) {
+      console.error('[SendApprovalEmail] Missing required fields');
       return NextResponse.json(
         { success: false, error: 'Email and name are required' },
         { status: 400 }
       );
     }
 
+    // Check if Resend API key is configured
+    if (!process.env.RESEND_API_KEY) {
+      console.error('[SendApprovalEmail] RESEND_API_KEY is not configured');
+      return NextResponse.json({
+        success: true,
+        emailSent: false,
+        reason: 'RESEND_API_KEY not configured',
+      });
+    }
+
+    console.log('[SendApprovalEmail] RESEND_API_KEY is configured');
+
     const appUrl = process.env.NEXTAUTH_URL || 'https://www.tswi-ai.com';
+    console.log(`[SendApprovalEmail] Using app URL: ${appUrl}`);
 
     const html = generateApprovalEmail(name, appUrl);
 
+    console.log(`[SendApprovalEmail] Calling sendEmail to: ${email}`);
     const success = await sendEmail({
       to: email,
       subject: 'Your TSWI Access Has Been Approved',
@@ -27,7 +45,9 @@ export async function POST(request: NextRequest) {
     });
 
     if (!success) {
-      console.warn('Email not sent - no email service configured');
+      console.warn('[SendApprovalEmail] sendEmail returned false - email not sent');
+    } else {
+      console.log('[SendApprovalEmail] Email sent successfully');
     }
 
     return NextResponse.json({
@@ -35,7 +55,7 @@ export async function POST(request: NextRequest) {
       emailSent: success,
     });
   } catch (error) {
-    console.error('Error sending approval email:', error);
+    console.error('[SendApprovalEmail] Error:', error);
     return NextResponse.json(
       { success: false, error: 'An error occurred' },
       { status: 500 }

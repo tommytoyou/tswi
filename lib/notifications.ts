@@ -37,7 +37,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
           'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
         },
         body: JSON.stringify({
-          from: process.env.EMAIL_FROM || 'alerts@tswi.space',
+          from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
           to: options.to,
           subject: options.subject,
           html: options.html,
@@ -46,10 +46,13 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       });
 
       if (!response.ok) {
-        throw new Error(`Resend API error: ${response.status}`);
+        const errorBody = await response.text();
+        console.error(`[Email] Resend API error ${response.status}:`, errorBody);
+        throw new Error(`Resend API error: ${response.status} - ${errorBody}`);
       }
 
-      console.log(`[Email] Sent to ${options.to}`);
+      const result = await response.json();
+      console.log(`[Email] Sent successfully to ${options.to}, ID: ${result.id}`);
       return true;
     }
 

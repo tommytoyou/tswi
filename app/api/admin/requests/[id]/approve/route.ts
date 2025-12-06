@@ -89,8 +89,12 @@ export async function POST(
     );
 
     // Send approval email
+    let emailSent = false;
     try {
-      await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:5000'}/api/admin/send-approval-email`, {
+      const emailUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:5000'}/api/admin/send-approval-email`;
+      console.log(`[Approve] Sending approval email to ${accessRequest.email} via ${emailUrl}`);
+
+      const emailResponse = await fetch(emailUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -98,8 +102,20 @@ export async function POST(
           name: accessRequest.name,
         }),
       });
+
+      const emailResult = await emailResponse.json();
+      console.log('[Approve] Email API response:', emailResult);
+
+      if (!emailResponse.ok) {
+        console.error('[Approve] Email API returned error status:', emailResponse.status);
+      } else if (!emailResult.emailSent) {
+        console.warn('[Approve] Email was not sent - check email service configuration');
+      } else {
+        emailSent = true;
+        console.log('[Approve] Approval email sent successfully');
+      }
     } catch (emailError) {
-      console.error('Failed to send approval email:', emailError);
+      console.error('[Approve] Failed to send approval email:', emailError);
       // Continue even if email fails
     }
 
