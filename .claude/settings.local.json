@@ -29,7 +29,10 @@
       "mcp__ide__getDiagnostics",
       "WebFetch(domain:www.tswi-ai.com)",
       "Bash(curl.exe:*)",
-      "Bash(dir \"C:\\Users\\tommy\\tswi\\components\\ui\" /b)"
+      "Bash(dir \"C:\\Users\\tommy\\tswi\\components\\ui\" /b)",
+      "Bash(npx tsx:*)",
+      "Bash(npx dotenv:*)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []
