@@ -426,7 +426,7 @@ export function SatelliteLayer({ viewer, Cesium, visible = true, kpValue = 0, on
   return (
     <>
       {/* Satellite Legend */}
-      <div className="absolute top-[180px] right-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3 min-w-[180px]">
+      <div className="absolute top-[200px] right-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3 min-w-[180px]">
         <div className="flex items-center gap-2 mb-3">
           <div className="w-3 h-3 rounded-full bg-yellow-500" />
           <span className="text-sm font-semibold text-white">Satellites</span>
