@@ -16,8 +16,6 @@ import { DstCard } from '@/components/dashboard/dst-card';
 import { SolarEventsCard } from '@/components/dashboard/solar-events-card';
 import { CmeCard } from '@/components/dashboard/cme-card';
 import { AlertsPanel } from '@/components/dashboard/alerts-panel';
-import { useStore } from '@/lib/store';
-import { Switch } from '@/components/ui/switch';
 import {
   LayoutDashboard,
   Wind,
@@ -69,7 +67,6 @@ export function TabbedDashboard() {
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const { kpBelts, tec, satellites, magnetometers, toggleLayer } = useStore();
 
   // Sync tab with URL param changes
   useEffect(() => {
@@ -147,32 +144,7 @@ export function TabbedDashboard() {
           </TabsContent>
 
           {/* Globe Tab */}
-          <TabsContent value="globe" className="h-full m-0 overflow-hidden relative">
-            {/* Layer Controls */}
-            <div className="absolute top-4 right-4 z-10 bg-slate-900/90 backdrop-blur-sm p-3 rounded-lg space-y-2 min-w-[180px]">
-              <h3 className="text-white font-semibold text-sm mb-2">Map Layers</h3>
-
-              <div className="flex items-center justify-between">
-                <label className="text-xs text-slate-300">Kp Belts</label>
-                <Switch checked={kpBelts} onCheckedChange={() => toggleLayer('kpBelts')} />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <label className="text-xs text-slate-300">TEC Overlay</label>
-                <Switch checked={tec} onCheckedChange={() => toggleLayer('tec')} />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <label className="text-xs text-slate-300">Satellites</label>
-                <Switch checked={satellites} onCheckedChange={() => toggleLayer('satellites')} />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <label className="text-xs text-slate-300">Magnetometers</label>
-                <Switch checked={magnetometers} onCheckedChange={() => toggleLayer('magnetometers')} />
-              </div>
-            </div>
-
+          <TabsContent value="globe" className="h-full m-0 overflow-hidden">
             <GlobeViewer />
           </TabsContent>
 
