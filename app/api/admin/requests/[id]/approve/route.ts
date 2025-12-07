@@ -180,7 +180,7 @@ function generateApprovalEmail(name: string, appUrl: string): string {
     <h2 style="color: #111827; margin: 20px 0 10px;">Hi ${name}!</h2>
 
     <p style="color: #374151; margin: 20px 0;">
-      Great news! Your request to access TSWI has been approved. You can now sign in using your Google account to access the space weather monitoring dashboard.
+      Great news! Your request to access TSWI has been approved. You can now sign in to access the space weather monitoring dashboard.
     </p>
 
     <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 20px; margin: 25px 0;">
@@ -197,12 +197,23 @@ function generateApprovalEmail(name: string, appUrl: string): string {
     <div style="margin-top: 30px; text-align: center;">
       <a href="${appUrl}/login"
          style="display: inline-block; background: #3b82f6; color: white; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
-        Sign In Now
+        Sign In with Google
+      </a>
+    </div>
+
+    <div style="background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 25px 0;">
+      <h3 style="color: #334155; margin: 0 0 10px; font-size: 14px;">Prefer email/password login?</h3>
+      <p style="color: #64748b; margin: 0 0 15px; font-size: 13px;">
+        You can also set up a password to sign in with your email address instead of Google.
+      </p>
+      <a href="${appUrl}/set-password"
+         style="display: inline-block; background: #475569; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px;">
+        Set Up Password
       </a>
     </div>
 
     <p style="color: #9ca3af; font-size: 13px; margin: 30px 0 0; text-align: center;">
-      Sign in with the same Google account you used to request access.
+      Use the same email address you used to request access.
     </p>
 
   </div>

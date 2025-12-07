@@ -1,5 +1,7 @@
 import { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import bcrypt from 'bcryptjs';
 import { getDb } from '@/lib/db';
 import type { User } from '@/lib/types';
 
@@ -30,6 +32,67 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
+    CredentialsProvider({
+      id: 'credentials',
+      name: 'Email',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error('Email and password are required');
+        }
+
+        try {
+          const db = await getDb();
+          const usersCollection = db.collection<User>('users');
+
+          // Find user by email
+          const user = await usersCollection.findOne({
+            email: credentials.email.toLowerCase()
+          });
+
+          if (!user) {
+            throw new Error('No account found with this email');
+          }
+
+          // Check if user has a password set
+          if (!user.password_hash) {
+            throw new Error('Password not set. Please set a password first or use Google sign-in.');
+          }
+
+          // Verify password
+          const isValidPassword = await bcrypt.compare(
+            credentials.password,
+            user.password_hash
+          );
+
+          if (!isValidPassword) {
+            throw new Error('Invalid password');
+          }
+
+          // Update last_login timestamp
+          await usersCollection.updateOne(
+            { email: credentials.email.toLowerCase() },
+            { $set: { last_login: new Date() } }
+          );
+
+          // Return user object for session
+          return {
+            id: user._id?.toString() || '',
+            email: user.email,
+            name: user.name,
+            image: null,
+          };
+        } catch (error) {
+          if (error instanceof Error) {
+            throw error;
+          }
+          throw new Error('Authentication failed');
+        }
+      },
+    }),
   ],
   pages: {
     signIn: '/login',
@@ -37,31 +100,39 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn({ user, account }) {
-      if (account?.provider !== 'google') return false;
-
-      try {
-        const db = await getDb();
-        const usersCollection = db.collection<User>('users');
-
-        // Check if user exists in users collection (approved beta tester)
-        const existingUser = await usersCollection.findOne({ email: user.email! });
-
-        if (!existingUser) {
-          // User not approved - redirect to access denied
-          return '/access-denied';
-        }
-
-        // Update last_login timestamp
-        await usersCollection.updateOne(
-          { email: user.email! },
-          { $set: { last_login: new Date() } }
-        );
-
+      // Credentials provider handles its own validation in authorize()
+      if (account?.provider === 'credentials') {
         return true;
-      } catch (error) {
-        console.error('Error during sign in:', error);
-        return false;
       }
+
+      // Google OAuth validation
+      if (account?.provider === 'google') {
+        try {
+          const db = await getDb();
+          const usersCollection = db.collection<User>('users');
+
+          // Check if user exists in users collection (approved beta tester)
+          const existingUser = await usersCollection.findOne({ email: user.email! });
+
+          if (!existingUser) {
+            // User not approved - redirect to access denied
+            return '/access-denied';
+          }
+
+          // Update last_login timestamp
+          await usersCollection.updateOne(
+            { email: user.email! },
+            { $set: { last_login: new Date() } }
+          );
+
+          return true;
+        } catch (error) {
+          console.error('Error during sign in:', error);
+          return false;
+        }
+      }
+
+      return false;
     },
 
     async jwt({ token, user, account }) {

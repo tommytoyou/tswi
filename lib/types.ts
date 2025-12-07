@@ -248,6 +248,7 @@ export const UserSchema = z.object({
   name: z.string(),
   company: z.string(),
   role: UserRoleSchema.default('user'),
+  password_hash: z.string().optional(), // Optional: for email/password login
   created_at: z.date(),
   last_login: z.date(),
 });
