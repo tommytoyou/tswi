@@ -103,7 +103,7 @@ function GlobeViewerComponent() {
 
         // Set initial camera position (centered over US)
         viewer.camera.setView({
-          destination: Cesium.Cartesian3.fromDegrees(-98.5, 39.8, 15000000),
+          destination: Cesium.Cartesian3.fromDegrees(-98.5, 39.8, 20000000),
           orientation: {
             heading: Cesium.Math.toRadians(0),
             pitch: Cesium.Math.toRadians(-90),
