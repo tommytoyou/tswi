@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     siteName: 'TSWI',
     images: [
       {
-        url: '/og-image.png',
+        url: '/api/og',
         width: 1200,
         height: 630,
         alt: 'TSWI - Tactical Space Weather Intelligence',
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'TSWI - Tactical Space Weather Intelligence',
     description: 'Real-time monitoring of solar activity, geomagnetic conditions, and AI-powered predictions for space weather events that impact Earth.',
-    images: ['/og-image.png'],
+    images: ['/api/og'],
   },
 };
 
