@@ -134,14 +134,24 @@ function LoginContent() {
 
           {/* Email Sign In - Secondary */}
           {!showEmailForm ? (
-            <Button
-              onClick={() => setShowEmailForm(true)}
-              variant="outline"
-              className="w-full border-slate-600 text-slate-300 hover:bg-slate-800"
-            >
-              <Mail className="mr-2 h-4 w-4" />
-              Sign in with Email
-            </Button>
+            <div className="space-y-3">
+              <Button
+                onClick={() => setShowEmailForm(true)}
+                variant="outline"
+                className="w-full border-slate-600 text-slate-300 hover:bg-slate-800"
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                Sign in with Email
+              </Button>
+              <div className="text-center">
+                <Link
+                  href="/set-password"
+                  className="text-sm text-blue-400 hover:text-blue-300"
+                >
+                  First time? Set up email login
+                </Link>
+              </div>
+            </div>
           ) : (
             <form onSubmit={handleEmailSignIn} className="space-y-4">
               {error && (
