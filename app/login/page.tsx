@@ -143,14 +143,14 @@ function LoginContent() {
                 <Mail className="mr-2 h-4 w-4" />
                 Sign in with Email
               </Button>
-              <div className="text-center">
+              <p className="text-center">
                 <Link
                   href="/set-password"
-                  className="text-sm text-blue-400 hover:text-blue-300"
+                  className="text-sm text-blue-400 hover:text-blue-300 underline hover:underline inline-block relative z-10"
                 >
                   First time? Set up email login
                 </Link>
-              </div>
+              </p>
             </div>
           ) : (
             <form onSubmit={handleEmailSignIn} className="space-y-4">
