@@ -8,9 +8,16 @@ export default function HomePage() {
       {/* Header */}
       <header className="absolute top-0 left-0 right-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Satellite className="h-6 w-6 text-blue-400" />
             <span className="text-xl font-bold text-white">TSWI</span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full text-xs text-blue-300">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
+              </span>
+              Private Beta
+            </span>
           </div>
           <Link href="/login">
             <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-800">
@@ -29,18 +36,14 @@ export default function HomePage() {
         </div>
 
         <div className="relative max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full mb-8">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-            </span>
-            <span className="text-sm text-blue-300">Private Beta</span>
-          </div>
-
           <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 tracking-tight">
+            <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+              Tactical
+            </span>
+            <br />
             Space Weather
             <br />
-            <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
               Intelligence
             </span>
           </h1>
