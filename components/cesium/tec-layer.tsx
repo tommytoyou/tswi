@@ -315,7 +315,7 @@ export function TecLayer({ viewer, Cesium, visible = true }: TecLayerProps) {
       subtitle="GloTEC"
       indicatorColor="#3b82f6"
       defaultCollapsed={true}
-      className="absolute top-[60px] left-4 z-20 min-w-[200px]"
+      className="absolute top-4 left-[220px] z-20 min-w-[200px]"
     >
       {loading ? (
         <div className="flex items-center gap-2 text-slate-400 text-sm">

@@ -331,7 +331,7 @@ export function KpAuroraLayer({ viewer, Cesium }: KpAuroraLayerProps) {
       indicatorColor="#4ade80"
       indicatorPulse={true}
       defaultCollapsed={true}
-      className="absolute top-4 left-4 z-20 min-w-[220px]"
+      className="absolute top-4 left-4 z-20 min-w-[200px]"
     >
       {loading ? (
         <div className="flex items-center gap-2 text-slate-400 text-sm">

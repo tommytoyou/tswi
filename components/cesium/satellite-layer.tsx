@@ -431,7 +431,7 @@ export function SatelliteLayer({ viewer, Cesium, visible = true, kpValue = 0, on
         title="Satellites"
         indicatorColor="#eab308"
         defaultCollapsed={true}
-        className="absolute top-[60px] right-4 z-20 min-w-[180px]"
+        className="absolute top-4 right-4 z-20 min-w-[180px]"
       >
         {loading ? (
           <div className="flex items-center gap-2 text-slate-400 text-sm">

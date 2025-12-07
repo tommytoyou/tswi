@@ -258,7 +258,7 @@ export function HfBlackoutLayer({ viewer, Cesium, visible = true }: HfBlackoutLa
       indicatorColor={isActive ? `rgb(${config!.color.r}, ${config!.color.g}, ${config!.color.b})` : '#22c55e'}
       indicatorPulse={isActive}
       defaultCollapsed={true}
-      className="absolute top-4 right-4 z-20 min-w-[220px]"
+      className="absolute top-4 right-[220px] z-20 min-w-[200px]"
     >
       {loading ? (
         <div className="flex items-center gap-2 text-slate-400 text-sm">
