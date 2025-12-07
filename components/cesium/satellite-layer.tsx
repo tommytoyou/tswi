@@ -426,7 +426,7 @@ export function SatelliteLayer({ viewer, Cesium, visible = true, kpValue = 0, on
   return (
     <>
       {/* Satellite Legend */}
-      <div className="absolute bottom-4 left-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3 min-w-[180px]">
+      <div className="absolute top-4 right-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3 min-w-[180px]">
         <div className="flex items-center gap-2 mb-3">
           <div className="w-3 h-3 rounded-full bg-yellow-500" />
           <span className="text-sm font-semibold text-white">Satellites</span>
@@ -509,7 +509,7 @@ export function SatelliteLayer({ viewer, Cesium, visible = true, kpValue = 0, on
 
       {/* Selected Satellite Details */}
       {selectedSatellite && (
-        <div className={`absolute bottom-52 left-4 z-20 bg-slate-900/95 backdrop-blur-sm rounded-lg border ${selectedSatellite.inDanger ? 'border-red-600' : 'border-slate-700'} p-4 min-w-[240px]`}>
+        <div className={`absolute bottom-20 right-4 z-20 bg-slate-900/95 backdrop-blur-sm rounded-lg border ${selectedSatellite.inDanger ? 'border-red-600' : 'border-slate-700'} p-4 min-w-[240px]`}>
           <div className="flex justify-between items-start mb-3">
             <div>
               <h3 className="text-sm font-bold text-white">
