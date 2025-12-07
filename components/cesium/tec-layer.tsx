@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { CollapsibleInfoBox } from './collapsible-info-box';
 
 interface TecLayerProps {
   viewer: any; // Cesium.Viewer
@@ -309,15 +310,13 @@ export function TecLayer({ viewer, Cesium, visible = true }: TecLayerProps) {
   const condition = getConditionLabel(maxTec);
 
   return (
-    <div className="absolute top-[220px] left-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3 min-w-[200px]">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-3 h-3 rounded-full bg-blue-500" />
-        <div>
-          <span className="text-sm font-semibold text-white">Total Electron Content</span>
-          <span className="text-xs text-slate-500 ml-2">(GloTEC)</span>
-        </div>
-      </div>
-
+    <CollapsibleInfoBox
+      title="TEC"
+      subtitle="GloTEC"
+      indicatorColor="#3b82f6"
+      defaultCollapsed={true}
+      className="absolute top-[60px] left-4 z-20 min-w-[200px]"
+    >
       {loading ? (
         <div className="flex items-center gap-2 text-slate-400 text-sm">
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500" />
@@ -419,6 +418,6 @@ export function TecLayer({ viewer, Cesium, visible = true }: TecLayerProps) {
           </div>
         </>
       )}
-    </div>
+    </CollapsibleInfoBox>
   );
 }

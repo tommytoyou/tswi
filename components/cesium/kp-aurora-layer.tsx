@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { CollapsibleInfoBox } from './collapsible-info-box';
 
 interface KpAuroraLayerProps {
   viewer: any; // Cesium.Viewer
@@ -324,12 +325,14 @@ export function KpAuroraLayer({ viewer, Cesium }: KpAuroraLayerProps) {
   const activity = getActivityLevel(maxProbability);
 
   return (
-    <div className="absolute top-4 left-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3 min-w-[220px]">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-3 h-3 rounded-full bg-green-400 animate-pulse" />
-        <span className="text-sm font-semibold text-white">OVATION Aurora Forecast</span>
-      </div>
-
+    <CollapsibleInfoBox
+      title="Aurora Forecast"
+      subtitle="OVATION"
+      indicatorColor="#4ade80"
+      indicatorPulse={true}
+      defaultCollapsed={true}
+      className="absolute top-4 left-4 z-20 min-w-[220px]"
+    >
       {loading ? (
         <div className="flex items-center gap-2 text-slate-400 text-sm">
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500" />
@@ -385,6 +388,6 @@ export function KpAuroraLayer({ viewer, Cesium }: KpAuroraLayerProps) {
           </div>
         </>
       )}
-    </div>
+    </CollapsibleInfoBox>
   );
 }
