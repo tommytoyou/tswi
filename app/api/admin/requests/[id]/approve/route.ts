@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth/admin';
 import { ObjectId } from 'mongodb';
-import { sendEmail } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,28 +88,55 @@ export async function POST(
       }
     );
 
-    // Send approval email directly (not via HTTP to avoid serverless issues)
+    // Send approval email directly using Resend API
     let emailSent = false;
     try {
-      console.log(`[Approve] Sending approval email to ${accessRequest.email}`);
+      console.log('[APPROVAL] ========================================');
+      console.log('[APPROVAL] About to send email to:', accessRequest.email);
+      console.log('[APPROVAL] RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY);
+      console.log('[APPROVAL] RESEND_API_KEY length:', process.env.RESEND_API_KEY?.length || 0);
 
       const appUrl = process.env.NEXTAUTH_URL || 'https://www.tswi-ai.com';
       const html = generateApprovalEmail(accessRequest.name, appUrl);
 
-      emailSent = await sendEmail({
-        to: accessRequest.email,
-        subject: 'Your TSWI Access Has Been Approved',
-        html,
-        text: `Hi ${accessRequest.name}, Your TSWI access has been approved! Sign in at ${appUrl}/login`,
-      });
-
-      if (emailSent) {
-        console.log('[Approve] Approval email sent successfully');
+      // Call Resend API directly to bypass any issues with lib/notifications
+      const resendApiKey = process.env.RESEND_API_KEY;
+      if (!resendApiKey) {
+        console.error('[APPROVAL] ERROR: RESEND_API_KEY is not set!');
       } else {
-        console.warn('[Approve] Email was not sent - check email service configuration');
+        console.log('[APPROVAL] Making Resend API call...');
+        const emailPayload = {
+          from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+          to: accessRequest.email,
+          subject: 'Your TSWI Access Has Been Approved',
+          html,
+          text: `Hi ${accessRequest.name}, Your TSWI access has been approved! Sign in at ${appUrl}/login`,
+        };
+        console.log('[APPROVAL] Email payload (sans html):', { ...emailPayload, html: '[HTML content]' });
+
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${resendApiKey}`,
+          },
+          body: JSON.stringify(emailPayload),
+        });
+
+        console.log('[APPROVAL] Resend response status:', response.status);
+        const responseText = await response.text();
+        console.log('[APPROVAL] Resend response body:', responseText);
+
+        if (response.ok) {
+          emailSent = true;
+          console.log('[APPROVAL] Email sent successfully!');
+        } else {
+          console.error('[APPROVAL] Resend API error:', response.status, responseText);
+        }
       }
+      console.log('[APPROVAL] ========================================');
     } catch (emailError) {
-      console.error('[Approve] Failed to send approval email:', emailError);
+      console.error('[APPROVAL] Exception sending email:', emailError);
       // Continue even if email fails
     }
 
