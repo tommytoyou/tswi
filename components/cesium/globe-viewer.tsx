@@ -165,7 +165,7 @@ function GlobeViewerComponent() {
 
       {/* Map Layers Panel */}
       {cesiumReady && (
-        <div className="absolute bottom-4 left-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3 min-w-[180px]">
+        <div className="absolute bottom-4 right-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3 min-w-[180px]">
           <div className="text-sm font-semibold text-white mb-2">Map Layers</div>
           <div className="space-y-2">
             <label className="flex items-center gap-2 cursor-pointer">
