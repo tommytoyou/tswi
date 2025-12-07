@@ -252,7 +252,7 @@ export function HfBlackoutLayer({ viewer, Cesium, visible = true }: HfBlackoutLa
   const config = isActive ? FLARE_CONFIG[flareClass] : null;
 
   return (
-    <div className="absolute top-4 right-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3 min-w-[220px]">
+    <div className="absolute top-48 left-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3 min-w-[220px]">
       <div className="flex items-center gap-2 mb-3">
         <div
           className={`w-3 h-3 rounded-full ${
