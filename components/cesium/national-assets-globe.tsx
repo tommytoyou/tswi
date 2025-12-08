@@ -293,7 +293,7 @@ function NationalAssetsGlobeComponent() {
         }
 
         viewer.camera.setView({
-          destination: Cesium.Cartesian3.fromDegrees(-98.5, 39.8, 20000000),
+          destination: Cesium.Cartesian3.fromDegrees(-98.5, 39.8, 80000000),
           orientation: {
             heading: Cesium.Math.toRadians(0),
             pitch: Cesium.Math.toRadians(-90),
@@ -665,30 +665,17 @@ function NationalAssetsGlobeComponent() {
             <div className="mt-3 pt-2 border-t border-slate-700">
               <div className="text-xs text-slate-400 mb-2">Shape by Sector</div>
               <div className="space-y-1">
-                <div className="flex items-center gap-2 text-xs text-slate-400">
-                  <svg width="12" height="12" viewBox="0 0 12 12">
-                    <circle cx="6" cy="6" r="5" fill="#6B7280" stroke="white" strokeWidth="1"/>
-                  </svg>
-                  <span>Commercial</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-slate-400">
-                  <svg width="12" height="12" viewBox="0 0 12 12">
-                    <polygon points="6,1 11,11 1,11" fill="#6B7280" stroke="white" strokeWidth="1"/>
-                  </svg>
-                  <span>Civil</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-slate-400">
-                  <svg width="12" height="12" viewBox="0 0 12 12">
-                    <rect x="1" y="1" width="10" height="10" fill="#6B7280" stroke="white" strokeWidth="1"/>
-                  </svg>
-                  <span>Government</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-slate-400">
-                  <svg width="12" height="12" viewBox="0 0 12 12">
-                    <polygon points="6,1 11,6 6,11 1,6" fill="#6B7280" stroke="white" strokeWidth="1"/>
-                  </svg>
-                  <span>Military</span>
-                </div>
+                {sectors.map((sector) => (
+                  <div key={sector} className="flex items-center gap-2 text-xs text-slate-400">
+                    <img
+                      src={createShapeSvg(SECTOR_SHAPES[sector], '#6B7280')}
+                      alt={sector}
+                      width={12}
+                      height={12}
+                    />
+                    <span>{sector}</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
