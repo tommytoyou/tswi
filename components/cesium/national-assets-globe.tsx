@@ -124,6 +124,51 @@ function calculatePosition(
   }
 }
 
+// Generate orbital track positions for one complete orbit
+function generateOrbitalTrack(
+  satrec: satellite.SatRec,
+  startDate: Date,
+  numPoints: number = 120
+): { longitude: number; latitude: number; altitude: number }[] {
+  const positions: { longitude: number; latitude: number; altitude: number }[] = [];
+
+  // Calculate orbital period from mean motion (revolutions per day)
+  const meanMotion = satrec.no; // radians per minute
+  const orbitalPeriodMinutes = (2 * Math.PI) / meanMotion;
+
+  // Generate positions for one complete orbit
+  for (let i = 0; i <= numPoints; i++) {
+    const timeOffset = (i / numPoints) * orbitalPeriodMinutes;
+    const date = new Date(startDate.getTime() + timeOffset * 60 * 1000);
+
+    try {
+      const positionAndVelocity = satellite.propagate(satrec, date);
+
+      if (
+        !positionAndVelocity ||
+        !positionAndVelocity.position ||
+        typeof positionAndVelocity.position === 'boolean'
+      ) {
+        continue;
+      }
+
+      const positionEci = positionAndVelocity.position as satellite.EciVec3<number>;
+      const gmst = satellite.gstime(date);
+      const positionGd = satellite.eciToGeodetic(positionEci, gmst);
+
+      positions.push({
+        longitude: satellite.degreesLong(positionGd.longitude),
+        latitude: satellite.degreesLat(positionGd.latitude),
+        altitude: positionGd.height,
+      });
+    } catch {
+      // Skip invalid positions
+    }
+  }
+
+  return positions;
+}
+
 function NationalAssetsGlobeComponent() {
   const viewerRef = useRef<HTMLDivElement>(null);
   const cesiumViewerRef = useRef<any>(null);
@@ -146,6 +191,10 @@ function NationalAssetsGlobeComponent() {
   const [stats, setStats] = useState<APIResponse['stats'] | null>(null);
   const [selectedSatellite, setSelectedSatellite] = useState<SatellitePosition | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
+
+  // Orbital tracks
+  const [showOrbitalTracks, setShowOrbitalTracks] = useState(false);
+  const orbitalTracksRef = useRef<any[]>([]);
 
   // Initialize Cesium
   useEffect(() => {
@@ -403,6 +452,76 @@ function NationalAssetsGlobeComponent() {
     };
   }, [cesiumReady, satellites, viewMode]);
 
+  // Render orbital tracks when enabled
+  useEffect(() => {
+    const viewer = cesiumViewerRef.current;
+    const Cesium = cesiumModuleRef.current;
+
+    if (!viewer || !Cesium || !cesiumReady) return;
+
+    // Clear existing orbital track entities
+    orbitalTracksRef.current.forEach((entity) => {
+      try {
+        viewer.entities.remove(entity);
+      } catch {
+        // Ignore cleanup errors
+      }
+    });
+    orbitalTracksRef.current = [];
+
+    // Only render if showOrbitalTracks is enabled
+    if (!showOrbitalTracks) return;
+
+    const now = new Date();
+
+    // Generate and draw orbital tracks for each satellite
+    satellites.forEach((sat) => {
+      if (!sat.satrec) return;
+
+      const trackPositions = generateOrbitalTrack(sat.satrec, now, 120);
+
+      if (trackPositions.length < 2) return;
+
+      // Get color based on view mode
+      const colorHex = viewMode === 'country' ? COUNTRY_COLORS[sat.countryNormalized] : SECTOR_COLORS[sat.sector];
+      const rgb = hexToRgb(colorHex);
+
+      // Create Cartesian3 positions array for the polyline
+      const cartesianPositions: any[] = [];
+      for (const pos of trackPositions) {
+        cartesianPositions.push(
+          Cesium.Cartesian3.fromDegrees(pos.longitude, pos.latitude, pos.altitude * 1000)
+        );
+      }
+
+      // Add polyline entity with semi-transparent dashed line
+      const trackEntity = viewer.entities.add({
+        polyline: {
+          positions: cartesianPositions,
+          width: 1.5,
+          material: new Cesium.PolylineDashMaterialProperty({
+            color: new Cesium.Color(rgb.r / 255, rgb.g / 255, rgb.b / 255, 0.4),
+            dashLength: 16,
+          }),
+          clampToGround: false,
+        },
+      });
+
+      orbitalTracksRef.current.push(trackEntity);
+    });
+
+    return () => {
+      orbitalTracksRef.current.forEach((entity) => {
+        try {
+          viewer.entities.remove(entity);
+        } catch {
+          // Ignore cleanup errors
+        }
+      });
+      orbitalTracksRef.current = [];
+    };
+  }, [cesiumReady, satellites, viewMode, showOrbitalTracks]);
+
   // Toggle country selection
   const toggleCountry = (country: CountryKey) => {
     setSelectedCountries((prev) => {
@@ -578,6 +697,19 @@ function NationalAssetsGlobeComponent() {
                 </label>
               ))}
             </div>
+          </div>
+
+          {/* Orbital Tracks Toggle */}
+          <div className="mt-3 pt-3 border-t border-slate-700">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showOrbitalTracks}
+                onChange={() => setShowOrbitalTracks(!showOrbitalTracks)}
+                className="w-3 h-3 rounded border-slate-600 bg-slate-800"
+              />
+              <span className="text-xs text-slate-300">Show Orbital Tracks</span>
+            </label>
           </div>
 
           {dataLoading && (
