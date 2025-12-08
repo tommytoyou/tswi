@@ -35,7 +35,8 @@
       "Bash(timeout:*)",
       "Bash(mkdir:*)",
       "WebFetch(domain:www.ucsusa.org)",
-      "WebFetch(domain:www.ucs.org)"
+      "WebFetch(domain:www.ucs.org)",
+      "WebFetch(domain:www.swpc.noaa.gov)"
     ],
     "deny": [],
     "ask": []

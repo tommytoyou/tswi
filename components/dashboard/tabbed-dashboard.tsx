@@ -36,11 +36,14 @@ const GlobeViewer = dynamic(() => import('@/components/cesium/globe-viewer'), {
   ),
 });
 
-const AuroraViewer = dynamic(() => import('@/components/dashboard/aurora-viewer'), {
+const AuroraGlobe = dynamic(() => import('@/components/cesium/aurora-globe'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-slate-900">
-      <div className="text-slate-400">Loading Aurora...</div>
+    <div className="w-full h-full flex items-center justify-center bg-[#050520]">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-500 mx-auto mb-4" />
+        <p className="text-slate-400">Loading Aurora Globe...</p>
+      </div>
     </div>
   ),
 });
@@ -166,7 +169,7 @@ export function TabbedDashboard() {
 
           {/* Aurora Tab */}
           <TabsContent value="aurora" className="h-full m-0 overflow-hidden">
-            <AuroraViewer />
+            <AuroraGlobe />
           </TabsContent>
 
           {/* Alerts Tab */}
