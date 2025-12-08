@@ -9,25 +9,38 @@ interface TLEData {
   line1: string;
   line2: string;
   noradId: string;
-  type: 'station' | 'weather' | 'comms' | 'starlink';
+  type: ConstellationType;
+  inclination?: number;
+  raan?: number;
+  orbitalPlane?: string;
 }
 
-// Key satellites to track
-const KEY_SATELLITES: { name: string; noradId: string; type: TLEData['type'] }[] = [
-  { name: 'ISS (ZARYA)', noradId: '25544', type: 'station' },
-  { name: 'NOAA 20', noradId: '43013', type: 'weather' },
-  { name: 'GOES 18', noradId: '51850', type: 'weather' },
-  { name: 'NOAA 19', noradId: '33591', type: 'weather' },
-  { name: 'GOES 16', noradId: '41866', type: 'weather' },
-  { name: 'STARLINK-1007', noradId: '44713', type: 'starlink' },
-  { name: 'STARLINK-1008', noradId: '44714', type: 'starlink' },
-  { name: 'STARLINK-1009', noradId: '44715', type: 'starlink' },
-  { name: 'IRIDIUM 180', noradId: '56730', type: 'comms' },
-  { name: 'GLOBALSTAR M087', noradId: '40269', type: 'comms' },
+// Constellation types
+type ConstellationType = 'station' | 'starlink' | 'iridium' | 'noaa' | 'goes' | 'gps' | 'science' | 'military';
+
+// CelesTrak category endpoints
+const CELESTRAK_CATEGORIES: { group: string; type: ConstellationType; limit?: number }[] = [
+  { group: 'stations', type: 'station' },
+  { group: 'starlink', type: 'starlink', limit: 5000 }, // Fetch all for orbital plane grouping
+  { group: 'iridium-NEXT', type: 'iridium' },
+  { group: 'noaa', type: 'noaa' },
+  { group: 'goes', type: 'goes' },
+  { group: 'gps-ops', type: 'gps' },
+  { group: 'science', type: 'science' },
+  { group: 'military', type: 'military' },
 ];
 
-// Parse TLE text into structured data
-function parseTLE(tleText: string, satelliteInfo: Map<string, { type: TLEData['type'] }>): TLEData[] {
+// Orbital plane grouping data
+interface OrbitalPlane {
+  id: string;
+  inclination: number;
+  raan: number;
+  satellites: TLEData[];
+  representative: TLEData;
+}
+
+// Parse TLE text into structured data with orbital elements
+function parseTLE(tleText: string, defaultType: ConstellationType): TLEData[] {
   const lines = tleText.trim().split('\n').map(l => l.trim()).filter(l => l);
   const satellites: TLEData[] = [];
 
@@ -46,101 +59,163 @@ function parseTLE(tleText: string, satelliteInfo: Map<string, { type: TLEData['t
     // Extract NORAD ID from line 1 (columns 3-7)
     const noradId = line1.substring(2, 7).trim();
 
-    // Get satellite type from our key satellites list
-    const info = satelliteInfo.get(noradId);
-    const type = info?.type || 'comms';
+    // Extract orbital elements from line 2
+    // Inclination: columns 9-16
+    // RAAN: columns 18-25
+    const inclination = parseFloat(line2.substring(8, 16).trim());
+    const raan = parseFloat(line2.substring(17, 25).trim());
 
     satellites.push({
       name: name.trim(),
       line1,
       line2,
       noradId,
-      type,
+      type: defaultType,
+      inclination,
+      raan,
     });
   }
 
   return satellites;
 }
 
-// Fetch TLE data from CelesTrak
-async function fetchTLEFromCelesTrak(): Promise<TLEData[]> {
-  // Build a map of our key satellites for type lookup
-  const satelliteInfo = new Map(
-    KEY_SATELLITES.map(s => [s.noradId, { type: s.type }])
+// Group satellites by orbital plane
+function groupByOrbitalPlane(satellites: TLEData[], incResolution: number = 1, raanResolution: number = 10): OrbitalPlane[] {
+  const planeMap = new Map<string, TLEData[]>();
+
+  for (const sat of satellites) {
+    if (sat.inclination === undefined || sat.raan === undefined) continue;
+
+    // Round inclination and RAAN to create orbital plane groups
+    const incGroup = Math.round(sat.inclination / incResolution) * incResolution;
+    const raanGroup = Math.round(sat.raan / raanResolution) * raanResolution;
+    const planeId = `${incGroup.toFixed(0)}_${raanGroup.toFixed(0)}`;
+
+    sat.orbitalPlane = planeId;
+
+    if (!planeMap.has(planeId)) {
+      planeMap.set(planeId, []);
+    }
+    planeMap.get(planeId)!.push(sat);
+  }
+
+  // Convert to OrbitalPlane array
+  const planes: OrbitalPlane[] = [];
+  for (const [id, sats] of planeMap) {
+    if (sats.length === 0) continue;
+
+    // Sort by NORAD ID and pick the first as representative (often the most recently launched)
+    sats.sort((a, b) => parseInt(b.noradId) - parseInt(a.noradId));
+    const representative = sats[0];
+
+    planes.push({
+      id,
+      inclination: representative.inclination!,
+      raan: representative.raan!,
+      satellites: sats,
+      representative,
+    });
+  }
+
+  return planes;
+}
+
+// Fetch TLE data from a single CelesTrak category
+async function fetchCategoryTLE(group: string, type: ConstellationType): Promise<TLEData[]> {
+  const tleUrl = `https://celestrak.org/NORAD/elements/gp.php?GROUP=${group}&FORMAT=tle`;
+
+  try {
+    const response = await fetch(tleUrl, {
+      headers: {
+        'User-Agent': 'TSWI-SpaceWeather/1.0',
+      },
+      next: { revalidate: 3600 }, // Cache for 1 hour
+    });
+
+    if (!response.ok) {
+      console.warn(`CelesTrak ${group} returned ${response.status}`);
+      return [];
+    }
+
+    const tleText = await response.text();
+    return parseTLE(tleText, type);
+  } catch (error) {
+    console.warn(`Failed to fetch ${group}:`, error);
+    return [];
+  }
+}
+
+// Fetch all satellite data from multiple CelesTrak categories
+async function fetchAllSatellites(): Promise<{
+  satellites: TLEData[];
+  starlinkPlanes: OrbitalPlane[];
+  iridiumPlanes: OrbitalPlane[];
+}> {
+  // Fetch all categories in parallel
+  const fetchPromises = CELESTRAK_CATEGORIES.map(cat =>
+    fetchCategoryTLE(cat.group, cat.type)
   );
 
-  // Fetch active satellites (includes ISS, weather, etc.)
-  const tleUrl = 'https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle';
+  const results = await Promise.all(fetchPromises);
 
-  const response = await fetch(tleUrl, {
-    headers: {
-      'User-Agent': 'TSWI-SpaceWeather/1.0',
-    },
-    next: { revalidate: 3600 }, // Cache for 1 hour
-  });
+  // Separate Starlink and Iridium for orbital plane grouping
+  let starlinkSats: TLEData[] = [];
+  let iridiumSats: TLEData[] = [];
+  const otherSats: TLEData[] = [];
 
-  if (!response.ok) {
-    throw new Error(`CelesTrak returned ${response.status}`);
-  }
-
-  const tleText = await response.text();
-  const allSatellites = parseTLE(tleText, satelliteInfo);
-
-  // Filter to only our key satellites
-  const keyNoradIds = new Set(KEY_SATELLITES.map(s => s.noradId));
-  let filtered = allSatellites.filter(s => keyNoradIds.has(s.noradId));
-
-  // If we didn't find some satellites, try individual fetches
-  if (filtered.length < KEY_SATELLITES.length) {
-    const foundIds = new Set(filtered.map(s => s.noradId));
-    const missing = KEY_SATELLITES.filter(s => !foundIds.has(s.noradId));
-
-    for (const sat of missing) {
-      try {
-        const singleUrl = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${sat.noradId}&FORMAT=tle`;
-        const singleResponse = await fetch(singleUrl, {
-          headers: { 'User-Agent': 'TSWI-SpaceWeather/1.0' },
-        });
-
-        if (singleResponse.ok) {
-          const singleTle = await singleResponse.text();
-          const parsed = parseTLE(singleTle, satelliteInfo);
-          if (parsed.length > 0) {
-            // Override with known type
-            parsed[0].type = sat.type;
-            filtered.push(parsed[0]);
-          }
-        }
-      } catch {
-        console.warn(`Failed to fetch TLE for ${sat.name}`);
-      }
+  results.forEach((sats, index) => {
+    const category = CELESTRAK_CATEGORIES[index];
+    if (category.type === 'starlink') {
+      starlinkSats = sats;
+    } else if (category.type === 'iridium') {
+      iridiumSats = sats;
+    } else {
+      otherSats.push(...sats);
     }
-  }
-
-  // Update types from our key satellites list
-  return filtered.map(s => {
-    const keySat = KEY_SATELLITES.find(ks => ks.noradId === s.noradId);
-    return {
-      ...s,
-      type: keySat?.type || s.type,
-    };
   });
+
+  // Group Starlink by orbital planes
+  const starlinkPlanes = groupByOrbitalPlane(starlinkSats, 1, 15);
+
+  // Group Iridium by orbital planes (they have fewer planes)
+  const iridiumPlanes = groupByOrbitalPlane(iridiumSats, 1, 30);
+
+  // For individual satellites response, include representatives from planes
+  const satellites: TLEData[] = [
+    ...otherSats,
+    ...starlinkPlanes.map(p => ({
+      ...p.representative,
+      orbitalPlane: p.id,
+    })),
+    ...iridiumPlanes.map(p => ({
+      ...p.representative,
+      orbitalPlane: p.id,
+    })),
+  ];
+
+  return {
+    satellites,
+    starlinkPlanes,
+    iridiumPlanes,
+  };
 }
 
 /**
  * GET /api/satellites
  *
- * Fetches TLE data for key satellites from CelesTrak
+ * Fetches TLE data for multiple satellite constellations from CelesTrak
  *
  * Query params:
- * - type: 'all' | 'station' | 'weather' | 'comms' | 'starlink' (default: 'all')
+ * - type: 'all' | constellation type (default: 'all')
+ * - includeOrbitalPlanes: 'true' to include orbital plane data for Starlink/Iridium
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const typeFilter = searchParams.get('type') || 'all';
+    const includeOrbitalPlanes = searchParams.get('includeOrbitalPlanes') === 'true';
 
-    const satellites = await fetchTLEFromCelesTrak();
+    const { satellites, starlinkPlanes, iridiumPlanes } = await fetchAllSatellites();
 
     // Filter by type if specified
     let filtered = satellites;
@@ -148,13 +223,57 @@ export async function GET(request: NextRequest) {
       filtered = satellites.filter(s => s.type === typeFilter);
     }
 
-    return NextResponse.json({
+    // Count satellites by type
+    const countByType: Record<string, number> = {};
+    for (const sat of satellites) {
+      countByType[sat.type] = (countByType[sat.type] || 0) + 1;
+    }
+
+    // Prepare response
+    const response: any = {
       success: true,
       satellites: filtered,
       count: filtered.length,
+      countByType,
       timestamp: new Date().toISOString(),
       source: 'celestrak',
-    });
+    };
+
+    // Include orbital plane data if requested
+    if (includeOrbitalPlanes) {
+      response.orbitalPlanes = {
+        starlink: starlinkPlanes.map(p => ({
+          id: p.id,
+          inclination: p.inclination,
+          raan: p.raan,
+          satelliteCount: p.satellites.length,
+          representative: {
+            name: p.representative.name,
+            noradId: p.representative.noradId,
+            line1: p.representative.line1,
+            line2: p.representative.line2,
+          },
+        })),
+        iridium: iridiumPlanes.map(p => ({
+          id: p.id,
+          inclination: p.inclination,
+          raan: p.raan,
+          satelliteCount: p.satellites.length,
+          representative: {
+            name: p.representative.name,
+            noradId: p.representative.noradId,
+            line1: p.representative.line1,
+            line2: p.representative.line2,
+          },
+        })),
+      };
+      response.starlinkPlaneCount = starlinkPlanes.length;
+      response.iridiumPlaneCount = iridiumPlanes.length;
+      response.totalStarlinkSatellites = starlinkPlanes.reduce((acc, p) => acc + p.satellites.length, 0);
+      response.totalIridiumSatellites = iridiumPlanes.reduce((acc, p) => acc + p.satellites.length, 0);
+    }
+
+    return NextResponse.json(response);
   } catch (error: any) {
     console.error('Satellites API error:', error);
     return NextResponse.json(
