@@ -33,7 +33,9 @@
       "Bash(npx tsx:*)",
       "Bash(npx dotenv:*)",
       "Bash(timeout:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "WebFetch(domain:www.ucsusa.org)",
+      "WebFetch(domain:www.ucs.org)"
     ],
     "deny": [],
     "ask": []

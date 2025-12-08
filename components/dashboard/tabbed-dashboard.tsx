@@ -23,6 +23,7 @@ import {
   Globe2,
   Sparkles,
   Bell,
+  Flag,
 } from 'lucide-react';
 
 // Dynamic imports for heavy components
@@ -44,6 +45,15 @@ const AuroraViewer = dynamic(() => import('@/components/dashboard/aurora-viewer'
   ),
 });
 
+const NationalAssetsGlobe = dynamic(() => import('@/components/cesium/national-assets-globe'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-slate-900">
+      <div className="text-slate-400">Loading National Assets...</div>
+    </div>
+  ),
+});
+
 interface TabConfig {
   id: string;
   label: string;
@@ -55,6 +65,7 @@ const tabs: TabConfig[] = [
   { id: 'predictive-modelling', label: 'Predictive Modelling', icon: LayoutDashboard },
   { id: 'events', label: 'Events', icon: Flame },
   { id: 'globe', label: 'Globe', icon: Globe2 },
+  { id: 'national-assets', label: 'National Assets', icon: Flag },
   { id: 'aurora', label: 'Aurora', icon: Sparkles },
   { id: 'alerts', label: 'Alerts', icon: Bell },
 ];
@@ -146,6 +157,11 @@ export function TabbedDashboard() {
           {/* Globe Tab */}
           <TabsContent value="globe" className="h-full m-0 overflow-hidden">
             <GlobeViewer />
+          </TabsContent>
+
+          {/* National Assets Tab */}
+          <TabsContent value="national-assets" className="h-full m-0 overflow-hidden">
+            <NationalAssetsGlobe />
           </TabsContent>
 
           {/* Aurora Tab */}
