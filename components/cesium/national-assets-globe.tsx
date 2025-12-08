@@ -746,9 +746,11 @@ function NationalAssetsGlobeComponent() {
                     onChange={() => toggleSector(s)}
                     className="w-3 h-3 rounded border-slate-600 bg-slate-800"
                   />
-                  <div
-                    className="w-2.5 h-2.5 rounded-full"
-                    style={{ backgroundColor: SECTOR_COLORS[s] }}
+                  <img
+                    src={createShapeSvg(SECTOR_SHAPES[s], SECTOR_COLORS[s])}
+                    alt={s}
+                    width={12}
+                    height={12}
                   />
                   <span className="text-xs text-slate-300">{s}</span>
                 </label>
