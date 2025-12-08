@@ -74,6 +74,57 @@ const SECTOR_SHAPES: Record<SectorKey, 'circle' | 'triangle' | 'square' | 'diamo
   Military: 'diamond',
 };
 
+// Generate SVG data URI for different shapes with specified color
+function createShapeSvg(shape: 'circle' | 'triangle' | 'square' | 'diamond', colorHex: string): string {
+  const size = 24;
+  const strokeWidth = 2;
+  let svgContent: string;
+
+  switch (shape) {
+    case 'circle':
+      svgContent = `<circle cx="${size/2}" cy="${size/2}" r="${size/2 - strokeWidth}" fill="${colorHex}" stroke="white" stroke-width="${strokeWidth}"/>`;
+      break;
+    case 'triangle': {
+      // Equilateral triangle pointing up
+      const triPadding = strokeWidth;
+      const triTop = triPadding;
+      const triBottom = size - triPadding;
+      const triLeft = triPadding;
+      const triRight = size - triPadding;
+      svgContent = `<polygon points="${size/2},${triTop} ${triRight},${triBottom} ${triLeft},${triBottom}" fill="${colorHex}" stroke="white" stroke-width="${strokeWidth}"/>`;
+      break;
+    }
+    case 'square': {
+      const sqPadding = strokeWidth + 1;
+      svgContent = `<rect x="${sqPadding}" y="${sqPadding}" width="${size - sqPadding*2}" height="${size - sqPadding*2}" fill="${colorHex}" stroke="white" stroke-width="${strokeWidth}"/>`;
+      break;
+    }
+    case 'diamond': {
+      // Diamond (rotated square)
+      const dPadding = strokeWidth;
+      const dCenter = size / 2;
+      svgContent = `<polygon points="${dCenter},${dPadding} ${size - dPadding},${dCenter} ${dCenter},${size - dPadding} ${dPadding},${dCenter}" fill="${colorHex}" stroke="white" stroke-width="${strokeWidth}"/>`;
+      break;
+    }
+    default:
+      svgContent = `<circle cx="${size/2}" cy="${size/2}" r="${size/2 - strokeWidth}" fill="${colorHex}" stroke="white" stroke-width="${strokeWidth}"/>`;
+  }
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${svgContent}</svg>`;
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+}
+
+// Cache for shape SVGs to avoid recreating them
+const shapeSvgCache = new Map<string, string>();
+
+function getShapeSvg(shape: 'circle' | 'triangle' | 'square' | 'diamond', colorHex: string): string {
+  const key = `${shape}-${colorHex}`;
+  if (!shapeSvgCache.has(key)) {
+    shapeSvgCache.set(key, createShapeSvg(shape, colorHex));
+  }
+  return shapeSvgCache.get(key)!;
+}
+
 // Convert hex to RGB
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -371,36 +422,14 @@ function NationalAssetsGlobeComponent() {
       const rgb = hexToRgb(colorHex);
       const cesiumColor = new Cesium.Color(rgb.r / 255, rgb.g / 255, rgb.b / 255, 1.0);
 
-      // Determine shape/size based on mode
-      let pixelSize = 8;
-      if (viewMode === 'country') {
-        // In country mode, use different shapes for sectors (emulated via size/outline)
-        const shape = SECTOR_SHAPES[sat.sector];
-        switch (shape) {
-          case 'diamond':
-            pixelSize = 10; // Slightly larger for military
-            break;
-          case 'square':
-            pixelSize = 9;
-            break;
-          case 'triangle':
-            pixelSize = 8;
-            break;
-          default:
-            pixelSize = 7;
-        }
-      }
+      // In country mode, use billboards with different shapes based on sector
+      // In sector mode, use simple points (circles) colored by sector
+      const useShapes = viewMode === 'country';
+      const shape = SECTOR_SHAPES[sat.sector];
 
-      const entity = viewer.entities.add({
+      const entityConfig: any = {
         name: sat.name,
         position: Cesium.Cartesian3.fromDegrees(sat.longitude, sat.latitude, sat.altitude * 1000),
-        point: {
-          pixelSize,
-          color: cesiumColor,
-          outlineColor: Cesium.Color.WHITE,
-          outlineWidth: 1,
-          scaleByDistance: new Cesium.NearFarScalar(1e6, 1.5, 1e8, 0.5),
-        },
         label: {
           text: sat.name,
           font: '11px sans-serif',
@@ -409,7 +438,7 @@ function NationalAssetsGlobeComponent() {
           outlineWidth: 2,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-          pixelOffset: new Cesium.Cartesian2(0, -12),
+          pixelOffset: new Cesium.Cartesian2(0, -14),
           scaleByDistance: new Cesium.NearFarScalar(1e6, 1.0, 1e8, 0.3),
           distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 2e7),
         },
@@ -418,8 +447,29 @@ function NationalAssetsGlobeComponent() {
           country: sat.countryNormalized,
           sector: sat.sector,
         },
-      });
+      };
 
+      if (useShapes) {
+        // Use billboard with SVG shape for country mode
+        const svgDataUri = getShapeSvg(shape, colorHex);
+        entityConfig.billboard = {
+          image: svgDataUri,
+          width: 16,
+          height: 16,
+          scaleByDistance: new Cesium.NearFarScalar(1e6, 1.5, 1e8, 0.5),
+        };
+      } else {
+        // Use simple point for sector mode
+        entityConfig.point = {
+          pixelSize: 8,
+          color: cesiumColor,
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 1,
+          scaleByDistance: new Cesium.NearFarScalar(1e6, 1.5, 1e8, 0.5),
+        };
+      }
+
+      const entity = viewer.entities.add(entityConfig);
       entitiesRef.current.push(entity);
     });
 
@@ -613,12 +663,32 @@ function NationalAssetsGlobeComponent() {
           </div>
           {viewMode === 'country' && (
             <div className="mt-3 pt-2 border-t border-slate-700">
-              <div className="text-xs text-slate-400 mb-1">Shape by Sector</div>
-              <div className="grid grid-cols-2 gap-1 text-xs text-slate-500">
-                <div>Circle = Commercial</div>
-                <div>Triangle = Civil</div>
-                <div>Square = Government</div>
-                <div>Diamond = Military</div>
+              <div className="text-xs text-slate-400 mb-2">Shape by Sector</div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <svg width="12" height="12" viewBox="0 0 12 12">
+                    <circle cx="6" cy="6" r="5" fill="#6B7280" stroke="white" strokeWidth="1"/>
+                  </svg>
+                  <span>Commercial</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <svg width="12" height="12" viewBox="0 0 12 12">
+                    <polygon points="6,1 11,11 1,11" fill="#6B7280" stroke="white" strokeWidth="1"/>
+                  </svg>
+                  <span>Civil</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <svg width="12" height="12" viewBox="0 0 12 12">
+                    <rect x="1" y="1" width="10" height="10" fill="#6B7280" stroke="white" strokeWidth="1"/>
+                  </svg>
+                  <span>Government</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <svg width="12" height="12" viewBox="0 0 12 12">
+                    <polygon points="6,1 11,6 6,11 1,6" fill="#6B7280" stroke="white" strokeWidth="1"/>
+                  </svg>
+                  <span>Military</span>
+                </div>
               </div>
             </div>
           )}
