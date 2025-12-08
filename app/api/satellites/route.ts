@@ -120,6 +120,12 @@ function groupByOrbitalPlane(satellites: TLEData[], incResolution: number = 1, r
   return planes;
 }
 
+// Space station NORAD IDs - only permanent stations, not visiting spacecraft
+const SPACE_STATION_IDS = new Set([
+  '25544', // ISS (ZARYA)
+  '48274', // Tiangong / CSS (TIANHE)
+]);
+
 // Fetch TLE data from a single CelesTrak category
 async function fetchCategoryTLE(group: string, type: ConstellationType): Promise<TLEData[]> {
   const tleUrl = `https://celestrak.org/NORAD/elements/gp.php?GROUP=${group}&FORMAT=tle`;
@@ -138,7 +144,14 @@ async function fetchCategoryTLE(group: string, type: ConstellationType): Promise
     }
 
     const tleText = await response.text();
-    return parseTLE(tleText, type);
+    let satellites = parseTLE(tleText, type);
+
+    // Filter space stations to only include ISS and Tiangong
+    if (group === 'stations') {
+      satellites = satellites.filter(sat => SPACE_STATION_IDS.has(sat.noradId));
+    }
+
+    return satellites;
   } catch (error) {
     console.warn(`Failed to fetch ${group}:`, error);
     return [];
