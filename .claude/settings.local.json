@@ -37,7 +37,9 @@
       "WebFetch(domain:www.ucsusa.org)",
       "WebFetch(domain:www.ucs.org)",
       "WebFetch(domain:www.swpc.noaa.gov)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm ls:*)"
     ],
     "deny": [],
     "ask": []
