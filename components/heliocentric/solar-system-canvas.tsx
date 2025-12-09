@@ -52,11 +52,11 @@ function Sun() {
 // Planet orbit ring
 function OrbitRing({ radius, color }: { radius: number; color: string }) {
   const points = useMemo(() => {
-    const pts: THREE.Vector3[] = [];
+    const pts: [number, number, number][] = [];
     const segments = 128;
     for (let i = 0; i <= segments; i++) {
       const angle = (i / segments) * Math.PI * 2;
-      pts.push(new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius));
+      pts.push([Math.cos(angle) * radius, 0, Math.sin(angle) * radius]);
     }
     return pts;
   }, [radius]);
@@ -66,8 +66,6 @@ function OrbitRing({ radius, color }: { radius: number; color: string }) {
       points={points}
       color={color}
       lineWidth={0.5}
-      transparent
-      opacity={0.3}
     />
   );
 }
