@@ -24,6 +24,7 @@ import {
   Sparkles,
   Bell,
   Flag,
+  Sun,
 } from 'lucide-react';
 
 // Dynamic imports for heavy components
@@ -57,10 +58,22 @@ const NationalAssetsGlobe = dynamic(() => import('@/components/cesium/national-a
   ),
 });
 
+const SolarSystemViewer = dynamic(() => import('@/components/heliocentric/solar-system-viewer'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-[#050520]">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-500 mx-auto mb-4" />
+        <p className="text-slate-400">Loading Heliocentric View...</p>
+      </div>
+    </div>
+  ),
+});
+
 interface TabConfig {
   id: string;
   label: string;
-  icon: React.ElementType;
+  icon: React.ComponentType<{ className?: string }>;
 }
 
 const tabs: TabConfig[] = [
@@ -69,6 +82,7 @@ const tabs: TabConfig[] = [
   { id: 'events', label: 'Events', icon: Flame },
   { id: 'globe', label: 'Globe', icon: Globe2 },
   { id: 'national-assets', label: 'National Assets', icon: Flag },
+  { id: 'heliocentric', label: 'Heliocentric', icon: Sun },
   { id: 'aurora', label: 'Aurora', icon: Sparkles },
   { id: 'alerts', label: 'Alerts', icon: Bell },
 ];
@@ -165,6 +179,11 @@ export function TabbedDashboard() {
           {/* National Assets Tab */}
           <TabsContent value="national-assets" className="h-full m-0 overflow-hidden">
             <NationalAssetsGlobe />
+          </TabsContent>
+
+          {/* Heliocentric Tab */}
+          <TabsContent value="heliocentric" className="h-full m-0 overflow-hidden">
+            <SolarSystemViewer />
           </TabsContent>
 
           {/* Aurora Tab */}
