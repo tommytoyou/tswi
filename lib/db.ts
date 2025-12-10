@@ -164,6 +164,13 @@ export async function initializeCollections(): Promise<void> {
   const admins = database.collection('admins');
   await admins.createIndex({ email: 1 }, { unique: true });
 
+  // Invites collection indexes
+  const invites = database.collection('invites');
+  await invites.createIndex({ inviteCode: 1 }, { unique: true });
+  await invites.createIndex({ email: 1 });
+  await invites.createIndex({ status: 1 });
+  await invites.createIndex({ createdAt: -1 });
+
   console.log('✅ Indexes created');
 }
 

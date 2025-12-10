@@ -536,3 +536,33 @@ export const ProcessedCmeSchema = z.object({
   enlilModelUrl: z.string().optional(),
 });
 export type ProcessedCme = z.infer<typeof ProcessedCmeSchema>;
+
+// ============================================================================
+// INVITE SYSTEM TYPES
+// ============================================================================
+
+// Invite status
+export const InviteStatusSchema = z.enum(['pending', 'sent', 'accepted', 'expired']);
+export type InviteStatus = z.infer<typeof InviteStatusSchema>;
+
+// Invite channel
+export const InviteChannelSchema = z.enum(['email', 'linkedin']);
+export type InviteChannel = z.infer<typeof InviteChannelSchema>;
+
+// Invite (stored in invites collection)
+export const InviteSchema = z.object({
+  _id: z.string().optional(),
+  email: z.string().email(),
+  name: z.string().min(1),
+  title: z.string().optional(), // Job title
+  organization: z.string().min(1),
+  inviteCode: z.string().length(12), // 12-character alphanumeric code
+  status: InviteStatusSchema.default('pending'),
+  channel: InviteChannelSchema.default('email'),
+  notes: z.string().optional(), // Admin reference notes
+  createdAt: z.date(),
+  sentAt: z.date().nullable().optional(),
+  acceptedAt: z.date().nullable().optional(),
+  expiresAt: z.date(), // 30 days from creation
+});
+export type Invite = z.infer<typeof InviteSchema>;
