@@ -58,8 +58,8 @@ const NationalAssetsGlobe = dynamic(() => import('@/components/cesium/national-a
   ),
 });
 
-const SolarSystemViewer = dynamic(
-  () => import('@/components/heliocentric/solar-system-viewer').then(mod => mod.default),
+const HeliocentricViewer = dynamic(
+  () => import('@/components/heliocentric/cesium-heliocentric-viewer'),
   {
     ssr: false,
     loading: () => (
@@ -186,7 +186,7 @@ export function TabbedDashboard() {
 
           {/* Heliocentric Tab */}
           <TabsContent value="heliocentric" className="h-full m-0 overflow-hidden">
-            <SolarSystemViewer />
+            <HeliocentricViewer />
           </TabsContent>
 
           {/* Aurora Tab */}
