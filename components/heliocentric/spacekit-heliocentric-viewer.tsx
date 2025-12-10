@@ -12,13 +12,31 @@ import {
 } from 'lucide-react';
 import type { SpacecraftData, PlanetData, ViewMode } from './types';
 
-// Agency colors for spacecraft
+// Agency colors for spacecraft (muted, professional colors)
 const AGENCY_COLORS: Record<string, string> = {
-  'NASA': '#3B82F6',
-  'ESA': '#F4D03F',
-  'NASA/ESA': '#8B5CF6',
-  'JAXA': '#EF4444',
+  'NASA': '#4A90D9',
+  'ESA': '#B8A038',
+  'NASA/ESA': '#7B68A8',
+  'JAXA': '#C44E4E',
 };
+
+// NASA/Solar System Scope texture URLs for realistic planet rendering
+const TEXTURE_BASE = 'https://www.solarsystemscope.com/textures/download';
+const PLANET_TEXTURES: Record<string, { texture: string; radius: number; tilt?: number }> = {
+  sun: { texture: `${TEXTURE_BASE}/2k_sun.jpg`, radius: 0.05 },
+  mercury: { texture: `${TEXTURE_BASE}/2k_mercury.jpg`, radius: 0.003, tilt: 0.03 },
+  venus: { texture: `${TEXTURE_BASE}/2k_venus_surface.jpg`, radius: 0.006, tilt: 177.4 },
+  earth: { texture: `${TEXTURE_BASE}/2k_earth_daymap.jpg`, radius: 0.0065, tilt: 23.4 },
+  mars: { texture: `${TEXTURE_BASE}/2k_mars.jpg`, radius: 0.004, tilt: 25.2 },
+  jupiter: { texture: `${TEXTURE_BASE}/2k_jupiter.jpg`, radius: 0.035, tilt: 3.1 },
+  saturn: { texture: `${TEXTURE_BASE}/2k_saturn.jpg`, radius: 0.030, tilt: 26.7 },
+  uranus: { texture: `${TEXTURE_BASE}/2k_uranus.jpg`, radius: 0.015, tilt: 97.8 },
+  neptune: { texture: `${TEXTURE_BASE}/2k_neptune.jpg`, radius: 0.014, tilt: 28.3 },
+  pluto: { texture: `${TEXTURE_BASE}/2k_moon.jpg`, radius: 0.002, tilt: 122.5 }, // Using moon texture for Pluto as fallback
+};
+
+// Saturn ring texture
+const SATURN_RING_TEXTURE = `${TEXTURE_BASE}/2k_saturn_ring_alpha.png`;
 
 // Deep space probe definitions with orbital elements (approximate current positions)
 const DEEP_SPACE_PROBES = [
@@ -184,52 +202,84 @@ function SpacekitHeliocentricComponent() {
 
         simulationRef.current = viz;
 
-        // Create star background
+        // Create star background (clean, minimal stars)
         viz.createStars();
 
-        // Create lighting
-        viz.createAmbientLight(0x333333);
-        viz.createLight([0, 0, 0], 0xFFFFFF); // Light from the Sun
+        // Create lighting from the Sun
+        viz.createLight([0, 0, 0], 0xFFFFFF);
+        viz.createAmbientLight(0x222222); // Subtle ambient light
 
-        // Add the Sun
-        viz.createObject('sun', {
-          ...Spacekit.SpaceObjectPresets.SUN,
+        // Add the Sun as a textured sphere (no glow effect)
+        const sunConfig = PLANET_TEXTURES.sun;
+        viz.createSphere('sun', {
+          textureUrl: sunConfig.texture,
+          radius: sunConfig.radius,
+          position: [0, 0, 0],
           labelText: 'Sun',
+          theme: {
+            color: 0xFFDD44,
+          },
         });
 
-        // Add all planets with their built-in ephemeris
-        const planetNames = ['MERCURY', 'VENUS', 'EARTH', 'MARS', 'JUPITER', 'SATURN', 'URANUS', 'NEPTUNE'] as const;
+        // Add all planets as textured spheres with proper ephemeris
+        const planetNames = ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'] as const;
 
         planetNames.forEach((planetName) => {
-          const preset = Spacekit.SpaceObjectPresets[planetName];
-          if (preset) {
-            viz.createObject(planetName.toLowerCase(), {
-              ...preset,
-              labelText: planetName.charAt(0) + planetName.slice(1).toLowerCase(),
+          const upperName = planetName.toUpperCase() as keyof typeof Spacekit.EphemPresets;
+          const ephem = Spacekit.EphemPresets[upperName];
+          const textureConfig = PLANET_TEXTURES[planetName];
+
+          if (ephem && textureConfig) {
+            const sphere = viz.createSphere(planetName, {
+              textureUrl: textureConfig.texture,
+              radius: textureConfig.radius,
+              ephem: ephem,
+              labelText: planetName.charAt(0).toUpperCase() + planetName.slice(1),
+              axialTilt: textureConfig.tilt,
+              theme: {
+                color: 0xFFFFFF,
+                orbitColor: 0x444455,
+              },
             });
+
+            // Add Saturn's rings
+            if (planetName === 'saturn' && sphere.addRings) {
+              sphere.addRings(
+                74500, // Inner radius in km
+                140220, // Outer radius in km
+                SATURN_RING_TEXTURE,
+                64
+              );
+            }
           }
         });
 
-        // Add Pluto
-        viz.createObject('pluto', {
-          ...Spacekit.SpaceObjectPresets.PLUTO,
+        // Add Pluto as textured sphere
+        const plutoConfig = PLANET_TEXTURES.pluto;
+        viz.createSphere('pluto', {
+          textureUrl: plutoConfig.texture,
+          radius: plutoConfig.radius,
+          ephem: Spacekit.EphemPresets.PLUTO,
           labelText: 'Pluto',
+          axialTilt: plutoConfig.tilt,
+          theme: {
+            color: 0xFFFFFF,
+            orbitColor: 0x444455,
+          },
         });
 
-        // Add deep space probes as static objects at their approximate positions
-        // Use smallparticle.png texture for point representation
-        const spacecraftTextureUrl = 'https://typpo.github.io/spacekit/src/assets/sprites/smallparticle.png';
-
+        // Add deep space probes as small, clean markers (no glow)
+        // Using a very small particle size for professional appearance
         DEEP_SPACE_PROBES.forEach((probe) => {
           const [x, y, z] = sphericalToCartesian(probe.distanceAU, probe.eclipticLat, probe.eclipticLon);
 
           const probeObj = viz.createObject(probe.id, {
             position: [x, y, z],
-            textureUrl: spacecraftTextureUrl,
             labelText: probe.name,
             hideOrbit: true,
+            particleSize: 4, // Small, clean dots
             theme: {
-              color: parseInt(probe.color.replace('#', ''), 16),
+              color: 0xCCCCCC, // Neutral gray for professional look
             },
           });
 
@@ -308,10 +358,8 @@ function SpacekitHeliocentricComponent() {
     const Spacekit = spacekitRef.current;
     if (!viz || !Spacekit || !spacekitReady) return;
 
-    // Use smallparticle.png texture for point representation
-    const spacecraftTextureUrl = 'https://typpo.github.io/spacekit/src/assets/sprites/smallparticle.png';
-
     // Update existing spacecraft objects with new positions from API
+    // Using small particle size for clean, professional appearance
     spacecraft.forEach((sc) => {
       if (!sc.position) return;
 
@@ -322,15 +370,14 @@ function SpacekitHeliocentricComponent() {
         // Update position if object exists
         scObj.setPosition(sc.position.x, sc.position.y, sc.position.z);
       } else {
-        // Create new object with texture for point representation
-        const agencyColor = AGENCY_COLORS[sc.agency] || '#ffffff';
+        // Create new object as small dot (no glow effect)
         scObj = viz.createObject(sc.id, {
           position: [sc.position.x, sc.position.y, sc.position.z],
-          textureUrl: spacecraftTextureUrl,
           labelText: showLabels ? sc.name : undefined,
           hideOrbit: true,
+          particleSize: 4, // Small, clean dots
           theme: {
-            color: parseInt(agencyColor.replace('#', ''), 16),
+            color: 0xCCCCCC, // Neutral gray - professional look
           },
         });
         spacecraftObjectsRef.current.set(sc.id, scObj);
@@ -415,27 +462,27 @@ function SpacekitHeliocentricComponent() {
     // viewer.camera.position.set(obj.position.x + offset, obj.position.y - offset, obj.position.z + offset);
   }, []);
 
-  // Error display
+  // Error display - minimal
   if (error) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-[#050520]">
-        <div className="max-w-md p-6 bg-red-900/20 border border-red-500 rounded-lg">
-          <h3 className="text-red-400 font-bold mb-2">Heliocentric Viewer Error</h3>
-          <p className="text-red-300 text-sm">{error}</p>
+      <div className="w-full h-full flex items-center justify-center bg-[#000008]">
+        <div className="max-w-sm p-4 bg-black/50 border border-red-900/50 rounded">
+          <h3 className="text-red-400/80 text-sm font-medium mb-1">Error</h3>
+          <p className="text-slate-400 text-xs">{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative w-full h-full bg-[#050520]">
-      {/* Loading overlay */}
+    <div className="relative w-full h-full bg-[#000008]">
+      {/* Loading overlay - clean, minimal */}
       {isLoading && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#050520]">
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#000008]">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-500 mx-auto mb-4" />
-            <p className="text-white text-xl">Initializing Heliocentric View...</p>
-            <p className="text-slate-400 text-sm mt-2">Loading Spacekit 3D engine</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-2 border-slate-600 border-t-slate-300 mx-auto mb-4" />
+            <p className="text-slate-300 text-lg font-light">Initializing Solar System</p>
+            <p className="text-slate-500 text-xs mt-2">Loading 3D visualization</p>
           </div>
         </div>
       )}
@@ -443,179 +490,140 @@ function SpacekitHeliocentricComponent() {
       {/* Spacekit container */}
       <div ref={containerRef} className="w-full h-full" />
 
-      {/* Title and status */}
+      {/* Title and status - clean, minimal panel */}
       {spacekitReady && (
-        <div className="absolute top-4 left-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-4 max-w-xs">
-          <h2 className="text-lg font-bold text-white mb-1">Heliocentric View</h2>
-          <p className="text-xs text-slate-400 mb-3">
-            {dataLoading ? 'Fetching real-time positions...' : 'Real-time spacecraft positions'}
-          </p>
+        <div className="absolute top-4 left-4 z-20 bg-black/70 backdrop-blur-sm rounded border border-slate-700/50 p-3 max-w-xs">
+          <h2 className="text-sm font-medium text-slate-200 mb-2 tracking-wide">SOLAR SYSTEM</h2>
 
-          <div className="space-y-1 text-xs">
-            <div className="flex justify-between">
-              <span className="text-slate-400">Planets:</span>
-              <span className="text-white">{STATIC_PLANETS.length + 1} (Sun + 8 planets + Pluto)</span>
+          <div className="space-y-1 text-xs font-mono">
+            <div className="flex justify-between text-slate-400">
+              <span>Bodies</span>
+              <span className="text-slate-300">10</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Spacecraft:</span>
-              <span className="text-white">
-                {dataLoading ? (
-                  <span className="text-yellow-400 animate-pulse">Loading...</span>
-                ) : (
-                  `${spacecraft.filter(s => s.position).length + DEEP_SPACE_PROBES.length} tracked`
-                )}
+            <div className="flex justify-between text-slate-400">
+              <span>Spacecraft</span>
+              <span className="text-slate-300">
+                {dataLoading ? '...' : spacecraft.filter(s => s.position).length + DEEP_SPACE_PROBES.length}
               </span>
             </div>
             {stats?.furthestFromSun && (
-              <div className="flex justify-between">
-                <span className="text-slate-400">Furthest:</span>
-                <span className="text-white truncate ml-2">
-                  {stats.furthestFromSun.name} ({stats.furthestFromSun.distance.toFixed(1)} AU)
-                </span>
-              </div>
-            )}
-            {stats?.closestToSun && (
-              <div className="flex justify-between">
-                <span className="text-slate-400">Closest:</span>
-                <span className="text-white truncate ml-2">
-                  {stats.closestToSun.name} ({stats.closestToSun.distance.toFixed(3)} AU)
+              <div className="flex justify-between text-slate-400">
+                <span>Furthest</span>
+                <span className="text-slate-300 truncate ml-2">
+                  {stats.furthestFromSun.distance.toFixed(1)} AU
                 </span>
               </div>
             )}
           </div>
 
-          <div className="mt-3 pt-3 border-t border-slate-700">
-            <div className="text-xs text-slate-500">Powered by Spacekit.js</div>
-            <div className="text-xs text-slate-500">Data: NASA JPL Horizons</div>
+          <div className="mt-2 pt-2 border-t border-slate-700/50 text-[10px] text-slate-500">
+            NASA JPL Horizons
           </div>
         </div>
       )}
 
-      {/* View mode selector */}
+      {/* View mode selector - minimal buttons */}
       {spacekitReady && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-2">
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 bg-black/70 backdrop-blur-sm rounded border border-slate-700/50 p-1.5">
           <div className="flex gap-1">
             {(['inner', 'outer', 'full'] as ViewMode[]).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
-                className={`px-4 py-2 text-sm rounded transition-colors ${
+                className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
                   viewMode === mode
-                    ? 'bg-yellow-600 text-white'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    ? 'bg-slate-600 text-white'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                 }`}
               >
-                {mode === 'inner' ? 'Inner System' : mode === 'outer' ? 'Outer System' : 'Full System'}
+                {mode === 'inner' ? 'Inner' : mode === 'outer' ? 'Outer' : 'Full'}
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Display options */}
+      {/* Display options - compact, minimal */}
       {spacekitReady && (
-        <div className="absolute top-4 right-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3 space-y-2">
-          <div className="text-xs text-slate-400 mb-2">Display Options</div>
-          <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+        <div className="absolute top-4 right-4 z-20 bg-black/70 backdrop-blur-sm rounded border border-slate-700/50 p-2.5 space-y-1.5">
+          <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer hover:text-slate-300">
             <input
               type="checkbox"
               checked={showOrbits}
               onChange={(e) => setShowOrbits(e.target.checked)}
-              className="rounded border-slate-600 bg-slate-800"
+              className="w-3 h-3 rounded-sm border-slate-600 bg-slate-800 accent-slate-500"
             />
-            Orbit Lines
+            Orbits
           </label>
-          <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+          <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer hover:text-slate-300">
             <input
               type="checkbox"
               checked={showLabels}
               onChange={(e) => setShowLabels(e.target.checked)}
-              className="rounded border-slate-600 bg-slate-800"
+              className="w-3 h-3 rounded-sm border-slate-600 bg-slate-800 accent-slate-500"
             />
             Labels
           </label>
-          <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+          <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer hover:text-slate-300">
             <input
               type="checkbox"
               checked={showTrails}
               onChange={(e) => setShowTrails(e.target.checked)}
-              className="rounded border-slate-600 bg-slate-800"
+              className="w-3 h-3 rounded-sm border-slate-600 bg-slate-800 accent-slate-500"
             />
-            Trajectory Lines
+            Trails
           </label>
         </div>
       )}
 
-      {/* Camera controls */}
+      {/* Camera controls - minimal icons */}
       {spacekitReady && (
-        <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2">
+        <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-1">
           <button
             onClick={zoomIn}
-            className="p-2 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 bg-black/60 rounded border border-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-black/80 transition-colors"
             title="Zoom In"
           >
-            <ZoomIn className="w-5 h-5" />
+            <ZoomIn className="w-4 h-4" />
           </button>
           <button
             onClick={zoomOut}
-            className="p-2 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 bg-black/60 rounded border border-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-black/80 transition-colors"
             title="Zoom Out"
           >
-            <ZoomOut className="w-5 h-5" />
+            <ZoomOut className="w-4 h-4" />
           </button>
           <button
             onClick={resetView}
-            className="p-2 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 bg-black/60 rounded border border-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-black/80 transition-colors"
             title="Reset View"
           >
-            <RotateCcw className="w-5 h-5" />
+            <RotateCcw className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Legend */}
-      {spacekitReady && (
-        <div className="absolute bottom-4 left-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3">
-          <div className="text-xs text-slate-400 mb-2">Spacecraft Agencies</div>
-          <div className="space-y-1">
-            {Object.entries(AGENCY_COLORS).map(([agency, color]) => (
-              <div key={agency} className="flex items-center gap-2">
-                <div
-                  className="w-3 h-3 rounded-full border-2"
-                  style={{ borderColor: color, backgroundColor: 'white' }}
-                />
-                <span className="text-xs text-slate-300">{agency}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* Selected object info */}
+      {/* Selected object info - clean panel */}
       {selectedObject && (
-        <div className="absolute bottom-20 left-4 z-20 bg-slate-900/95 backdrop-blur-sm rounded-lg border border-slate-700 p-4 max-w-sm">
+        <div className="absolute bottom-16 left-4 z-20 bg-black/80 backdrop-blur-sm rounded border border-slate-700/50 p-3 max-w-xs">
           <div className="flex items-start justify-between mb-2">
-            <h3 className="text-lg font-bold text-white">{selectedObject.name}</h3>
+            <h3 className="text-sm font-medium text-slate-200">{selectedObject.name}</h3>
             <button
               onClick={() => setSelectedObject(null)}
-              className="text-slate-400 hover:text-white p-1"
+              className="text-slate-500 hover:text-slate-300 p-0.5"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {'agency' in selectedObject && (
             <div className="flex items-center gap-2 mb-2">
-              <span
-                className="px-2 py-0.5 rounded text-xs font-medium text-white"
-                style={{ backgroundColor: AGENCY_COLORS[selectedObject.agency] }}
-              >
+              <span className="text-[10px] text-slate-400 font-mono">
                 {selectedObject.agency}
               </span>
-              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                selectedObject.missionStatus === 'active'
-                  ? 'bg-green-500/20 text-green-400'
-                  : 'bg-yellow-500/20 text-yellow-400'
+              <span className={`text-[10px] font-mono ${
+                selectedObject.missionStatus === 'active' ? 'text-green-500' : 'text-slate-500'
               }`}>
                 {selectedObject.missionStatus}
               </span>
@@ -623,43 +631,29 @@ function SpacekitHeliocentricComponent() {
           )}
 
           {'description' in selectedObject && selectedObject.description && (
-            <p className="text-slate-300 text-sm mb-3">{selectedObject.description}</p>
+            <p className="text-slate-400 text-xs mb-2">{selectedObject.description}</p>
           )}
 
           {selectedObject.position && (
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Distance from Sun:</span>
-                <span className="text-white font-mono">
-                  {selectedObject.position.distanceFromSun.toFixed(3)} AU
-                </span>
-              </div>
+            <div className="text-xs font-mono text-slate-400">
+              {selectedObject.position.distanceFromSun.toFixed(3)} AU from Sun
             </div>
           )}
 
           <button
             onClick={() => flyToObject(selectedObject)}
-            className="mt-3 w-full px-3 py-2 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700 transition-colors flex items-center justify-center gap-2"
+            className="mt-2 w-full px-2 py-1 bg-slate-700/50 text-slate-300 text-xs rounded hover:bg-slate-600/50 transition-colors flex items-center justify-center gap-1.5"
           >
-            <Target className="w-4 h-4" />
-            Fly to {selectedObject.name}
+            <Target className="w-3 h-3" />
+            Focus
           </button>
         </div>
       )}
 
-      {/* Instructions */}
+      {/* Instructions - minimal hint */}
       {spacekitReady && !selectedObject && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20 bg-slate-900/80 backdrop-blur-sm rounded-lg border border-slate-700 px-4 py-2 text-xs text-slate-400">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Target className="w-3 h-3" />
-              <span>Click objects for details</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Maximize2 className="w-3 h-3" />
-              <span>Scroll to zoom, drag to rotate</span>
-            </div>
-          </div>
+        <div className="absolute bottom-4 left-4 z-20 text-[10px] text-slate-600 font-mono">
+          Scroll to zoom · Drag to rotate
         </div>
       )}
     </div>
@@ -670,10 +664,10 @@ function SpacekitHeliocentricComponent() {
 export default dynamic(() => Promise.resolve(SpacekitHeliocentricComponent), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-[#050520]">
+    <div className="w-full h-full flex items-center justify-center bg-[#000008]">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-500 mx-auto mb-4" />
-        <p className="text-white text-xl">Loading Heliocentric View...</p>
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-slate-700 border-t-slate-400 mx-auto mb-3" />
+        <p className="text-slate-400 text-sm">Loading...</p>
       </div>
     </div>
   ),
