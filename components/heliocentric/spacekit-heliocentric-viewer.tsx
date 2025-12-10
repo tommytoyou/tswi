@@ -217,11 +217,15 @@ function SpacekitHeliocentricComponent() {
         });
 
         // Add deep space probes as static objects at their approximate positions
+        // Use smallparticle.png texture for point representation
+        const spacecraftTextureUrl = 'https://typpo.github.io/spacekit/src/assets/sprites/smallparticle.png';
+
         DEEP_SPACE_PROBES.forEach((probe) => {
           const [x, y, z] = sphericalToCartesian(probe.distanceAU, probe.eclipticLat, probe.eclipticLon);
 
           const probeObj = viz.createObject(probe.id, {
             position: [x, y, z],
+            textureUrl: spacecraftTextureUrl,
             labelText: probe.name,
             hideOrbit: true,
             theme: {
@@ -304,6 +308,9 @@ function SpacekitHeliocentricComponent() {
     const Spacekit = spacekitRef.current;
     if (!viz || !Spacekit || !spacekitReady) return;
 
+    // Use smallparticle.png texture for point representation
+    const spacecraftTextureUrl = 'https://typpo.github.io/spacekit/src/assets/sprites/smallparticle.png';
+
     // Update existing spacecraft objects with new positions from API
     spacecraft.forEach((sc) => {
       if (!sc.position) return;
@@ -315,10 +322,11 @@ function SpacekitHeliocentricComponent() {
         // Update position if object exists
         scObj.setPosition(sc.position.x, sc.position.y, sc.position.z);
       } else {
-        // Create new object
+        // Create new object with texture for point representation
         const agencyColor = AGENCY_COLORS[sc.agency] || '#ffffff';
         scObj = viz.createObject(sc.id, {
           position: [sc.position.x, sc.position.y, sc.position.z],
+          textureUrl: spacecraftTextureUrl,
           labelText: showLabels ? sc.name : undefined,
           hideOrbit: true,
           theme: {
