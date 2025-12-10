@@ -235,7 +235,6 @@ function CesiumHeliocentricComponent() {
   const cesiumViewerRef = useRef<any>(null);
   const cesiumModuleRef = useRef<any>(null);
   const entitiesRef = useRef<Map<string, any>>(new Map());
-  const orbitEntitiesRef = useRef<any[]>([]);
   const trailEntitiesRef = useRef<any[]>([]);
 
   const [error, setError] = useState<string | null>(null);
@@ -399,63 +398,6 @@ function CesiumHeliocentricComponent() {
     fetchData();
   }, [fetchData]);
 
-  // Create Sun entity
-  const createSun = useCallback(() => {
-    const viewer = cesiumViewerRef.current;
-    const Cesium = cesiumModuleRef.current;
-    if (!viewer || !Cesium) return;
-
-    // Remove existing sun if any
-    const existingSun = entitiesRef.current.get('sun');
-    if (existingSun) {
-      viewer.entities.remove(existingSun);
-    }
-
-    // Create glowing sun at origin
-    const sunRadius = 696340000 * 20; // Sun radius * visual scale
-
-    const sunEntity = viewer.entities.add({
-      id: 'sun',
-      name: 'Sun',
-      position: Cesium.Cartesian3.ZERO,
-      ellipsoid: {
-        radii: new Cesium.Cartesian3(sunRadius, sunRadius, sunRadius),
-        material: new Cesium.ColorMaterialProperty(
-          Cesium.Color.fromCssColorString('#FFD700')
-        ),
-      },
-      label: showLabels ? {
-        text: 'Sun',
-        font: '14px sans-serif',
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        pixelOffset: new Cesium.Cartesian2(0, -sunRadius * SCALE_FACTOR - 20),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      } : undefined,
-    });
-
-    entitiesRef.current.set('sun', sunEntity);
-
-    // Add sun glow effect (outer corona)
-    const glowRadius = sunRadius * 1.5;
-    const glowEntity = viewer.entities.add({
-      id: 'sun-glow',
-      name: 'Sun Corona',
-      position: Cesium.Cartesian3.ZERO,
-      ellipsoid: {
-        radii: new Cesium.Cartesian3(glowRadius, glowRadius, glowRadius),
-        material: new Cesium.ColorMaterialProperty(
-          Cesium.Color.fromCssColorString('#FFA500').withAlpha(0.3)
-        ),
-      },
-    });
-
-    entitiesRef.current.set('sun-glow', glowEntity);
-  }, [showLabels]);
-
   // Convert AU position to Cesium Cartesian3
   const auToCartesian = useCallback((x: number, y: number, z: number) => {
     const Cesium = cesiumModuleRef.current;
@@ -469,108 +411,8 @@ function CesiumHeliocentricComponent() {
     return new Cesium.Cartesian3(scaledX, scaledZ, -scaledY); // Swap Y and Z for top-down view
   }, []);
 
-  // Create orbit line for a planet
-  const createOrbitLine = useCallback((planet: PlanetData) => {
-    const viewer = cesiumViewerRef.current;
-    const Cesium = cesiumModuleRef.current;
-    if (!viewer || !Cesium || !planet.orbitRadius) return;
-
-    const orbitRadiusMeters = planet.orbitRadius * AU_TO_METERS * SCALE_FACTOR;
-    const positions: any[] = [];
-    const segments = 360;
-
-    for (let i = 0; i <= segments; i++) {
-      const angle = (i / segments) * Math.PI * 2;
-      const x = Math.cos(angle) * orbitRadiusMeters;
-      const z = Math.sin(angle) * orbitRadiusMeters;
-      positions.push(new Cesium.Cartesian3(x, 0, z));
-    }
-
-    const orbitEntity = viewer.entities.add({
-      id: `orbit-${planet.id}`,
-      name: `${planet.name} Orbit`,
-      polyline: {
-        positions: positions,
-        width: 1,
-        material: new Cesium.ColorMaterialProperty(
-          Cesium.Color.fromCssColorString(planet.color).withAlpha(0.4)
-        ),
-      },
-    });
-
-    orbitEntitiesRef.current.push(orbitEntity);
-  }, []);
-
-  // Create planet entity
-  const createPlanet = useCallback((planet: PlanetData) => {
-    const viewer = cesiumViewerRef.current;
-    const Cesium = cesiumModuleRef.current;
-    if (!viewer || !Cesium || !planet.position) return;
-
-    const position = auToCartesian(planet.position.x, planet.position.y, planet.position.z);
-    if (!position) return;
-
-    // Get planet radius in AU, convert to scaled meters
-    const planetRadiusAU = PLANET_VISUAL_RADII_AU[planet.id] || 0.03;
-    const visualSize = planetRadiusAU * AU_TO_METERS * SCALE_FACTOR;
-    const color = PLANET_COLORS[planet.id] || planet.color;
-
-    const planetEntity = viewer.entities.add({
-      id: planet.id,
-      name: planet.name,
-      position: position,
-      ellipsoid: {
-        radii: new Cesium.Cartesian3(visualSize, visualSize, visualSize),
-        material: new Cesium.ColorMaterialProperty(
-          Cesium.Color.fromCssColorString(color)
-        ),
-      },
-      label: showLabels ? {
-        text: planet.name,
-        font: 'bold 14px sans-serif',
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 3,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        pixelOffset: new Cesium.Cartesian2(0, -35),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      } : undefined,
-      description: `
-        <div style="padding: 10px;">
-          <h3>${planet.name}</h3>
-          <p>Distance from Sun: ${planet.position.distanceFromSun.toFixed(3)} AU</p>
-          <p>Position: X=${planet.position.x.toFixed(3)}, Y=${planet.position.y.toFixed(3)}, Z=${planet.position.z.toFixed(3)} AU</p>
-        </div>
-      `,
-    });
-
-    // Add Saturn rings
-    if (planet.id === 'saturn') {
-      const innerRingRadius = visualSize * 1.2;
-      const outerRingRadius = visualSize * 2.3;
-
-      viewer.entities.add({
-        id: 'saturn-rings',
-        name: 'Saturn Rings',
-        position: position,
-        ellipse: {
-          semiMajorAxis: outerRingRadius,
-          semiMinorAxis: outerRingRadius,
-          material: new Cesium.ColorMaterialProperty(
-            Cesium.Color.fromCssColorString('#E8D5A3').withAlpha(0.6)
-          ),
-          height: 0,
-          rotation: Cesium.Math.toRadians(27), // Saturn's axial tilt
-        },
-      });
-    }
-
-    entitiesRef.current.set(planet.id, planetEntity);
-  }, [auToCartesian, showLabels]);
-
-  // Create spacecraft entity with trail
-  const createSpacecraft = useCallback((sc: SpacecraftData) => {
+  // Create spacecraft entity with trail - no dependencies on showLabels/showTrails to avoid re-renders
+  const createSpacecraft = useCallback((sc: SpacecraftData, labelsVisible: boolean, trailsVisible: boolean) => {
     const viewer = cesiumViewerRef.current;
     const Cesium = cesiumModuleRef.current;
     if (!viewer || !Cesium || !sc.position) return;
@@ -592,7 +434,7 @@ function CesiumHeliocentricComponent() {
         outlineWidth: 3,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
-      label: showLabels ? {
+      label: labelsVisible ? {
         text: sc.name,
         font: '11px sans-serif',
         fillColor: Cesium.Color.fromCssColorString(agencyColor),
@@ -619,7 +461,7 @@ function CesiumHeliocentricComponent() {
     entitiesRef.current.set(sc.id, scEntity);
 
     // Create trail from Sun to spacecraft if trails enabled
-    if (showTrails) {
+    if (trailsVisible) {
       const trailEntity = viewer.entities.add({
         id: `trail-${sc.id}`,
         name: `${sc.name} Trail`,
@@ -634,13 +476,23 @@ function CesiumHeliocentricComponent() {
       });
       trailEntitiesRef.current.push(trailEntity);
     }
-  }, [auToCartesian, showLabels, showTrails]);
+  }, [auToCartesian]);
+
+  // Track last render state to avoid unnecessary re-renders
+  const lastRenderKeyRef = useRef<string>('');
 
   // Render spacecraft entities (planets and Sun are rendered statically on init)
   useEffect(() => {
     const viewer = cesiumViewerRef.current;
     const Cesium = cesiumModuleRef.current;
     if (!viewer || !Cesium || !cesiumReady) return;
+
+    // Create a key representing current render state to avoid unnecessary re-renders
+    const renderKey = `${spacecraft.map(s => s.id).sort().join(',')}-${showLabels}-${showTrails}`;
+    if (renderKey === lastRenderKeyRef.current) {
+      return; // No changes, skip re-render
+    }
+    lastRenderKeyRef.current = renderKey;
 
     // Only clear dynamically-added spacecraft entities and trails (not static planets/sun)
     entitiesRef.current.forEach((entity) => {
@@ -657,12 +509,12 @@ function CesiumHeliocentricComponent() {
     });
     trailEntitiesRef.current = [];
 
-    // Add spacecraft from API data
-    spacecraft.forEach(createSpacecraft);
+    // Add spacecraft from API data - pass current showLabels/showTrails values
+    spacecraft.forEach(sc => createSpacecraft(sc, showLabels, showTrails));
 
     console.log(`Rendered ${spacecraft.length} spacecraft from API`);
 
-  }, [cesiumReady, spacecraft, createSpacecraft]);
+  }, [cesiumReady, spacecraft, createSpacecraft, showLabels, showTrails]);
 
   // Handle entity click
   useEffect(() => {
