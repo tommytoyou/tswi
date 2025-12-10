@@ -23,16 +23,17 @@ import type { SpacecraftData, PlanetData, ViewMode } from './types';
 const AU_TO_METERS = 149597870700; // 1 AU in meters
 const SCALE_FACTOR = 1e-9; // Scale down for Cesium visualization
 
-// Planet visual sizes (not to scale - for visibility)
-const PLANET_VISUAL_SIZES: Record<string, number> = {
-  mercury: 2439700 * 500,
-  venus: 6051800 * 300,
-  earth: 6371000 * 300,
-  mars: 3389500 * 400,
-  jupiter: 69911000 * 50,
-  saturn: 58232000 * 50,
-  uranus: 25362000 * 100,
-  neptune: 24622000 * 100,
+// Planet visual sizes in AU - exaggerated for visibility (0.02-0.15 AU visual diameter)
+// These are NOT realistic - they're sized for easy clicking and identification
+const PLANET_VISUAL_RADII_AU: Record<string, number> = {
+  mercury: 0.02,   // Small rocky planet
+  venus: 0.03,    // Similar to Earth
+  earth: 0.03,    // Our reference
+  mars: 0.025,    // Slightly smaller than Earth
+  jupiter: 0.08,  // Gas giant - largest
+  saturn: 0.07,   // Gas giant with rings
+  uranus: 0.05,   // Ice giant
+  neptune: 0.05,  // Ice giant
 };
 
 // Planet colors for realistic appearance
@@ -99,44 +100,47 @@ function auToCartesian3(Cesium: any, x: number, y: number, z: number) {
   return new Cesium.Cartesian3(scaledX, scaledZ, -scaledY); // Swap Y and Z for top-down view
 }
 
+// Sun visual radius in AU (exaggerated for visibility - actual sun is ~0.00465 AU radius)
+const SUN_VISUAL_RADIUS_AU = 0.08;
+
 // Add static Sun and planets immediately on Cesium init (no API dependency)
 function addStaticSolarSystem(viewer: any, Cesium: any) {
   console.log('Adding static solar system entities...');
 
-  // Create glowing Sun at origin
-  const sunRadius = 696340000 * 20 * SCALE_FACTOR; // Sun radius * visual scale * unit scale
+  // Convert AU to scaled meters
+  const sunRadiusScaled = SUN_VISUAL_RADIUS_AU * AU_TO_METERS * SCALE_FACTOR;
 
   viewer.entities.add({
     id: 'sun-static',
     name: 'Sun',
     position: Cesium.Cartesian3.ZERO,
     ellipsoid: {
-      radii: new Cesium.Cartesian3(sunRadius, sunRadius, sunRadius),
+      radii: new Cesium.Cartesian3(sunRadiusScaled, sunRadiusScaled, sunRadiusScaled),
       material: new Cesium.ColorMaterialProperty(
         Cesium.Color.fromCssColorString('#FFD700')
       ),
     },
     label: {
       text: 'Sun',
-      font: '16px sans-serif',
+      font: 'bold 16px sans-serif',
       fillColor: Cesium.Color.YELLOW,
       outlineColor: Cesium.Color.BLACK,
-      outlineWidth: 2,
+      outlineWidth: 3,
       style: Cesium.LabelStyle.FILL_AND_OUTLINE,
       verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-      pixelOffset: new Cesium.Cartesian2(0, -30),
+      pixelOffset: new Cesium.Cartesian2(0, -40),
       disableDepthTestDistance: Number.POSITIVE_INFINITY,
     },
   });
 
   // Add sun glow/corona
-  const glowRadius = sunRadius * 1.5;
+  const glowRadiusScaled = sunRadiusScaled * 1.4;
   viewer.entities.add({
     id: 'sun-glow-static',
     name: 'Sun Corona',
     position: Cesium.Cartesian3.ZERO,
     ellipsoid: {
-      radii: new Cesium.Cartesian3(glowRadius, glowRadius, glowRadius),
+      radii: new Cesium.Cartesian3(glowRadiusScaled, glowRadiusScaled, glowRadiusScaled),
       material: new Cesium.ColorMaterialProperty(
         Cesium.Color.fromCssColorString('#FFA500').withAlpha(0.3)
       ),
@@ -148,7 +152,9 @@ function addStaticSolarSystem(viewer: any, Cesium: any) {
     if (!planet.position) return;
 
     const position = auToCartesian3(Cesium, planet.position.x, planet.position.y, planet.position.z);
-    const visualSize = (PLANET_VISUAL_SIZES[planet.id] || 5000000 * 200) * SCALE_FACTOR;
+    // Get planet radius in AU, convert to scaled meters
+    const planetRadiusAU = PLANET_VISUAL_RADII_AU[planet.id] || 0.03;
+    const visualSizeScaled = planetRadiusAU * AU_TO_METERS * SCALE_FACTOR;
     const color = PLANET_COLORS[planet.id] || planet.color;
 
     // Add orbit line
@@ -168,9 +174,9 @@ function addStaticSolarSystem(viewer: any, Cesium: any) {
       name: `${planet.name} Orbit`,
       polyline: {
         positions: orbitPositions,
-        width: 1,
+        width: 1.5,
         material: new Cesium.ColorMaterialProperty(
-          Cesium.Color.fromCssColorString(color).withAlpha(0.4)
+          Cesium.Color.fromCssColorString(color).withAlpha(0.5)
         ),
       },
     });
@@ -181,28 +187,28 @@ function addStaticSolarSystem(viewer: any, Cesium: any) {
       name: planet.name,
       position: position,
       ellipsoid: {
-        radii: new Cesium.Cartesian3(visualSize, visualSize, visualSize),
+        radii: new Cesium.Cartesian3(visualSizeScaled, visualSizeScaled, visualSizeScaled),
         material: new Cesium.ColorMaterialProperty(
           Cesium.Color.fromCssColorString(color)
         ),
       },
       label: {
         text: planet.name,
-        font: '12px sans-serif',
+        font: 'bold 14px sans-serif',
         fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
+        outlineWidth: 3,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        pixelOffset: new Cesium.Cartesian2(0, -25),
+        pixelOffset: new Cesium.Cartesian2(0, -35),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
     });
 
     // Add Saturn's rings
     if (planet.id === 'saturn') {
-      const innerRingRadius = visualSize * 1.2;
-      const outerRingRadius = visualSize * 2.3;
+      const innerRingRadius = visualSizeScaled * 1.3;
+      const outerRingRadius = visualSizeScaled * 2.2;
 
       viewer.entities.add({
         id: 'saturn-rings-static',
@@ -298,12 +304,14 @@ function CesiumHeliocentricComponent() {
         viewer.scene.globe.depthTestAgainstTerrain = false;
 
         // Configure for deep space viewing
-        viewer.scene.screenSpaceCameraController.minimumZoomDistance = 1e8;
+        viewer.scene.screenSpaceCameraController.minimumZoomDistance = 1e7;
         viewer.scene.screenSpaceCameraController.maximumZoomDistance = 1e14;
 
-        // Set initial camera to view solar system from above
+        // Set initial camera to view inner solar system from above
+        // Camera at ~3 AU height shows Mercury through Mars clearly
+        const innerSystemViewHeight = 3 * AU_TO_METERS * SCALE_FACTOR;
         viewer.camera.setView({
-          destination: new Cesium.Cartesian3(0, 0, 5e12),
+          destination: new Cesium.Cartesian3(0, innerSystemViewHeight, 0),
           orientation: {
             heading: 0,
             pitch: -Cesium.Math.PI_OVER_TWO,
@@ -502,7 +510,9 @@ function CesiumHeliocentricComponent() {
     const position = auToCartesian(planet.position.x, planet.position.y, planet.position.z);
     if (!position) return;
 
-    const visualSize = PLANET_VISUAL_SIZES[planet.id] || 5000000 * 200;
+    // Get planet radius in AU, convert to scaled meters
+    const planetRadiusAU = PLANET_VISUAL_RADII_AU[planet.id] || 0.03;
+    const visualSize = planetRadiusAU * AU_TO_METERS * SCALE_FACTOR;
     const color = PLANET_COLORS[planet.id] || planet.color;
 
     const planetEntity = viewer.entities.add({
@@ -517,13 +527,13 @@ function CesiumHeliocentricComponent() {
       },
       label: showLabels ? {
         text: planet.name,
-        font: '12px sans-serif',
+        font: 'bold 14px sans-serif',
         fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
+        outlineWidth: 3,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        pixelOffset: new Cesium.Cartesian2(0, -25),
+        pixelOffset: new Cesium.Cartesian2(0, -35),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       } : undefined,
       description: `
@@ -728,8 +738,10 @@ function CesiumHeliocentricComponent() {
     const Cesium = cesiumModuleRef.current;
     if (!viewer || !Cesium) return;
 
+    // Reset to inner solar system view (~3 AU height)
+    const innerSystemViewHeight = 3 * AU_TO_METERS * SCALE_FACTOR;
     viewer.camera.flyTo({
-      destination: new Cesium.Cartesian3(0, 0, 5e12),
+      destination: new Cesium.Cartesian3(0, innerSystemViewHeight, 0),
       orientation: {
         heading: 0,
         pitch: -Cesium.Math.PI_OVER_TWO,
