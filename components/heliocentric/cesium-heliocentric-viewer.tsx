@@ -47,6 +47,19 @@ const PLANET_COLORS: Record<string, string> = {
   neptune: '#4169E1',
 };
 
+// Static planet data with approximate orbital positions (hardcoded fallback)
+// These are approximate positions - actual positions fetched from API will override
+const STATIC_PLANETS: PlanetData[] = [
+  { id: 'mercury', name: 'Mercury', horizonsId: '199', color: '#8C8C8C', size: 0.4, orbitRadius: 0.387, position: { x: 0.35, y: 0.15, z: 0.02, distanceFromSun: 0.387 } },
+  { id: 'venus', name: 'Venus', horizonsId: '299', color: '#E6A64E', size: 0.9, orbitRadius: 0.723, position: { x: -0.5, y: 0.52, z: 0.01, distanceFromSun: 0.723 } },
+  { id: 'earth', name: 'Earth', horizonsId: '399', color: '#3B82F6', size: 1.0, orbitRadius: 1.0, position: { x: 0.85, y: -0.52, z: 0.0, distanceFromSun: 1.0 } },
+  { id: 'mars', name: 'Mars', horizonsId: '499', color: '#EF4444', size: 0.5, orbitRadius: 1.524, position: { x: -1.2, y: -0.9, z: 0.03, distanceFromSun: 1.524 } },
+  { id: 'jupiter', name: 'Jupiter', horizonsId: '599', color: '#D4A574', size: 2.5, orbitRadius: 5.203, position: { x: 4.5, y: 2.5, z: -0.1, distanceFromSun: 5.203 } },
+  { id: 'saturn', name: 'Saturn', horizonsId: '699', color: '#F4D03F', size: 2.2, orbitRadius: 9.537, position: { x: -8.0, y: 5.0, z: 0.2, distanceFromSun: 9.537 } },
+  { id: 'uranus', name: 'Uranus', horizonsId: '799', color: '#06B6D4', size: 1.5, orbitRadius: 19.191, position: { x: 15.0, y: -12.0, z: -0.3, distanceFromSun: 19.191 } },
+  { id: 'neptune', name: 'Neptune', horizonsId: '899', color: '#1E40AF', size: 1.4, orbitRadius: 30.069, position: { x: 28.0, y: 10.0, z: -0.5, distanceFromSun: 30.069 } },
+];
+
 // Agency colors for spacecraft
 const AGENCY_COLORS: Record<string, string> = {
   'NASA': '#3B82F6',
@@ -76,6 +89,139 @@ interface ApiResponse {
     furthestFromSun: { name: string; distance: number } | null;
     closestToSun: { name: string; distance: number } | null;
   };
+}
+
+// Helper function to convert AU position to Cesium Cartesian3
+function auToCartesian3(Cesium: any, x: number, y: number, z: number) {
+  const scaledX = x * AU_TO_METERS * SCALE_FACTOR;
+  const scaledY = y * AU_TO_METERS * SCALE_FACTOR;
+  const scaledZ = z * AU_TO_METERS * SCALE_FACTOR;
+  return new Cesium.Cartesian3(scaledX, scaledZ, -scaledY); // Swap Y and Z for top-down view
+}
+
+// Add static Sun and planets immediately on Cesium init (no API dependency)
+function addStaticSolarSystem(viewer: any, Cesium: any) {
+  console.log('Adding static solar system entities...');
+
+  // Create glowing Sun at origin
+  const sunRadius = 696340000 * 20 * SCALE_FACTOR; // Sun radius * visual scale * unit scale
+
+  viewer.entities.add({
+    id: 'sun-static',
+    name: 'Sun',
+    position: Cesium.Cartesian3.ZERO,
+    ellipsoid: {
+      radii: new Cesium.Cartesian3(sunRadius, sunRadius, sunRadius),
+      material: new Cesium.ColorMaterialProperty(
+        Cesium.Color.fromCssColorString('#FFD700')
+      ),
+    },
+    label: {
+      text: 'Sun',
+      font: '16px sans-serif',
+      fillColor: Cesium.Color.YELLOW,
+      outlineColor: Cesium.Color.BLACK,
+      outlineWidth: 2,
+      style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+      verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+      pixelOffset: new Cesium.Cartesian2(0, -30),
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+    },
+  });
+
+  // Add sun glow/corona
+  const glowRadius = sunRadius * 1.5;
+  viewer.entities.add({
+    id: 'sun-glow-static',
+    name: 'Sun Corona',
+    position: Cesium.Cartesian3.ZERO,
+    ellipsoid: {
+      radii: new Cesium.Cartesian3(glowRadius, glowRadius, glowRadius),
+      material: new Cesium.ColorMaterialProperty(
+        Cesium.Color.fromCssColorString('#FFA500').withAlpha(0.3)
+      ),
+    },
+  });
+
+  // Add all 8 planets with their static positions
+  STATIC_PLANETS.forEach((planet) => {
+    if (!planet.position) return;
+
+    const position = auToCartesian3(Cesium, planet.position.x, planet.position.y, planet.position.z);
+    const visualSize = (PLANET_VISUAL_SIZES[planet.id] || 5000000 * 200) * SCALE_FACTOR;
+    const color = PLANET_COLORS[planet.id] || planet.color;
+
+    // Add orbit line
+    const orbitRadiusMeters = planet.orbitRadius * AU_TO_METERS * SCALE_FACTOR;
+    const orbitPositions: any[] = [];
+    const segments = 360;
+
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      const ox = Math.cos(angle) * orbitRadiusMeters;
+      const oz = Math.sin(angle) * orbitRadiusMeters;
+      orbitPositions.push(new Cesium.Cartesian3(ox, 0, oz));
+    }
+
+    viewer.entities.add({
+      id: `orbit-static-${planet.id}`,
+      name: `${planet.name} Orbit`,
+      polyline: {
+        positions: orbitPositions,
+        width: 1,
+        material: new Cesium.ColorMaterialProperty(
+          Cesium.Color.fromCssColorString(color).withAlpha(0.4)
+        ),
+      },
+    });
+
+    // Add planet sphere
+    viewer.entities.add({
+      id: `planet-static-${planet.id}`,
+      name: planet.name,
+      position: position,
+      ellipsoid: {
+        radii: new Cesium.Cartesian3(visualSize, visualSize, visualSize),
+        material: new Cesium.ColorMaterialProperty(
+          Cesium.Color.fromCssColorString(color)
+        ),
+      },
+      label: {
+        text: planet.name,
+        font: '12px sans-serif',
+        fillColor: Cesium.Color.WHITE,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        pixelOffset: new Cesium.Cartesian2(0, -25),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+    });
+
+    // Add Saturn's rings
+    if (planet.id === 'saturn') {
+      const innerRingRadius = visualSize * 1.2;
+      const outerRingRadius = visualSize * 2.3;
+
+      viewer.entities.add({
+        id: 'saturn-rings-static',
+        name: 'Saturn Rings',
+        position: position,
+        ellipse: {
+          semiMajorAxis: outerRingRadius,
+          semiMinorAxis: outerRingRadius,
+          material: new Cesium.ColorMaterialProperty(
+            Cesium.Color.fromCssColorString('#E8D5A3').withAlpha(0.6)
+          ),
+          height: 0,
+          rotation: Cesium.Math.toRadians(27),
+        },
+      });
+    }
+  });
+
+  console.log(`Added Sun and ${STATIC_PLANETS.length} planets as static entities`);
 }
 
 function CesiumHeliocentricComponent() {
@@ -172,10 +318,14 @@ function CesiumHeliocentricComponent() {
 
         cesiumViewerRef.current = viewer;
         cesiumModuleRef.current = Cesium;
+
+        // Immediately add Sun and planets using static data
+        addStaticSolarSystem(viewer, Cesium);
+
         setIsLoading(false);
         setCesiumReady(true);
 
-        console.log('Cesium heliocentric viewer initialized');
+        console.log('Cesium heliocentric viewer initialized with static solar system');
       } catch (err: any) {
         console.error('Cesium initialization error:', err);
         setError(err.message || 'Failed to initialize Cesium');
@@ -200,19 +350,37 @@ function CesiumHeliocentricComponent() {
   // Fetch data from API
   const fetchData = useCallback(async () => {
     setDataLoading(true);
+    console.log(`Fetching spacecraft data for view mode: ${viewMode}`);
     try {
       const response = await fetch(`/api/spacecraft?view=${viewMode}`);
+      console.log(`API response status: ${response.status}`);
+
+      if (!response.ok) {
+        console.error(`API returned error status: ${response.status}`);
+        return;
+      }
+
       const data: ApiResponse = await response.json();
+      console.log('API response:', {
+        success: data.success,
+        spacecraftCount: data.spacecraft?.length,
+        planetsCount: data.planets?.length,
+        stats: data.stats
+      });
 
       if (data.success) {
-        setSpacecraft(data.spacecraft);
+        // Filter to only spacecraft with valid positions
+        const validSpacecraft = data.spacecraft.filter(s => s.position !== null);
+        console.log(`Valid spacecraft with positions: ${validSpacecraft.length}/${data.spacecraft.length}`);
+
+        setSpacecraft(validSpacecraft);
         setPlanets(data.planets);
         setStats(data.stats);
       } else {
-        console.error('Failed to fetch spacecraft data');
+        console.error('API returned success: false');
       }
     } catch (err) {
-      console.error('Error fetching data:', err);
+      console.error('Error fetching spacecraft data:', err);
     } finally {
       setDataLoading(false);
     }
@@ -458,26 +626,19 @@ function CesiumHeliocentricComponent() {
     }
   }, [auToCartesian, showLabels, showTrails]);
 
-  // Render all entities
+  // Render spacecraft entities (planets and Sun are rendered statically on init)
   useEffect(() => {
     const viewer = cesiumViewerRef.current;
     const Cesium = cesiumModuleRef.current;
     if (!viewer || !Cesium || !cesiumReady) return;
 
-    // Clear existing entities
+    // Only clear dynamically-added spacecraft entities and trails (not static planets/sun)
     entitiesRef.current.forEach((entity) => {
       try {
         viewer.entities.remove(entity);
       } catch (e) {}
     });
     entitiesRef.current.clear();
-
-    orbitEntitiesRef.current.forEach((entity) => {
-      try {
-        viewer.entities.remove(entity);
-      } catch (e) {}
-    });
-    orbitEntitiesRef.current = [];
 
     trailEntitiesRef.current.forEach((entity) => {
       try {
@@ -486,21 +647,12 @@ function CesiumHeliocentricComponent() {
     });
     trailEntitiesRef.current = [];
 
-    // Create Sun
-    createSun();
-
-    // Create orbits
-    if (showOrbits) {
-      planets.forEach(createOrbitLine);
-    }
-
-    // Create planets
-    planets.forEach(createPlanet);
-
-    // Create spacecraft
+    // Add spacecraft from API data
     spacecraft.forEach(createSpacecraft);
 
-  }, [cesiumReady, planets, spacecraft, createSun, createOrbitLine, createPlanet, createSpacecraft, showOrbits]);
+    console.log(`Rendered ${spacecraft.length} spacecraft from API`);
+
+  }, [cesiumReady, spacecraft, createSpacecraft]);
 
   // Handle entity click
   useEffect(() => {
@@ -515,7 +667,18 @@ function CesiumHeliocentricComponent() {
       if (Cesium.defined(pickedObject) && pickedObject.id) {
         const entityId = pickedObject.id.id || pickedObject.id;
 
-        // Find in planets or spacecraft
+        // Check for static planet entities (format: planet-static-{id})
+        const staticPlanetMatch = entityId.match?.(/^planet-static-(.+)$/);
+        if (staticPlanetMatch) {
+          const planetId = staticPlanetMatch[1];
+          const staticPlanet = STATIC_PLANETS.find(p => p.id === planetId);
+          if (staticPlanet) {
+            setSelectedObject(staticPlanet);
+            return;
+          }
+        }
+
+        // Find in API-fetched planets or spacecraft
         const planet = planets.find(p => p.id === entityId);
         const sc = spacecraft.find(s => s.id === entityId);
 
@@ -611,15 +774,13 @@ function CesiumHeliocentricComponent() {
 
   return (
     <div className="relative w-full h-full bg-[#050520]">
-      {/* Loading overlay */}
-      {(isLoading || dataLoading) && (
+      {/* Loading overlay - only show during initial Cesium load, not API load */}
+      {isLoading && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#050520]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-500 mx-auto mb-4" />
-            <p className="text-white text-xl">
-              {isLoading ? 'Initializing Heliocentric View...' : 'Loading spacecraft positions...'}
-            </p>
-            <p className="text-slate-400 text-sm mt-2">Fetching data from NASA JPL Horizons</p>
+            <p className="text-white text-xl">Initializing Heliocentric View...</p>
+            <p className="text-slate-400 text-sm mt-2">Loading Cesium 3D engine</p>
           </div>
         </div>
       )}
@@ -628,35 +789,45 @@ function CesiumHeliocentricComponent() {
       <div ref={viewerRef} className="w-full h-full" />
 
       {/* Title and status */}
-      {cesiumReady && !dataLoading && (
+      {cesiumReady && (
         <div className="absolute top-4 left-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-4 max-w-xs">
           <h2 className="text-lg font-bold text-white mb-1">Heliocentric View</h2>
-          <p className="text-xs text-slate-400 mb-3">Real-time spacecraft positions</p>
+          <p className="text-xs text-slate-400 mb-3">
+            {dataLoading ? 'Fetching real-time positions...' : 'Real-time spacecraft positions'}
+          </p>
 
-          {stats && (
-            <div className="space-y-1 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Tracking:</span>
-                <span className="text-white">{stats.successfulFetches} objects</span>
-              </div>
-              {stats.furthestFromSun && (
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Furthest:</span>
-                  <span className="text-white truncate ml-2">
-                    {stats.furthestFromSun.name} ({stats.furthestFromSun.distance.toFixed(1)} AU)
-                  </span>
-                </div>
-              )}
-              {stats.closestToSun && (
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Closest:</span>
-                  <span className="text-white truncate ml-2">
-                    {stats.closestToSun.name} ({stats.closestToSun.distance.toFixed(3)} AU)
-                  </span>
-                </div>
-              )}
+          <div className="space-y-1 text-xs">
+            <div className="flex justify-between">
+              <span className="text-slate-400">Planets:</span>
+              <span className="text-white">{STATIC_PLANETS.length} (Sun + 8 planets)</span>
             </div>
-          )}
+            <div className="flex justify-between">
+              <span className="text-slate-400">Spacecraft:</span>
+              <span className="text-white">
+                {dataLoading ? (
+                  <span className="text-yellow-400 animate-pulse">Loading...</span>
+                ) : (
+                  `${spacecraft.filter(s => s.position).length} tracked`
+                )}
+              </span>
+            </div>
+            {stats?.furthestFromSun && (
+              <div className="flex justify-between">
+                <span className="text-slate-400">Furthest:</span>
+                <span className="text-white truncate ml-2">
+                  {stats.furthestFromSun.name} ({stats.furthestFromSun.distance.toFixed(1)} AU)
+                </span>
+              </div>
+            )}
+            {stats?.closestToSun && (
+              <div className="flex justify-between">
+                <span className="text-slate-400">Closest:</span>
+                <span className="text-white truncate ml-2">
+                  {stats.closestToSun.name} ({stats.closestToSun.distance.toFixed(3)} AU)
+                </span>
+              </div>
+            )}
+          </div>
 
           <div className="mt-3 pt-3 border-t border-slate-700">
             <div className="text-xs text-slate-500">Data: NASA JPL Horizons</div>
