@@ -59,14 +59,14 @@ const NationalAssetsGlobe = dynamic(() => import('@/components/cesium/national-a
 });
 
 const HeliocentricViewer = dynamic(
-  () => import('@/components/heliocentric/spacekit-heliocentric-viewer'),
+  () => import('@/components/heliocentric/nasa-eyes-viewer'),
   {
     ssr: false,
     loading: () => (
       <div className="w-full h-full flex items-center justify-center bg-[#050520]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-500 mx-auto mb-4" />
-          <p className="text-slate-400">Loading Heliocentric View...</p>
+          <p className="text-slate-400">Loading NASA Eyes...</p>
         </div>
       </div>
     ),
