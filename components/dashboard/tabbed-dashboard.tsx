@@ -59,7 +59,7 @@ const NationalAssetsGlobe = dynamic(() => import('@/components/cesium/national-a
 });
 
 const HeliocentricViewer = dynamic(
-  () => import('@/components/heliocentric/cesium-heliocentric-viewer'),
+  () => import('@/components/heliocentric/spacekit-heliocentric-viewer'),
   {
     ssr: false,
     loading: () => (
