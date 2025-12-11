@@ -112,7 +112,8 @@ export const authOptions: NextAuthOptions = {
           const usersCollection = db.collection<User>('users');
 
           // Check if user exists in users collection (approved beta tester)
-          const existingUser = await usersCollection.findOne({ email: user.email! });
+          // Use lowercase for case-insensitive email matching
+          const existingUser = await usersCollection.findOne({ email: user.email!.toLowerCase() });
 
           if (!existingUser) {
             // User not approved - redirect to access denied
@@ -121,7 +122,7 @@ export const authOptions: NextAuthOptions = {
 
           // Update last_login timestamp
           await usersCollection.updateOne(
-            { email: user.email! },
+            { email: user.email!.toLowerCase() },
             { $set: { last_login: new Date() } }
           );
 
@@ -141,7 +142,7 @@ export const authOptions: NextAuthOptions = {
         try {
           const db = await getDb();
           const usersCollection = db.collection<User>('users');
-          const dbUser = await usersCollection.findOne({ email: user.email! });
+          const dbUser = await usersCollection.findOne({ email: user.email!.toLowerCase() });
 
           if (dbUser) {
             token.id = dbUser._id?.toString() || '';
