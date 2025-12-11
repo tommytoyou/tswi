@@ -1,38 +1,94 @@
 import { MongoClient, Db, Collection, Document } from 'mongodb';
 import { config } from './config';
 
-let client: MongoClient | null = null;
-let db: Db | null = null;
+// Global cache for serverless environments
+// In serverless, each invocation may reuse the same runtime
+// so we cache the client promise to avoid creating multiple connections
+declare global {
+  // eslint-disable-next-line no-var
+  var _mongoClientPromise: Promise<MongoClient> | undefined;
+}
+
+let cachedDb: Db | null = null;
+
+function createClient(): MongoClient {
+  return new MongoClient(config.mongodb.uri, {
+    maxPoolSize: 10,
+    minPoolSize: 1,
+    maxIdleTimeMS: 30000,
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+    connectTimeoutMS: 10000,
+    retryWrites: true,
+    retryReads: true,
+  });
+}
+
+async function getClientWithRetry(retries = 3): Promise<MongoClient> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      // Check if we have a cached promise
+      if (global._mongoClientPromise) {
+        const client = await global._mongoClientPromise;
+
+        // Check if topology is closed or client is disconnected
+        const isTopologyClosed = (client as any).topology?.s?.state === 'closed';
+        const isConnected = (client as any).topology?.isConnected?.();
+
+        if (isTopologyClosed || isConnected === false) {
+          console.log('[MongoDB] Topology closed or disconnected, reconnecting...');
+          global._mongoClientPromise = undefined;
+          // Continue to create new client below
+        } else {
+          // Verify the client is still connected by pinging
+          try {
+            await client.db('admin').command({ ping: 1 });
+            return client;
+          } catch (pingError) {
+            // Connection is stale or topology closed, clear cache and retry
+            const errorMessage = pingError instanceof Error ? pingError.message : String(pingError);
+            console.log(`[MongoDB] Connection check failed (${errorMessage}), reconnecting...`);
+            global._mongoClientPromise = undefined;
+            // Continue to create new client below
+          }
+        }
+      }
+
+      // Create new client and cache the promise
+      const newClient = createClient();
+      global._mongoClientPromise = newClient.connect();
+      const connectedClient = await global._mongoClientPromise;
+      console.log('✅ Connected to MongoDB Atlas');
+      return connectedClient;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`[MongoDB] Connection attempt ${attempt}/${retries} failed:`, errorMessage);
+
+      // Clear cached promise on error
+      global._mongoClientPromise = undefined;
+
+      if (attempt === retries) {
+        throw error;
+      }
+
+      // Wait before retrying (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 100));
+    }
+  }
+
+  throw new Error('Failed to connect to MongoDB after retries');
+}
 
 export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db }> {
-  if (client && db) {
-    return { client, db };
-  }
-
-  try {
-    client = new MongoClient(config.mongodb.uri, {
-      maxPoolSize: 10,
-      minPoolSize: 2,
-      maxIdleTimeMS: 60000,
-    });
-
-    await client.connect();
-    db = client.db(config.mongodb.dbName);
-
-    console.log('✅ Connected to MongoDB Atlas');
-
-    return { client, db };
-  } catch (error) {
-    console.error('❌ MongoDB connection error:', error);
-    throw error;
-  }
+  const client = await getClientWithRetry();
+  const db = client.db(config.mongodb.dbName);
+  cachedDb = db;
+  return { client, db };
 }
 
 export async function getDb(): Promise<Db> {
-  if (!db) {
-    const connection = await connectToDatabase();
-    return connection.db;
-  }
+  // Always verify connection health in serverless
+  const { db } = await connectToDatabase();
   return db;
 }
 
@@ -176,9 +232,14 @@ export async function initializeCollections(): Promise<void> {
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-  if (client) {
-    await client.close();
-    console.log('MongoDB connection closed');
-    process.exit(0);
+  if (global._mongoClientPromise) {
+    try {
+      const client = await global._mongoClientPromise;
+      await client.close();
+      console.log('MongoDB connection closed');
+    } catch (error) {
+      console.error('Error closing MongoDB connection:', error);
+    }
   }
+  process.exit(0);
 });
