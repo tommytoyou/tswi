@@ -100,39 +100,68 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn({ user, account }) {
+      console.log('[AUTH DEBUG] signIn callback triggered');
+      console.log('[AUTH DEBUG] Provider:', account?.provider);
+      console.log('[AUTH DEBUG] User email from OAuth:', user.email);
+      console.log('[AUTH DEBUG] User email type:', typeof user.email);
+
       // Credentials provider handles its own validation in authorize()
       if (account?.provider === 'credentials') {
+        console.log('[AUTH DEBUG] Credentials provider - allowing sign in');
         return true;
       }
 
       // Google OAuth validation
       if (account?.provider === 'google') {
+        console.log('[AUTH DEBUG] Google OAuth flow started');
+
+        if (!user.email) {
+          console.log('[AUTH DEBUG] DENIED: No email provided by Google');
+          return false;
+        }
+
+        const normalizedEmail = user.email.toLowerCase();
+        console.log('[AUTH DEBUG] Normalized email:', normalizedEmail);
+
         try {
           const db = await getDb();
           const usersCollection = db.collection<User>('users');
 
           // Check if user exists in users collection (approved beta tester)
           // Use lowercase for case-insensitive email matching
-          const existingUser = await usersCollection.findOne({ email: user.email!.toLowerCase() });
+          console.log('[AUTH DEBUG] Querying database for email:', normalizedEmail);
+          const existingUser = await usersCollection.findOne({ email: normalizedEmail });
+
+          console.log('[AUTH DEBUG] Database query result:', existingUser ? {
+            found: true,
+            dbEmail: existingUser.email,
+            name: existingUser.name,
+            role: existingUser.role,
+            company: existingUser.company
+          } : { found: false });
 
           if (!existingUser) {
             // User not approved - redirect to access denied
+            console.log('[AUTH DEBUG] DENIED: User not found in database, redirecting to /access-denied');
             return '/access-denied';
           }
 
           // Update last_login timestamp
+          console.log('[AUTH DEBUG] User found, updating last_login');
           await usersCollection.updateOne(
-            { email: user.email!.toLowerCase() },
+            { email: normalizedEmail },
             { $set: { last_login: new Date() } }
           );
 
+          console.log('[AUTH DEBUG] SUCCESS: Allowing Google sign in for:', normalizedEmail);
           return true;
         } catch (error) {
-          console.error('Error during sign in:', error);
+          console.error('[AUTH DEBUG] DENIED: Database error during sign in:', error);
           return false;
         }
       }
 
+      console.log('[AUTH DEBUG] DENIED: Unknown provider or no provider');
       return false;
     },
 
