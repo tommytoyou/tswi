@@ -39,7 +39,11 @@
       "WebFetch(domain:www.swpc.noaa.gov)",
       "Bash(git stash:*)",
       "Bash(npx tsc:*)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(copy:*)",
+      "Bash(cmd /c copy \"c:\\Users\\tommy\\OneDrive\\Pictures\\DeepSpaceDynamics\\dsd logo.png\" \"C:\\Users\\tommy\\tswi\\public\\dsd_logo.png\")",
+      "Bash(cmd /c dir \"C:\\Users\\tommy\\tswi\\public\\dsd_logo.png\")",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []

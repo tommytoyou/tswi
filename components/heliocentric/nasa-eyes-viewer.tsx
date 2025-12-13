@@ -9,16 +9,27 @@ export default function NasaEyesViewer() {
         title="NASA Eyes on the Solar System"
         allow="fullscreen"
       />
-      {/* Overlay to hide the share button in top right corner */}
+      {/* Logo overlay to cover the share button in top right corner */}
       <div
-        className="absolute top-0 right-0 bg-black"
+        className="absolute"
         style={{
-          width: '100px',
-          height: '50px',
+          top: 0,
+          right: 0,
+          width: '150px',
+          minHeight: '60px',
+          zIndex: 9999,
           pointerEvents: 'auto'
         }}
-        aria-hidden="true"
-      />
+      >
+        <img
+          src="/dsd_logo.png"
+          alt="Deep Space Dynamics"
+          style={{
+            width: '100%',
+            height: 'auto'
+          }}
+        />
+      </div>
     </div>
   );
 }
