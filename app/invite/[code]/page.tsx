@@ -100,10 +100,21 @@ export default function InvitePage() {
         setError(data.error || 'Failed to create account');
       } else {
         setSuccess(true);
-        // Redirect to login after 2 seconds
-        setTimeout(() => {
-          router.push('/login');
-        }, 2000);
+        // Auto sign in and redirect to dashboard
+        const signInResult = await signIn('credentials', {
+          email: inviteInfo?.email,
+          password: password,
+          redirect: false,
+        });
+
+        if (signInResult?.ok) {
+          router.push('/dashboard');
+        } else {
+          // Fallback: redirect to login if auto-signin fails
+          setTimeout(() => {
+            router.push('/login');
+          }, 2000);
+        }
       }
     } catch {
       setError('An error occurred. Please try again.');
@@ -168,7 +179,7 @@ export default function InvitePage() {
             <div className="space-y-2 text-center">
               <CardTitle className="text-xl font-bold text-white">Account Created</CardTitle>
               <CardDescription className="text-slate-400">
-                Your account has been set up successfully. Redirecting to login...
+                Your account has been set up successfully. Signing you in...
               </CardDescription>
             </div>
           </CardHeader>

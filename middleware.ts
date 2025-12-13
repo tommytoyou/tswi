@@ -6,11 +6,13 @@ import { getToken } from 'next-auth/jwt';
 const PUBLIC_ROUTES = [
   '/',
   '/login',
+  '/invite',
   '/request-access',
   '/access-denied',
   '/api/health',
   '/api/auth',
   '/api/access-requests',
+  '/api/invite',
 ];
 
 // Admin routes - require admin cookie
