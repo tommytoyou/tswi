@@ -13,7 +13,7 @@ import { KpCardV2 } from '@/components/dashboard/kp-card-v2';
 import { XRayFluxCardV2 } from '@/components/dashboard/xray-flux-card-v2';
 import { ProtonFluxCard } from '@/components/dashboard/proton-flux-card';
 import { DstCard } from '@/components/dashboard/dst-card';
-import { SolarEventsCard } from '@/components/dashboard/solar-events-card';
+import { SolarImageryCard } from '@/components/dashboard/solar-imagery-card';
 import { CmeCard } from '@/components/dashboard/cme-card';
 import { AlertsPanel } from '@/components/dashboard/alerts-panel';
 import { SDAPanel } from '@/components/dashboard/sda-panel';
@@ -172,7 +172,7 @@ export function TabbedDashboard() {
           {/* Events Tab */}
           <TabsContent value="events" className="h-full m-0 p-4 overflow-hidden">
             <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <SolarEventsCard key={`events-${refreshTrigger}`} />
+              <SolarImageryCard key={`imagery-${refreshTrigger}`} />
               <CmeCard key={`cme-${refreshTrigger}`} />
             </div>
           </TabsContent>
