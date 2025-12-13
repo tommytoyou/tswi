@@ -151,7 +151,7 @@ function AuroraGlobeComponent() {
 
         // Set initial view to Arctic region (North Pole aurora view)
         viewer.camera.setView({
-          destination: Cesium.Cartesian3.fromDegrees(0, 68, 25000000),
+          destination: Cesium.Cartesian3.fromDegrees(0, 68, 31250000),
           orientation: {
             heading: Cesium.Math.toRadians(0),
             pitch: Cesium.Math.toRadians(-70),
@@ -221,7 +221,7 @@ function AuroraGlobeComponent() {
     const targetLat = hemisphere === 'north' ? 75 : -75;
 
     viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(0, targetLat, 18000000),
+      destination: Cesium.Cartesian3.fromDegrees(0, targetLat, 22500000),
       orientation: {
         heading: Cesium.Math.toRadians(0),
         pitch: Cesium.Math.toRadians(-85),
