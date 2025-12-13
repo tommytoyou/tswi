@@ -490,9 +490,9 @@ function AuroraGlobeComponent() {
         </div>
       )}
 
-      {/* Probability Legend - Bottom Center */}
+      {/* Probability Legend - Bottom Left */}
       {cesiumReady && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3">
+        <div className="absolute bottom-4 left-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3">
           <div className="text-xs text-slate-400 mb-2 text-center">Aurora Probability</div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500">10%</span>
