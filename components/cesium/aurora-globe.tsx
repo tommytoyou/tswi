@@ -149,12 +149,12 @@ function AuroraGlobeComponent() {
           viewer.scene.skyAtmosphere.show = true;
         }
 
-        // Set initial view to North pole
+        // Set initial view to Arctic region (North Pole aurora view)
         viewer.camera.setView({
-          destination: Cesium.Cartesian3.fromDegrees(0, 90, 20000000),
+          destination: Cesium.Cartesian3.fromDegrees(0, 68, 25000000),
           orientation: {
             heading: Cesium.Math.toRadians(0),
-            pitch: Cesium.Math.toRadians(-90),
+            pitch: Cesium.Math.toRadians(-70),
             roll: 0.0,
           },
         });
