@@ -16,6 +16,7 @@ import { DstCard } from '@/components/dashboard/dst-card';
 import { SolarEventsCard } from '@/components/dashboard/solar-events-card';
 import { CmeCard } from '@/components/dashboard/cme-card';
 import { AlertsPanel } from '@/components/dashboard/alerts-panel';
+import { SDAPanel } from '@/components/dashboard/sda-panel';
 import {
   LayoutDashboard,
   Wind,
@@ -25,6 +26,7 @@ import {
   Bell,
   Flag,
   Sun,
+  Satellite,
 } from 'lucide-react';
 
 // Dynamic imports for heavy components
@@ -87,6 +89,7 @@ const tabs: TabConfig[] = [
   { id: 'national-assets', label: 'National Assets', icon: Flag },
   { id: 'heliocentric', label: 'Heliocentric', icon: Sun },
   { id: 'aurora', label: 'Aurora', icon: Sparkles },
+  { id: 'sda', label: 'SDA', icon: Satellite },
   { id: 'alerts', label: 'Alerts', icon: Bell },
 ];
 
@@ -192,6 +195,11 @@ export function TabbedDashboard() {
           {/* Aurora Tab */}
           <TabsContent value="aurora" className="h-full m-0 overflow-hidden">
             <AuroraGlobe />
+          </TabsContent>
+
+          {/* SDA Tab */}
+          <TabsContent value="sda" className="h-full m-0 overflow-hidden">
+            <SDAPanel />
           </TabsContent>
 
           {/* Alerts Tab */}
