@@ -92,15 +92,15 @@ export function SolarImageryCard() {
 
   return (
     <Card className="flex flex-col h-full">
-      <CardHeader className="flex-shrink-0 pb-2">
+      <CardHeader className="flex-shrink-0 py-2 px-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sun className={`h-5 w-5 ${currentWavelength.color}`} />
-            <CardTitle className="text-base">Solar Imagery - Live</CardTitle>
+            <Sun className={`h-4 w-4 ${currentWavelength.color}`} />
+            <CardTitle className="text-sm">Solar Imagery - Live</CardTitle>
           </div>
           <div className="flex items-center gap-2">
             <Select value={selectedWavelength} onValueChange={setSelectedWavelength}>
-              <SelectTrigger className="w-[160px] h-8 text-xs bg-slate-800 border-slate-700">
+              <SelectTrigger className="w-[140px] h-7 text-xs bg-slate-800 border-slate-700">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-slate-800 border-slate-700">
@@ -118,20 +118,16 @@ export function SolarImageryCard() {
             </Select>
             <button
               onClick={refreshImage}
-              className="p-1.5 rounded hover:bg-slate-700 transition-colors"
+              className="p-1 rounded hover:bg-slate-700 transition-colors"
               title="Refresh image"
             >
-              <RefreshCw className={`h-4 w-4 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-3.5 w-3.5 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
-        <div className="flex items-center justify-between text-xs text-slate-500 mt-1">
-          <span className={currentWavelength.color}>{currentWavelength.description}</span>
-          <span>Updated: {lastUpdated.toLocaleTimeString()}</span>
-        </div>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 flex items-center justify-center p-2">
-        <div className="relative w-full h-full flex items-center justify-center">
+      <CardContent className="flex-1 min-h-0 flex flex-col p-2">
+        <div className="relative flex-1 min-h-0 flex items-center justify-center">
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50 z-10">
               <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
@@ -152,11 +148,14 @@ export function SolarImageryCard() {
               key={`${currentWavelength.id}-${imageKey}`}
               src={`${currentWavelength.url}?t=${imageKey}`}
               alt={`NASA SDO ${currentWavelength.label} - ${currentWavelength.description}`}
-              className="max-w-full max-h-full object-contain rounded-lg"
+              className="max-w-full max-h-[280px] object-contain rounded-lg"
               onLoad={handleImageLoad}
               onError={handleImageError}
             />
           )}
+        </div>
+        <div className="text-center text-xs text-slate-500 mt-1">
+          {lastUpdated.toLocaleTimeString()}
         </div>
       </CardContent>
     </Card>
