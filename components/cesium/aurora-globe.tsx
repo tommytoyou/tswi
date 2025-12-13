@@ -150,11 +150,12 @@ function AuroraGlobeComponent() {
         }
 
         // Set initial view to Arctic region (North Pole aurora view)
+        // Position camera directly above to center the globe in viewport
         viewer.camera.setView({
-          destination: Cesium.Cartesian3.fromDegrees(0, 68, 31250000),
+          destination: Cesium.Cartesian3.fromDegrees(0, 90, 31250000),
           orientation: {
             heading: Cesium.Math.toRadians(0),
-            pitch: Cesium.Math.toRadians(-70),
+            pitch: Cesium.Math.toRadians(-90),
             roll: 0.0,
           },
         });
@@ -218,13 +219,14 @@ function AuroraGlobeComponent() {
     const Cesium = cesiumModuleRef.current;
     if (!viewer || !Cesium || !cesiumReady) return;
 
-    const targetLat = hemisphere === 'north' ? 75 : -75;
+    // Position camera directly above the pole to center the globe
+    const targetLat = hemisphere === 'north' ? 90 : -90;
 
     viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(0, targetLat, 22500000),
+      destination: Cesium.Cartesian3.fromDegrees(0, targetLat, 31250000),
       orientation: {
         heading: Cesium.Math.toRadians(0),
-        pitch: Cesium.Math.toRadians(-85),
+        pitch: Cesium.Math.toRadians(-90),
         roll: 0.0,
       },
       duration: 1.5,
