@@ -183,33 +183,6 @@ export function SDAPanel() {
     );
   }
 
-  if (credentialsError) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <Satellite className="h-12 w-12 text-slate-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-white mb-2">Space-Track Credentials Required</h3>
-          <p className="text-slate-400 text-sm mb-4">
-            To access Space Domain Awareness data, you need to configure your Space-Track.org credentials.
-            Create a free account at{' '}
-            <a
-              href="https://www.space-track.org"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:underline"
-            >
-              space-track.org
-            </a>
-            {' '}and add the credentials to your environment variables.
-          </p>
-          <div className="bg-slate-800/50 rounded p-3 text-left font-mono text-xs text-slate-300">
-            <div>SPACE_TRACK_USERNAME=your_username</div>
-            <div>SPACE_TRACK_PASSWORD=your_password</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -236,23 +209,58 @@ export function SDAPanel() {
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">Space Domain Awareness</h2>
-              <p className="text-sm text-slate-400">Orbital catalog, maneuvers, and conjunctions</p>
+              <p className="text-sm text-slate-400">Threat catalog, orbital data, and conjunctions</p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchData(true)}
-            disabled={refreshing}
-            className="gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+          {!credentialsError && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fetchData(true)}
+              disabled={refreshing}
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          )}
         </div>
 
-        {/* Catalog Statistics */}
-        {catalogStats && (
+        {/* Threat Catalog - Always visible, uses local static data */}
+        <ThreatCatalog />
+
+        {/* Space-Track Credentials Warning */}
+        {credentialsError && (
+          <Card className="bg-slate-900/50 border-yellow-500/30">
+            <CardContent className="py-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-yellow-400 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-white mb-1">Space-Track Credentials Required</h3>
+                  <p className="text-slate-400 text-xs mb-2">
+                    Configure Space-Track.org credentials to access live catalog statistics, maneuvers, and conjunction data.
+                    Create a free account at{' '}
+                    <a
+                      href="https://www.space-track.org"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:underline"
+                    >
+                      space-track.org
+                    </a>
+                  </p>
+                  <div className="bg-slate-800/50 rounded p-2 font-mono text-xs text-slate-300">
+                    <div>SPACE_TRACK_USERNAME=your_username</div>
+                    <div>SPACE_TRACK_PASSWORD=your_password</div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Catalog Statistics - Only show if credentials are configured */}
+        {!credentialsError && catalogStats && (
           <Card className="bg-slate-900/50 border-slate-700">
             <CardHeader className="pb-2 py-3">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -308,10 +316,8 @@ export function SDAPanel() {
           </Card>
         )}
 
-        {/* Threat Catalog */}
-        <ThreatCatalog />
-
-        {/* Two Column Layout */}
+        {/* Two Column Layout - Only show if credentials are configured */}
+        {!credentialsError && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Watch List Maneuvers */}
           <Card className="bg-slate-900/50 border-slate-700">
@@ -467,20 +473,23 @@ export function SDAPanel() {
             </CardContent>
           </Card>
         </div>
+        )}
 
-        {/* Data Source Attribution */}
-        <div className="text-center text-xs text-slate-500">
-          Data provided by{' '}
-          <a
-            href="https://www.space-track.org"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-400 hover:underline"
-          >
-            Space-Track.org
-          </a>
-          {' '}(18th Space Defense Squadron)
-        </div>
+        {/* Data Source Attribution - Only show if credentials are configured */}
+        {!credentialsError && (
+          <div className="text-center text-xs text-slate-500">
+            Data provided by{' '}
+            <a
+              href="https://www.space-track.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:underline"
+            >
+              Space-Track.org
+            </a>
+            {' '}(18th Space Defense Squadron)
+          </div>
+        )}
       </div>
     </div>
   );
