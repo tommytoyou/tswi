@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -15,6 +15,11 @@ import {
   Radio,
   Grip,
   ExternalLink,
+  Sun,
+  Moon,
+  MapPin,
+  Navigation,
+  RefreshCw,
 } from 'lucide-react';
 import {
   THREAT_DATABASE,
@@ -24,6 +29,14 @@ import {
   OrbitType,
   ThreatCountry,
 } from '@/lib/threat-database';
+import {
+  TLEData,
+  SatellitePosition,
+  propagateAllPositions,
+  clearSatrecCache,
+  formatCoordinate,
+  formatAltitude,
+} from '@/lib/orbital-propagation';
 
 const getThreatBadgeClass = (level: ThreatLevel) => {
   switch (level) {
@@ -77,11 +90,12 @@ const getCountryFlag = (country: ThreatCountry) => {
 
 interface ThreatCardProps {
   satellite: ThreatSatellite;
+  position: SatellitePosition | null;
   isExpanded: boolean;
   onToggle: () => void;
 }
 
-function ThreatCard({ satellite, isExpanded, onToggle }: ThreatCardProps) {
+function ThreatCard({ satellite, position, isExpanded, onToggle }: ThreatCardProps) {
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
       {/* Header - Always Visible */}
@@ -89,7 +103,7 @@ function ThreatCard({ satellite, isExpanded, onToggle }: ThreatCardProps) {
         onClick={onToggle}
         className="w-full p-3 flex items-center justify-between hover:bg-slate-700/30 transition-colors text-left"
       >
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className="flex-shrink-0">
             <div className={`p-2 rounded-lg ${
               satellite.threatLevel === 'HIGH'
@@ -107,10 +121,20 @@ function ThreatCard({ satellite, isExpanded, onToggle }: ThreatCardProps) {
               }`} />
             </div>
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-white">{satellite.name}</span>
               <span className="text-xs text-slate-500 font-mono">#{satellite.noradId}</span>
+              {/* Sunlight/Eclipse Indicator */}
+              {position && (
+                <span title={position.inSunlight ? 'In sunlight' : 'In eclipse'}>
+                  {position.inSunlight ? (
+                    <Sun className="h-3.5 w-3.5 text-yellow-400" />
+                  ) : (
+                    <Moon className="h-3.5 w-3.5 text-blue-400" />
+                  )}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               <Badge className={`${getCountryBadgeClass(satellite.country)} text-xs`}>
@@ -123,6 +147,19 @@ function ThreatCard({ satellite, isExpanded, onToggle }: ThreatCardProps) {
                 {satellite.threatLevel}
               </Badge>
             </div>
+            {/* Real-time Position Display */}
+            {position && (
+              <div className="flex items-center gap-3 mt-2 text-xs font-mono">
+                <span className="text-slate-400 flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  {formatCoordinate(position.latitude, true)} {formatCoordinate(position.longitude, false)}
+                </span>
+                <span className="text-slate-400 flex items-center gap-1">
+                  <Navigation className="h-3 w-3" />
+                  {formatAltitude(position.altitude)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex-shrink-0 ml-2">
@@ -231,13 +268,82 @@ type FilterCountry = 'all' | ThreatCountry;
 type FilterThreat = 'all' | ThreatLevel;
 type FilterOrbit = 'all' | OrbitType;
 
+const POSITION_UPDATE_INTERVAL = 30000; // 30 seconds
+const TLE_REFRESH_INTERVAL = 3600000; // 1 hour
+
 export function ThreatCatalog() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [filterCountry, setFilterCountry] = useState<FilterCountry>('all');
   const [filterThreat, setFilterThreat] = useState<FilterThreat>('all');
   const [filterOrbit, setFilterOrbit] = useState<FilterOrbit>('all');
+  const [tles, setTles] = useState<TLEData[]>([]);
+  const [positions, setPositions] = useState<Map<number, SatellitePosition>>(new Map());
+  const [isLoading, setIsLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [trackingError, setTrackingError] = useState<string | null>(null);
 
   const summary = getThreatSummary();
+
+  // Fetch TLEs from Celestrak API
+  const fetchTLEs = useCallback(async () => {
+    try {
+      setTrackingError(null);
+      const response = await fetch('/api/celestrak');
+      if (!response.ok) {
+        throw new Error('Failed to fetch orbital data');
+      }
+      const data = await response.json();
+      if (data.tles && data.tles.length > 0) {
+        clearSatrecCache();
+        setTles(data.tles);
+        // Also set initial positions from API
+        if (data.positions) {
+          const posMap = new Map<number, SatellitePosition>();
+          data.positions.forEach((pos: SatellitePosition) => {
+            posMap.set(pos.noradId, pos);
+          });
+          setPositions(posMap);
+          setLastUpdate(new Date());
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching TLEs:', error);
+      setTrackingError('Unable to fetch live tracking data');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Update positions using client-side propagation
+  const updatePositions = useCallback(() => {
+    if (tles.length === 0) return;
+    const newPositions = propagateAllPositions(tles);
+    setPositions(newPositions);
+    setLastUpdate(new Date());
+  }, [tles]);
+
+  // Initial fetch and set up intervals
+  useEffect(() => {
+    fetchTLEs();
+
+    // Refresh TLEs periodically
+    const tleInterval = setInterval(fetchTLEs, TLE_REFRESH_INTERVAL);
+
+    return () => {
+      clearInterval(tleInterval);
+    };
+  }, [fetchTLEs]);
+
+  // Position update interval (runs more frequently)
+  useEffect(() => {
+    if (tles.length === 0) return;
+
+    const positionInterval = setInterval(updatePositions, POSITION_UPDATE_INTERVAL);
+
+    return () => {
+      clearInterval(positionInterval);
+    };
+  }, [tles, updatePositions]);
 
   const filteredSatellites = THREAT_DATABASE.filter(sat => {
     if (filterCountry !== 'all' && sat.country !== filterCountry) return false;
@@ -250,6 +356,8 @@ export function ThreatCatalog() {
     setExpandedId(expandedId === noradId ? null : noradId);
   };
 
+  const trackedCount = positions.size;
+
   return (
     <Card className="bg-slate-900/50 border-slate-700">
       <CardHeader className="pb-2 py-3">
@@ -258,9 +366,27 @@ export function ThreatCatalog() {
             <Target className="h-4 w-4 text-red-400" />
             Threat Catalog
           </div>
-          <Badge variant="outline" className="text-xs">
-            {THREAT_DATABASE.length} Assets
-          </Badge>
+          <div className="flex items-center gap-2">
+            {/* Tracking Status */}
+            {isLoading ? (
+              <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-400 border-blue-500/30">
+                <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                Loading
+              </Badge>
+            ) : trackingError ? (
+              <Badge variant="outline" className="text-xs bg-red-500/10 text-red-400 border-red-500/30">
+                Offline
+              </Badge>
+            ) : trackedCount > 0 ? (
+              <Badge variant="outline" className="text-xs bg-green-500/10 text-green-400 border-green-500/30">
+                <span className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1.5 animate-pulse" />
+                {trackedCount} Live
+              </Badge>
+            ) : null}
+            <Badge variant="outline" className="text-xs">
+              {THREAT_DATABASE.length} Assets
+            </Badge>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0 space-y-3">
@@ -328,6 +454,7 @@ export function ThreatCatalog() {
               <ThreatCard
                 key={satellite.noradId}
                 satellite={satellite}
+                position={positions.get(satellite.noradId) || null}
                 isExpanded={expandedId === satellite.noradId}
                 onToggle={() => toggleExpanded(satellite.noradId)}
               />
@@ -336,8 +463,16 @@ export function ThreatCatalog() {
         </div>
 
         {/* Data Attribution */}
-        <div className="text-xs text-slate-500 pt-2 border-t border-slate-700">
-          Intelligence compiled from: Space Force, CSIS, Secure World Foundation, amateur tracking community
+        <div className="text-xs text-slate-500 pt-2 border-t border-slate-700 space-y-1">
+          <div>Intelligence: Space Force, CSIS, Secure World Foundation</div>
+          <div className="flex items-center justify-between">
+            <span>Orbital data: Celestrak (SGP4)</span>
+            {lastUpdate && (
+              <span className="text-slate-600">
+                Updated: {lastUpdate.toLocaleTimeString()}
+              </span>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>
