@@ -130,8 +130,8 @@ export function SolarImageryCard() {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 flex flex-col p-2">
-        <div className="relative flex-1 min-h-0 flex items-center justify-center">
+      <CardContent className="flex-shrink-0 flex flex-col p-2">
+        <div className="relative max-h-[350px] flex items-center justify-center">
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50 z-10">
               <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
