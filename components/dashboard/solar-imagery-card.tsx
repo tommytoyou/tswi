@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, RefreshCw, Sun } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 
 interface WavelengthOption {
   id: string;
@@ -55,22 +55,22 @@ export function SolarImageryCard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [imageKey, setImageKey] = useState(0);
+  const [timestamp, setTimestamp] = useState<number>(Date.now());
 
   const currentWavelength = WAVELENGTHS.find((w) => w.id === selectedWavelength) || WAVELENGTHS[0];
 
   const refreshImage = useCallback(() => {
     setLoading(true);
     setError(false);
-    setImageKey((prev) => prev + 1);
+    setTimestamp(Date.now());
     setLastUpdated(new Date());
   }, []);
 
-  // Auto-refresh every 5 minutes
+  // Auto-refresh every 60 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       refreshImage();
-    }, 5 * 60 * 1000);
+    }, 60 * 1000);
     return () => clearInterval(interval);
   }, [refreshImage]);
 
@@ -95,8 +95,12 @@ export function SolarImageryCard() {
       <CardHeader className="flex-shrink-0 py-2 px-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sun className={`h-4 w-4 ${currentWavelength.color}`} />
-            <CardTitle className="text-sm">Solar Imagery - Live</CardTitle>
+            <div className="relative">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+              <div className="absolute inset-0 w-2 h-2 bg-emerald-500 rounded-full animate-ping opacity-75" />
+            </div>
+            <CardTitle className="text-sm">Solar Imagery</CardTitle>
+            <span className="text-xs text-emerald-400 font-medium">LIVE</span>
           </div>
           <div className="flex items-center gap-2">
             <Select value={selectedWavelength} onValueChange={setSelectedWavelength}>
@@ -145,17 +149,22 @@ export function SolarImageryCard() {
             </div>
           ) : (
             <img
-              key={`${currentWavelength.id}-${imageKey}`}
-              src={`${currentWavelength.url}?t=${imageKey}`}
+              key={`${currentWavelength.id}-${timestamp}`}
+              src={`${currentWavelength.url}?t=${timestamp}`}
               alt={`NASA SDO ${currentWavelength.label} - ${currentWavelength.description}`}
-              className="max-w-full max-h-[280px] object-contain rounded-lg"
+              className="w-full h-full object-contain rounded-lg"
               onLoad={handleImageLoad}
               onError={handleImageError}
             />
           )}
         </div>
-        <div className="text-center text-xs text-slate-500 mt-1">
-          {lastUpdated.toLocaleTimeString()}
+        <div className="flex items-center justify-center gap-2 text-xs text-slate-500 mt-1 flex-shrink-0">
+          <span>Last updated:</span>
+          <span className="text-slate-400 font-mono">
+            {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </span>
+          <span className="text-slate-600">•</span>
+          <span className="text-slate-500">Auto-refresh: 60s</span>
         </div>
       </CardContent>
     </Card>
