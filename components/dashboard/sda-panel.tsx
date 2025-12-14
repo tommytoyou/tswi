@@ -25,6 +25,7 @@ import {
   classifyConjunctionRisk,
   INSPECTOR_SATELLITES,
 } from '@/lib/space-track-types';
+import { ThreatCatalog } from './threat-catalog';
 
 interface CatalogStats {
   total_payloads: number;
@@ -306,6 +307,9 @@ export function SDAPanel() {
             </CardContent>
           </Card>
         )}
+
+        {/* Threat Catalog */}
+        <ThreatCatalog />
 
         {/* Two Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

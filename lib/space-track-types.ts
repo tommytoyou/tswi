@@ -320,25 +320,33 @@ export function formatNoradId(id: number): string {
 
 export const INSPECTOR_SATELLITES = {
   // Chinese inspector satellites
-  SJ_21: { norad_id: 49502, name: 'SJ-21', country: 'PRC', description: 'Shijian-21 debris inspector' },
-  SJ_23: { norad_id: 52939, name: 'SJ-23', country: 'PRC', description: 'Shijian-23 experimental satellite' },
+  SJ_21: { norad_id: 49502, name: 'SJ-21', country: 'PRC', description: 'Shijian-21 GEO debris cleanup/RPO demo' },
+  SJ_23: { norad_id: 52939, name: 'SJ-23', country: 'PRC', description: 'Shijian-23 follow-on, suspected RPO' },
+  SJ_17: { norad_id: 41838, name: 'SJ-17', country: 'PRC', description: 'Shijian-17 GEO inspector with robotic arm' },
+  AOLONG_1: { norad_id: 41628, name: 'Aolong-1', country: 'PRC', description: 'Roaming Dragon debris capture demo' },
 
   // Russian inspector satellites
-  COSMOS_2558: { norad_id: 47852, name: 'COSMOS 2558', country: 'RUS', description: 'Russian inspector satellite' },
-  COSMOS_2542: { norad_id: 44835, name: 'COSMOS 2542', country: 'RUS', description: 'Nivelir inspector satellite' },
+  COSMOS_2542: { norad_id: 47852, name: 'COSMOS 2542', country: 'RUS', description: 'Nivelir inspector, RPO vs USA 245' },
   COSMOS_2543: { norad_id: 45916, name: 'COSMOS 2543', country: 'RUS', description: 'Sub-satellite of COSMOS 2542' },
+  COSMOS_2558: { norad_id: 49944, name: 'COSMOS 2558', country: 'RUS', description: 'Inspector tracking USA 326' },
 
-  // Additional objects of interest
-  LUCH_OLYMP: { norad_id: 40258, name: 'LUCH (OLYMP)', country: 'RUS', description: 'Russian GEO relay/inspector' },
+  // Russian GEO SIGINT/Inspector
+  LUCH_OLYMP_1: { norad_id: 40258, name: 'Luch (Olymp-K)', country: 'RUS', description: 'GEO SIGINT/inspector' },
+  LUCH_OLYMP_2: { norad_id: 43432, name: 'Luch (Olymp-K2)', country: 'RUS', description: 'GEO SIGINT/inspector' },
 } as const;
 
 export const DEFAULT_WATCH_LIST = [
+  // Chinese
   49502,  // SJ-21
   52939,  // SJ-23
-  47852,  // COSMOS 2558
-  44835,  // COSMOS 2542
+  41838,  // SJ-17
+  41628,  // Aolong-1
+  // Russian
+  47852,  // COSMOS 2542
   45916,  // COSMOS 2543
-  49944,  // Additional watch target
+  49944,  // COSMOS 2558
+  40258,  // Luch/Olymp-1
+  43432,  // Luch/Olymp-2
 ];
 
 // ============================================================================
