@@ -152,7 +152,7 @@ export function SolarImageryCard() {
               key={`${currentWavelength.id}-${timestamp}`}
               src={`${currentWavelength.url}?t=${timestamp}`}
               alt={`NASA SDO ${currentWavelength.label} - ${currentWavelength.description}`}
-              className="max-h-[550px] object-contain rounded-lg mx-auto"
+              className="max-h-[530px] object-contain rounded-lg mx-auto"
               onLoad={handleImageLoad}
               onError={handleImageError}
             />
