@@ -25,25 +25,31 @@ function GlobeViewerComponent() {
   const [kpValue, setKpValue] = useState<number>(0);
 
   // Fetch Kp index for radiation zone calculations
-  const fetchKpIndex = useCallback(async () => {
+  const fetchKpIndex = useCallback(async (signal?: AbortSignal) => {
     try {
-      const response = await fetch('/api/noaa/kp-index');
+      const response = await fetch('/api/noaa/kp-index', { signal });
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.latest) {
           setKpValue(data.latest.kp || data.latest.kp_index || 0);
         }
       }
-    } catch (err) {
-      console.error('Failed to fetch Kp index:', err);
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.error('Failed to fetch Kp index:', err);
+      }
     }
   }, []);
 
   // Fetch Kp on mount and periodically
   useEffect(() => {
-    fetchKpIndex();
-    const interval = setInterval(fetchKpIndex, 5 * 60 * 1000);
-    return () => clearInterval(interval);
+    const controller = new AbortController();
+    fetchKpIndex(controller.signal);
+    const interval = setInterval(() => fetchKpIndex(controller.signal), 5 * 60 * 1000);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
   }, [fetchKpIndex]);
 
   useEffect(() => {

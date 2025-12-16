@@ -186,10 +186,10 @@ function AuroraGlobeComponent() {
   }, []);
 
   // Fetch aurora data
-  const fetchAuroraData = useCallback(async () => {
+  const fetchAuroraData = useCallback(async (signal?: AbortSignal) => {
     try {
       setDataLoading(true);
-      const res = await fetch('/api/noaa/aurora?fetch=latest&minProbability=3');
+      const res = await fetch('/api/noaa/aurora?fetch=latest&minProbability=3', { signal });
       if (!res.ok) throw new Error('Failed to fetch aurora data');
       const data = await res.json();
       if (data.success) {
@@ -199,8 +199,10 @@ function AuroraGlobeComponent() {
         throw new Error(data.error || 'Unknown error');
       }
     } catch (err: any) {
-      console.error('Aurora fetch error:', err);
-      setDataError(err.message);
+      if (err.name !== 'AbortError') {
+        console.error('Aurora fetch error:', err);
+        setDataError(err.message);
+      }
     } finally {
       setDataLoading(false);
     }
@@ -208,9 +210,13 @@ function AuroraGlobeComponent() {
 
   // Fetch data on mount and refresh periodically
   useEffect(() => {
-    fetchAuroraData();
-    const interval = setInterval(fetchAuroraData, 5 * 60 * 1000);
-    return () => clearInterval(interval);
+    const controller = new AbortController();
+    fetchAuroraData(controller.signal);
+    const interval = setInterval(() => fetchAuroraData(controller.signal), 5 * 60 * 1000);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
   }, [fetchAuroraData]);
 
   // Fly to hemisphere when changed

@@ -47,18 +47,24 @@ export default function AuroraViewer() {
   const [worldData, setWorldData] = useState<any>(null);
 
   useEffect(() => {
-    fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
+    const controller = new AbortController();
+    fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json', { signal: controller.signal })
       .then(res => res.json())
       .then(data => {
         const countries = feature(data, data.objects.countries);
         setWorldData(countries);
       })
-      .catch(err => console.error('Failed to load world data:', err));
+      .catch(err => {
+        if (err.name !== 'AbortError') {
+          console.error('Failed to load world data:', err);
+        }
+      });
+    return () => controller.abort();
   }, []);
 
-  const fetchAuroraData = useCallback(async () => {
+  const fetchAuroraData = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await fetch('/api/noaa/aurora?fetch=latest');
+      const res = await fetch('/api/noaa/aurora?fetch=latest', { signal });
       if (!res.ok) throw new Error('Failed to fetch aurora data');
       const data = await res.json();
       if (data.success) {
@@ -68,17 +74,23 @@ export default function AuroraViewer() {
         throw new Error(data.error || 'Unknown error');
       }
     } catch (err: any) {
-      console.error('Aurora fetch error:', err);
-      setError(err.message);
+      if (err.name !== 'AbortError') {
+        console.error('Aurora fetch error:', err);
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchAuroraData();
-    const interval = setInterval(fetchAuroraData, 5 * 60 * 1000);
-    return () => clearInterval(interval);
+    const controller = new AbortController();
+    fetchAuroraData(controller.signal);
+    const interval = setInterval(() => fetchAuroraData(controller.signal), 5 * 60 * 1000);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
   }, [fetchAuroraData]);
 
   const createPolarGrid = useCallback((

@@ -285,10 +285,10 @@ export function ThreatCatalog() {
   const summary = getThreatSummary();
 
   // Fetch TLEs from Celestrak API
-  const fetchTLEs = useCallback(async () => {
+  const fetchTLEs = useCallback(async (signal?: AbortSignal) => {
     try {
       setTrackingError(null);
-      const response = await fetch('/api/celestrak');
+      const response = await fetch('/api/celestrak', { signal });
       if (!response.ok) {
         throw new Error('Failed to fetch orbital data');
       }
@@ -306,9 +306,11 @@ export function ThreatCatalog() {
           setLastUpdate(new Date());
         }
       }
-    } catch (error) {
-      console.error('Error fetching TLEs:', error);
-      setTrackingError('Unable to fetch live tracking data');
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('Error fetching TLEs:', error);
+        setTrackingError('Unable to fetch live tracking data');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -324,12 +326,14 @@ export function ThreatCatalog() {
 
   // Initial fetch and set up intervals
   useEffect(() => {
-    fetchTLEs();
+    const controller = new AbortController();
+    fetchTLEs(controller.signal);
 
     // Refresh TLEs periodically
-    const tleInterval = setInterval(fetchTLEs, TLE_REFRESH_INTERVAL);
+    const tleInterval = setInterval(() => fetchTLEs(controller.signal), TLE_REFRESH_INTERVAL);
 
     return () => {
+      controller.abort();
       clearInterval(tleInterval);
     };
   }, [fetchTLEs]);

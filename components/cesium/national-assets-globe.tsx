@@ -326,8 +326,11 @@ function NationalAssetsGlobeComponent() {
     };
   }, []);
 
+  // AbortController ref for satellite fetches
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   // Fetch satellite data
-  const fetchSatellites = useCallback(async () => {
+  const fetchSatellites = useCallback(async (signal?: AbortSignal) => {
     setDataLoading(true);
 
     try {
@@ -341,7 +344,7 @@ function NationalAssetsGlobeComponent() {
       params.set('includeTLE', 'true');
       params.set('limit', '500');
 
-      const response = await fetch(`/api/satellites/national?${params}`);
+      const response = await fetch(`/api/satellites/national?${params}`, { signal });
 
       if (!response.ok) {
         throw new Error('Failed to fetch satellite data');
@@ -385,8 +388,10 @@ function NationalAssetsGlobeComponent() {
 
       setSatellites(positions);
     } catch (err: any) {
-      console.error('Fetch error:', err);
-      setError(err.message);
+      if (err.name !== 'AbortError') {
+        console.error('Fetch error:', err);
+        setError(err.message);
+      }
     } finally {
       setDataLoading(false);
     }
@@ -395,8 +400,14 @@ function NationalAssetsGlobeComponent() {
   // Fetch data when filters change
   useEffect(() => {
     if (cesiumReady) {
-      fetchSatellites();
+      // Cancel any previous fetch
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = new AbortController();
+      fetchSatellites(abortControllerRef.current.signal);
     }
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, [cesiumReady, fetchSatellites]);
 
   // Render satellites on globe
