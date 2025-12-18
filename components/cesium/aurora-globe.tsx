@@ -149,9 +149,10 @@ function AuroraGlobeComponent() {
           viewer.scene.skyAtmosphere.show = true;
         }
 
-        // Set initial view to North pole
+        // Set initial view to Arctic region (North Pole aurora view)
+        // Position camera directly above to center the globe in viewport
         viewer.camera.setView({
-          destination: Cesium.Cartesian3.fromDegrees(0, 90, 20000000),
+          destination: Cesium.Cartesian3.fromDegrees(0, 90, 31250000),
           orientation: {
             heading: Cesium.Math.toRadians(0),
             pitch: Cesium.Math.toRadians(-90),
@@ -185,10 +186,10 @@ function AuroraGlobeComponent() {
   }, []);
 
   // Fetch aurora data
-  const fetchAuroraData = useCallback(async () => {
+  const fetchAuroraData = useCallback(async (signal?: AbortSignal) => {
     try {
       setDataLoading(true);
-      const res = await fetch('/api/noaa/aurora?fetch=latest&minProbability=3');
+      const res = await fetch('/api/noaa/aurora?fetch=latest&minProbability=3', { signal });
       if (!res.ok) throw new Error('Failed to fetch aurora data');
       const data = await res.json();
       if (data.success) {
@@ -198,8 +199,10 @@ function AuroraGlobeComponent() {
         throw new Error(data.error || 'Unknown error');
       }
     } catch (err: any) {
-      console.error('Aurora fetch error:', err);
-      setDataError(err.message);
+      if (err.name !== 'AbortError') {
+        console.error('Aurora fetch error:', err);
+        setDataError(err.message);
+      }
     } finally {
       setDataLoading(false);
     }
@@ -207,9 +210,13 @@ function AuroraGlobeComponent() {
 
   // Fetch data on mount and refresh periodically
   useEffect(() => {
-    fetchAuroraData();
-    const interval = setInterval(fetchAuroraData, 5 * 60 * 1000);
-    return () => clearInterval(interval);
+    const controller = new AbortController();
+    fetchAuroraData(controller.signal);
+    const interval = setInterval(() => fetchAuroraData(controller.signal), 5 * 60 * 1000);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
   }, [fetchAuroraData]);
 
   // Fly to hemisphere when changed
@@ -218,13 +225,14 @@ function AuroraGlobeComponent() {
     const Cesium = cesiumModuleRef.current;
     if (!viewer || !Cesium || !cesiumReady) return;
 
-    const targetLat = hemisphere === 'north' ? 75 : -75;
+    // Position camera directly above the pole to center the globe
+    const targetLat = hemisphere === 'north' ? 90 : -90;
 
     viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(0, targetLat, 18000000),
+      destination: Cesium.Cartesian3.fromDegrees(0, targetLat, 31250000),
       orientation: {
         heading: Cesium.Math.toRadians(0),
-        pitch: Cesium.Math.toRadians(-85),
+        pitch: Cesium.Math.toRadians(-90),
         roll: 0.0,
       },
       duration: 1.5,
@@ -490,9 +498,9 @@ function AuroraGlobeComponent() {
         </div>
       )}
 
-      {/* Probability Legend - Bottom Center */}
+      {/* Probability Legend - Bottom Left */}
       {cesiumReady && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3">
+        <div className="absolute bottom-4 left-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3">
           <div className="text-xs text-slate-400 mb-2 text-center">Aurora Probability</div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500">10%</span>

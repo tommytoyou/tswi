@@ -126,6 +126,7 @@ export const authOptions: NextAuthOptions = {
         try {
           const db = await getDb();
           const usersCollection = db.collection<User>('users');
+          const invitesCollection = db.collection('invites');
 
           // Check if user exists in users collection (approved beta tester)
           // Use lowercase for case-insensitive email matching
@@ -141,8 +142,47 @@ export const authOptions: NextAuthOptions = {
           } : { found: false });
 
           if (!existingUser) {
-            // User not approved - redirect to access denied
-            console.log('[AUTH DEBUG] DENIED: User not found in database, redirecting to /access-denied');
+            // User doesn't exist - check if they have a pending invite
+            console.log('[AUTH DEBUG] User not found, checking for pending invite');
+            const pendingInvite = await invitesCollection.findOne({
+              email: normalizedEmail,
+              status: { $in: ['pending', 'sent'] },
+              expiresAt: { $gt: new Date() }
+            });
+
+            if (pendingInvite) {
+              // User has a valid invite - create their account
+              console.log('[AUTH DEBUG] Found pending invite, creating user account');
+              const now = new Date();
+
+              const newUser = {
+                email: normalizedEmail,
+                name: pendingInvite.name || user.name || 'User',
+                company: pendingInvite.organization || '',
+                role: 'user' as const,
+                created_at: now,
+                last_login: now,
+              };
+
+              await usersCollection.insertOne(newUser);
+
+              // Mark invite as accepted
+              await invitesCollection.updateOne(
+                { _id: pendingInvite._id },
+                {
+                  $set: {
+                    status: 'accepted',
+                    acceptedAt: now,
+                  }
+                }
+              );
+
+              console.log('[AUTH DEBUG] SUCCESS: Created user and accepted invite for:', normalizedEmail);
+              return true;
+            }
+
+            // No user and no valid invite - redirect to access denied
+            console.log('[AUTH DEBUG] DENIED: User not found in database and no pending invite, redirecting to /access-denied');
             return '/access-denied';
           }
 

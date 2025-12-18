@@ -326,8 +326,11 @@ function NationalAssetsGlobeComponent() {
     };
   }, []);
 
+  // AbortController ref for satellite fetches
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   // Fetch satellite data
-  const fetchSatellites = useCallback(async () => {
+  const fetchSatellites = useCallback(async (signal?: AbortSignal) => {
     setDataLoading(true);
 
     try {
@@ -341,7 +344,7 @@ function NationalAssetsGlobeComponent() {
       params.set('includeTLE', 'true');
       params.set('limit', '500');
 
-      const response = await fetch(`/api/satellites/national?${params}`);
+      const response = await fetch(`/api/satellites/national?${params}`, { signal });
 
       if (!response.ok) {
         throw new Error('Failed to fetch satellite data');
@@ -385,8 +388,10 @@ function NationalAssetsGlobeComponent() {
 
       setSatellites(positions);
     } catch (err: any) {
-      console.error('Fetch error:', err);
-      setError(err.message);
+      if (err.name !== 'AbortError') {
+        console.error('Fetch error:', err);
+        setError(err.message);
+      }
     } finally {
       setDataLoading(false);
     }
@@ -395,8 +400,14 @@ function NationalAssetsGlobeComponent() {
   // Fetch data when filters change
   useEffect(() => {
     if (cesiumReady) {
-      fetchSatellites();
+      // Cancel any previous fetch
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = new AbortController();
+      fetchSatellites(abortControllerRef.current.signal);
     }
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, [cesiumReady, fetchSatellites]);
 
   // Render satellites on globe
@@ -624,94 +635,9 @@ function NationalAssetsGlobeComponent() {
       )}
       <div ref={viewerRef} className="w-full h-full" />
 
-      {/* Legend - Top Right */}
-      {cesiumReady && (
-        <div className="absolute top-4 right-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3 min-w-[200px]">
-          <div className="text-sm font-semibold text-white mb-2">
-            {viewMode === 'country' ? 'By Country' : 'By Sector'}
-          </div>
-          <div className="space-y-1">
-            {viewMode === 'country'
-              ? countries.map((c) => (
-                  <div key={c} className="flex items-center gap-2 text-xs">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: COUNTRY_COLORS[c] }}
-                    />
-                    <span className="text-slate-300">{c}</span>
-                    {stats && (
-                      <span className="text-slate-500 ml-auto">
-                        {stats.countryCounts[c] || 0}
-                      </span>
-                    )}
-                  </div>
-                ))
-              : sectors.map((s) => (
-                  <div key={s} className="flex items-center gap-2 text-xs">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: SECTOR_COLORS[s] }}
-                    />
-                    <span className="text-slate-300">{s}</span>
-                    {stats && (
-                      <span className="text-slate-500 ml-auto">
-                        {stats.sectorCounts[s] || 0}
-                      </span>
-                    )}
-                  </div>
-                ))}
-          </div>
-          {viewMode === 'country' && (
-            <div className="mt-3 pt-2 border-t border-slate-700">
-              <div className="text-xs text-slate-400 mb-2">Shape by Sector</div>
-              <div className="space-y-1">
-                {sectors.map((sector) => (
-                  <div key={sector} className="flex items-center gap-2 text-xs text-slate-400">
-                    <img
-                      src={createShapeSvg(SECTOR_SHAPES[sector], '#6B7280')}
-                      alt={sector}
-                      width={12}
-                      height={12}
-                    />
-                    <span>{sector}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Filter Panel - Bottom Left */}
       {cesiumReady && (
         <div className="absolute bottom-4 left-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3 min-w-[220px]">
-          {/* View Mode Toggle */}
-          <div className="mb-3">
-            <div className="text-xs text-slate-400 mb-2">View Mode</div>
-            <div className="flex gap-1">
-              <button
-                onClick={() => setViewMode('country')}
-                className={`flex-1 px-3 py-1.5 text-xs rounded ${
-                  viewMode === 'country'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                }`}
-              >
-                Country
-              </button>
-              <button
-                onClick={() => setViewMode('sector')}
-                className={`flex-1 px-3 py-1.5 text-xs rounded ${
-                  viewMode === 'sector'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                }`}
-              >
-                Sector
-              </button>
-            </div>
-          </div>
-
           {/* Country Filters */}
           <div className="mb-3">
             <div className="text-xs text-slate-400 mb-2">Countries</div>

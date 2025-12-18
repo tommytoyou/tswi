@@ -13,9 +13,10 @@ import { KpCardV2 } from '@/components/dashboard/kp-card-v2';
 import { XRayFluxCardV2 } from '@/components/dashboard/xray-flux-card-v2';
 import { ProtonFluxCard } from '@/components/dashboard/proton-flux-card';
 import { DstCard } from '@/components/dashboard/dst-card';
-import { SolarEventsCard } from '@/components/dashboard/solar-events-card';
+import { SolarImageryCard } from '@/components/dashboard/solar-imagery-card';
 import { CmeCard } from '@/components/dashboard/cme-card';
 import { AlertsPanel } from '@/components/dashboard/alerts-panel';
+import { SDAPanel } from '@/components/dashboard/sda-panel';
 import {
   LayoutDashboard,
   Wind,
@@ -25,6 +26,7 @@ import {
   Bell,
   Flag,
   Sun,
+  Satellite,
 } from 'lucide-react';
 
 // Dynamic imports for heavy components
@@ -87,6 +89,7 @@ const tabs: TabConfig[] = [
   { id: 'national-assets', label: 'National Assets', icon: Flag },
   { id: 'heliocentric', label: 'Heliocentric', icon: Sun },
   { id: 'aurora', label: 'Aurora', icon: Sparkles },
+  { id: 'sda', label: 'SDA', icon: Satellite },
   { id: 'alerts', label: 'Alerts', icon: Bell },
 ];
 
@@ -169,7 +172,7 @@ export function TabbedDashboard() {
           {/* Events Tab */}
           <TabsContent value="events" className="h-full m-0 p-4 overflow-hidden">
             <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <SolarEventsCard key={`events-${refreshTrigger}`} />
+              <SolarImageryCard key={`imagery-${refreshTrigger}`} />
               <CmeCard key={`cme-${refreshTrigger}`} />
             </div>
           </TabsContent>
@@ -192,6 +195,11 @@ export function TabbedDashboard() {
           {/* Aurora Tab */}
           <TabsContent value="aurora" className="h-full m-0 overflow-hidden">
             <AuroraGlobe />
+          </TabsContent>
+
+          {/* SDA Tab */}
+          <TabsContent value="sda" className="h-full m-0 overflow-hidden">
+            <SDAPanel />
           </TabsContent>
 
           {/* Alerts Tab */}

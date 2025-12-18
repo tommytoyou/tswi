@@ -148,7 +148,7 @@ function LoginContent() {
                   href="/set-password"
                   className="text-sm text-blue-400 hover:text-blue-300 underline hover:underline inline-block relative z-10"
                 >
-                  First time? Set up email login
+                  Set up or reset password
                 </Link>
               </p>
             </div>

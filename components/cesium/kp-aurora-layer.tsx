@@ -100,12 +100,12 @@ export function KpAuroraLayer({ viewer, Cesium }: KpAuroraLayerProps) {
   const primitiveCollectionRef = useRef<any>(null);
 
   // Fetch OVATION aurora data
-  const fetchAuroraData = useCallback(async () => {
+  const fetchAuroraData = useCallback(async (signal?: AbortSignal) => {
     try {
       // Fetch both aurora data and Kp index in parallel
       const [auroraRes, kpRes] = await Promise.all([
-        fetch('/api/noaa/aurora?fetch=latest&minProbability=5'),
-        fetch('/api/noaa/kp-index'),
+        fetch('/api/noaa/aurora?fetch=latest&minProbability=5', { signal }),
+        fetch('/api/noaa/kp-index', { signal }),
       ]);
 
       if (auroraRes.ok) {
@@ -123,8 +123,10 @@ export function KpAuroraLayer({ viewer, Cesium }: KpAuroraLayerProps) {
         }
       }
     } catch (err: any) {
-      console.error('Aurora fetch error:', err);
-      setError(err.message);
+      if (err.name !== 'AbortError') {
+        console.error('Aurora fetch error:', err);
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -289,10 +291,14 @@ export function KpAuroraLayer({ viewer, Cesium }: KpAuroraLayerProps) {
 
   // Fetch data on mount and refresh periodically
   useEffect(() => {
-    fetchAuroraData();
+    const controller = new AbortController();
+    fetchAuroraData(controller.signal);
     // OVATION updates every 5 minutes
-    const interval = setInterval(fetchAuroraData, 5 * 60 * 1000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => fetchAuroraData(controller.signal), 5 * 60 * 1000);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
   }, [fetchAuroraData]);
 
   // Format time for display
