@@ -1,9 +1,15 @@
-import React from 'react'
+'use client';
+
+import React from 'react';
+import { useActivityTracker } from '@/hooks/useActivityTracker';
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  return <>{children}</>
+  // Initialize activity tracking
+  useActivityTracker();
+
+  return <>{children}</>;
 }

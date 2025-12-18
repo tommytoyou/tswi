@@ -566,3 +566,68 @@ export const InviteSchema = z.object({
   expiresAt: z.date(), // 30 days from creation
 });
 export type Invite = z.infer<typeof InviteSchema>;
+
+// ============================================================================
+// USER ACTIVITY TRACKING TYPES
+// ============================================================================
+
+// Activity event types
+export const ActivityEventTypeSchema = z.enum([
+  'page_view',
+  'tab_switch',
+  'login',
+  'logout',
+  'ai_query',
+  'feature_interaction',
+]);
+export type ActivityEventType = z.infer<typeof ActivityEventTypeSchema>;
+
+// Activity event data
+export const ActivityEventDataSchema = z.object({
+  page: z.string().optional(),
+  tab: z.string().optional(),
+  feature: z.string().optional(),
+  aiTokensUsed: z.number().optional(),
+  aiQuery: z.string().optional(), // truncated query text
+  aiModel: z.string().optional(),
+  aiResponseTime: z.number().optional(), // milliseconds
+  duration: z.number().optional(), // milliseconds
+  metadata: z.record(z.any()).optional(), // additional flexible data
+});
+export type ActivityEventData = z.infer<typeof ActivityEventDataSchema>;
+
+// User Activity Record (stored in user_activity collection)
+export const UserActivitySchema = z.object({
+  _id: z.string().optional(),
+  userId: z.string(),
+  userEmail: z.string().email(),
+  userName: z.string(),
+  eventType: ActivityEventTypeSchema,
+  eventData: ActivityEventDataSchema,
+  sessionId: z.string(), // UUID for session tracking
+  timestamp: z.date(),
+  userAgent: z.string().optional(),
+  ip: z.string().optional(), // Anonymized (last octet removed)
+});
+export type UserActivity = z.infer<typeof UserActivitySchema>;
+
+// Activity Summary (for aggregated stats)
+export const UserActivitySummarySchema = z.object({
+  userId: z.string(),
+  userEmail: z.string(),
+  userName: z.string(),
+  totalSessions: z.number(),
+  totalPageViews: z.number(),
+  aiQueriesCount: z.number(),
+  totalAiTokens: z.number(),
+  lastActive: z.date(),
+  mostViewedTabs: z.array(z.object({
+    tab: z.string(),
+    count: z.number(),
+  })),
+  timeRange: z.object({
+    start: z.date(),
+    end: z.date(),
+  }),
+});
+export type UserActivitySummary = z.infer<typeof UserActivitySummarySchema>;

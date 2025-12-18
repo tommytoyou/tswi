@@ -25,7 +25,11 @@ import {
   Download,
   Plus,
   Link2,
+  Activity,
 } from 'lucide-react';
+import { ActivityFeed } from '@/components/admin/ActivityFeed';
+import { ActivitySummary } from '@/components/admin/ActivitySummary';
+import { UserActivityModal } from '@/components/admin/UserActivityModal';
 
 interface AccessRequest {
   _id: string;
@@ -67,7 +71,7 @@ interface Invite {
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'requests' | 'users' | 'invites'>('requests');
+  const [activeTab, setActiveTab] = useState<'requests' | 'users' | 'invites' | 'activity'>('requests');
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
@@ -84,6 +88,7 @@ export default function AdminDashboard() {
     email: '',
     notes: '',
   });
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const fetchRequests = async () => {
     try {
@@ -426,6 +431,14 @@ export default function AdminDashboard() {
                 {pendingInvitesCount}
               </span>
             )}
+          </Button>
+          <Button
+            variant={activeTab === 'activity' ? 'default' : 'outline'}
+            onClick={() => setActiveTab('activity')}
+            className={activeTab === 'activity' ? 'bg-blue-600' : 'border-slate-600 text-slate-300'}
+          >
+            <Activity className="h-4 w-4 mr-2" />
+            Activity
           </Button>
         </div>
 
@@ -917,7 +930,22 @@ export default function AdminDashboard() {
             </Card>
           </div>
         )}
+
+        {activeTab === 'activity' && (
+          <div className="space-y-6">
+            <ActivitySummary onUserClick={(userId) => setSelectedUserId(userId)} />
+            <ActivityFeed autoRefresh={true} />
+          </div>
+        )}
       </main>
+
+      {/* User Activity Modal */}
+      {selectedUserId && (
+        <UserActivityModal
+          userId={selectedUserId}
+          onClose={() => setSelectedUserId(null)}
+        />
+      )}
     </div>
   );
 }

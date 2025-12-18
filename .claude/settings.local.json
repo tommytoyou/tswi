@@ -39,7 +39,14 @@
       "WebFetch(domain:www.swpc.noaa.gov)",
       "Bash(git stash:*)",
       "Bash(npx tsc:*)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "WebFetch(domain:typpo.github.io)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:theskylive.com)",
+      "WebSearch",
+      "WebFetch(domain:www.solarsystemscope.com)",
+      "Bash(npm audit:*)"
     ],
     "deny": [],
     "ask": []

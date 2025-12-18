@@ -227,6 +227,14 @@ export async function initializeCollections(): Promise<void> {
   await invites.createIndex({ status: 1 });
   await invites.createIndex({ createdAt: -1 });
 
+  // User activity collection indexes
+  const userActivity = database.collection('user_activity');
+  await userActivity.createIndex({ userId: 1, timestamp: -1 });
+  await userActivity.createIndex({ timestamp: -1 });
+  await userActivity.createIndex({ eventType: 1, timestamp: -1 });
+  await userActivity.createIndex({ sessionId: 1 });
+  await userActivity.createIndex({ userId: 1, eventType: 1, timestamp: -1 });
+
   console.log('✅ Indexes created');
 }
 
