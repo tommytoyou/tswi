@@ -4,6 +4,23 @@ import { getAdminSession } from '@/lib/auth/admin';
 
 export const dynamic = 'force-dynamic';
 
+interface UserSummaryAggregation {
+  userId: string;
+  userEmail: string;
+  userName: string;
+  totalSessions: number;
+  totalPageViews: number;
+  aiQueriesCount: number;
+  totalAiTokens: number;
+  lastActive: Date;
+  tabViews: string[];
+}
+
+interface UserSummaryWithTabs extends Omit<UserSummaryAggregation, 'tabViews'> {
+  mostViewedTabs: { tab: string; count: number }[];
+  tabViews: undefined;
+}
+
 /**
  * GET /api/admin/activity/summary
  *
@@ -121,10 +138,10 @@ export async function GET(request: NextRequest) {
           tabViews: 1,
         }
       }
-    ]).toArray();
+    ]).toArray() as UserSummaryAggregation[];
 
     // Calculate most viewed tabs for each user
-    const summariesWithTabs = userSummaries.map(summary => {
+    const summariesWithTabs: UserSummaryWithTabs[] = userSummaries.map(summary => {
       // Count tab occurrences
       const tabCounts: Record<string, number> = {};
       (summary.tabViews || []).forEach((tab: string) => {
