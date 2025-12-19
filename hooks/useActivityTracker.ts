@@ -36,47 +36,34 @@ export function useActivityTracker() {
   const sessionId = useRef<string>('');
   const lastTrackedPage = useRef<string>('');
   const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
+  const statusRef = useRef(status);
+  const hasTrackedLogin = useRef(false);
 
-  // Initialize session ID
+  // Initialize session ID synchronously on first render
+  if (typeof window !== 'undefined' && !sessionId.current) {
+    sessionId.current = getOrCreateSessionId();
+    console.log('[ActivityTracker] Initialized sessionId:', sessionId.current);
+  }
+
+  // Keep status ref updated
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      sessionId.current = getOrCreateSessionId();
-    }
-  }, []);
+    statusRef.current = status;
+    console.log('[ActivityTracker] Status changed:', status);
+  }, [status]);
 
-  // Track session start (login)
-  useEffect(() => {
-    if (status === 'authenticated' && session) {
-      trackEvent({
-        eventType: 'login',
-        eventData: {},
-      });
-    }
-  }, [status, session]);
-
-  // Track page views
-  useEffect(() => {
-    if (status === 'authenticated' && pathname && pathname !== lastTrackedPage.current) {
-      lastTrackedPage.current = pathname;
-
-      trackEvent({
-        eventType: 'page_view',
-        eventData: {
-          page: pathname,
-        },
-      });
-    }
-  }, [pathname, status]);
-
-  // Track event function
+  // Track event function - defined BEFORE effects that use it
   const trackEvent = useCallback(async (options: TrackEventOptions) => {
-    // Only track if authenticated
-    if (status !== 'authenticated' || !sessionId.current) {
+    console.log('[ActivityTracker] trackEvent called:', options.eventType, 'status:', statusRef.current, 'sessionId:', sessionId.current);
+
+    // Only track if authenticated (use ref to avoid stale closure)
+    if (statusRef.current !== 'authenticated' || !sessionId.current) {
+      console.log('[ActivityTracker] Skipping - not authenticated or no sessionId');
       return;
     }
 
     try {
-      await fetch('/api/activity/track', {
+      console.log('[ActivityTracker] Sending request to /api/activity/track');
+      const response = await fetch('/api/activity/track', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -87,11 +74,41 @@ export function useActivityTracker() {
           sessionId: sessionId.current,
         }),
       });
+      const data = await response.json();
+      console.log('[ActivityTracker] Response:', response.status, data);
     } catch (error) {
       // Silently fail - don't disrupt user experience
-      console.error('Failed to track activity:', error);
+      console.error('[ActivityTracker] Failed to track activity:', error);
     }
-  }, [status]);
+  }, []);
+
+  // Track session start (login) - only once per session
+  useEffect(() => {
+    console.log('[ActivityTracker] Login effect - status:', status, 'session:', !!session, 'hasTrackedLogin:', hasTrackedLogin.current);
+    if (status === 'authenticated' && session && !hasTrackedLogin.current) {
+      hasTrackedLogin.current = true;
+      console.log('[ActivityTracker] Triggering login event');
+      trackEvent({
+        eventType: 'login',
+        eventData: {},
+      });
+    }
+  }, [status, session, trackEvent]);
+
+  // Track page views
+  useEffect(() => {
+    console.log('[ActivityTracker] Page view effect - status:', status, 'pathname:', pathname, 'lastTracked:', lastTrackedPage.current);
+    if (status === 'authenticated' && pathname && pathname !== lastTrackedPage.current) {
+      lastTrackedPage.current = pathname;
+      console.log('[ActivityTracker] Triggering page_view event for:', pathname);
+      trackEvent({
+        eventType: 'page_view',
+        eventData: {
+          page: pathname,
+        },
+      });
+    }
+  }, [pathname, status, trackEvent]);
 
   // Track tab switch with debouncing
   const trackTabSwitch = useCallback((tabName: string) => {

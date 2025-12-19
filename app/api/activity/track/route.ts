@@ -12,9 +12,11 @@ export const dynamic = 'force-dynamic';
  * Requires authentication
  */
 export async function POST(request: NextRequest) {
+  console.log('[Activity Track] Received request');
   try {
     // Verify user session
     const session = await getApiSession();
+    console.log('[Activity Track] Session:', session ? `User: ${session.user?.email}` : 'No session');
     if (!session) {
       return NextResponse.json(
         { success: false, error: 'Authentication required' },
@@ -23,6 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    console.log('[Activity Track] Body:', JSON.stringify(body));
 
     // Validate required fields
     if (!body.eventType || !body.sessionId) {
