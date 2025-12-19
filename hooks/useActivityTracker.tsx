@@ -1,9 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
 import type { ActivityEventType, ActivityEventData } from '@/lib/types';
+
+// Client-side wrapper component for activity tracking
+export function ActivityTrackerProvider({ children }: { children: React.ReactNode }) {
+  useActivityTracker();
+  return <>{children}</>;
+}
 
 // Generate or retrieve session ID from sessionStorage
 function getOrCreateSessionId(): string {
