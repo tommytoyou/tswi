@@ -153,26 +153,47 @@ export async function initializeCollections(): Promise<void> {
       granularity: 'minutes' as const,
       expireAfterSeconds: 90 * 24 * 60 * 60, // 90 days
     },
-    // NOAA Real-Time Data Collections
+    // NOAA Real-Time Data Collections (7-day TTL to stay within 512MB free tier)
     {
       name: 'timeseries_noaa_solarwind_mag',
       timeField: 'ts',
       metaField: 'meta',
       granularity: 'minutes' as const,
-      expireAfterSeconds: 30 * 24 * 60 * 60, // 30 days
+      expireAfterSeconds: 7 * 24 * 60 * 60, // 7 days
+    },
+    {
+      name: 'timeseries_noaa_solarwind_plasma',
+      timeField: 'ts',
+      metaField: 'meta',
+      granularity: 'minutes' as const,
+      expireAfterSeconds: 7 * 24 * 60 * 60, // 7 days
     },
     {
       name: 'timeseries_noaa_kp_index',
       timeField: 'ts',
       metaField: 'meta',
       granularity: 'minutes' as const,
-      expireAfterSeconds: 90 * 24 * 60 * 60, // 90 days
+      expireAfterSeconds: 7 * 24 * 60 * 60, // 7 days
     },
     {
       name: 'timeseries_noaa_xray_flux',
       timeField: 'ts',
       metaField: 'meta',
       granularity: 'minutes' as const,
+      expireAfterSeconds: 7 * 24 * 60 * 60, // 7 days
+    },
+    {
+      name: 'timeseries_noaa_proton_flux',
+      timeField: 'ts',
+      metaField: 'meta',
+      granularity: 'minutes' as const,
+      expireAfterSeconds: 7 * 24 * 60 * 60, // 7 days
+    },
+    {
+      name: 'timeseries_noaa_dst',
+      timeField: 'ts',
+      metaField: 'meta',
+      granularity: 'hours' as const,
       expireAfterSeconds: 7 * 24 * 60 * 60, // 7 days
     },
   ];
@@ -234,8 +255,43 @@ export async function initializeCollections(): Promise<void> {
   await userActivity.createIndex({ eventType: 1, timestamp: -1 });
   await userActivity.createIndex({ sessionId: 1 });
   await userActivity.createIndex({ userId: 1, eventType: 1, timestamp: -1 });
+  // TTL index to auto-delete user activity older than 30 days
+  await userActivity.createIndex(
+    { timestamp: 1 },
+    { expireAfterSeconds: 30 * 24 * 60 * 60, name: 'ttl_30_days' }
+  );
 
   console.log('✅ Indexes created');
+
+  // Update TTL (expireAfterSeconds) on existing timeseries collections
+  // This ensures existing collections get updated TTL settings
+  const ttlUpdates = [
+    { name: 'timeseries_noaa_xray_flux', expireAfterSeconds: 7 * 24 * 60 * 60 },
+    { name: 'timeseries_noaa_solarwind_plasma', expireAfterSeconds: 7 * 24 * 60 * 60 },
+    { name: 'timeseries_noaa_solarwind_mag', expireAfterSeconds: 7 * 24 * 60 * 60 },
+    { name: 'timeseries_noaa_proton_flux', expireAfterSeconds: 7 * 24 * 60 * 60 },
+    { name: 'timeseries_noaa_dst', expireAfterSeconds: 7 * 24 * 60 * 60 },
+    { name: 'timeseries_noaa_kp_index', expireAfterSeconds: 7 * 24 * 60 * 60 },
+  ];
+
+  for (const update of ttlUpdates) {
+    if (collectionNames.includes(update.name)) {
+      try {
+        await database.command({
+          collMod: update.name,
+          expireAfterSeconds: update.expireAfterSeconds,
+        });
+        console.log(`✅ Updated TTL for ${update.name} to ${update.expireAfterSeconds / 86400} days`);
+      } catch (error: any) {
+        // Ignore errors if TTL is already set or collection doesn't support it
+        if (!error.message?.includes('already set')) {
+          console.log(`Note: Could not update TTL for ${update.name}: ${error.message}`);
+        }
+      }
+    }
+  }
+
+  console.log('✅ TTL indexes configured');
 }
 
 // Graceful shutdown
