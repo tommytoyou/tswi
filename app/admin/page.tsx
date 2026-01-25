@@ -315,6 +315,28 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDeleteInvite = async (inviteId: string) => {
+    if (!confirm('Are you sure you want to delete this invitation?')) return;
+
+    setActionLoading(inviteId);
+    try {
+      const response = await fetch(`/api/admin/invites/${inviteId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setInvites(invites.filter(i => i._id !== inviteId));
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Failed to delete invite');
+      }
+    } catch (error) {
+      console.error('Error deleting invite:', error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleExportCSV = () => {
     const headers = ['Name', 'Title', 'Organization', 'Email', 'Status', 'Created', 'Sent', 'Accepted'];
     const rows = invites.map(inv => [
@@ -943,14 +965,24 @@ export default function AdminDashboard() {
                                   </>
                                 )}
                                 {invite.status === 'accepted' && (
-                                  <span className="text-green-400 flex items-center gap-1 text-sm">
+                                  <span className="text-green-400 flex items-center gap-1 text-sm mr-2">
                                     <CheckCircle className="h-4 w-4" />
                                     Registered
                                   </span>
                                 )}
                                 {invite.status === 'expired' && (
-                                  <span className="text-red-400 text-sm">Expired</span>
+                                  <span className="text-red-400 text-sm mr-2">Expired</span>
                                 )}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleDeleteInvite(invite._id)}
+                                  disabled={actionLoading === invite._id}
+                                  className="border-red-600 text-red-400 hover:bg-red-600/20"
+                                  title="Delete invitation"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               </div>
                             </td>
                           </tr>
