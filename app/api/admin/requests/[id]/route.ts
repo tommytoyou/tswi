@@ -1,0 +1,49 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getDb } from '@/lib/db';
+import { getAdminSession } from '@/lib/auth/admin';
+import { ObjectId } from 'mongodb';
+
+export const dynamic = 'force-dynamic';
+
+// DELETE - Remove access request
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const adminSession = await getAdminSession();
+    if (!adminSession) {
+      return NextResponse.json(
+        { success: false, error: 'Admin authentication required' },
+        { status: 401 }
+      );
+    }
+
+    const { id } = await params;
+
+    const db = await getDb();
+    const accessRequestsCollection = db.collection('access_requests');
+
+    const result = await accessRequestsCollection.deleteOne({
+      _id: new ObjectId(id),
+    });
+
+    if (result.deletedCount === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Access request not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Access request deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting access request:', error);
+    return NextResponse.json(
+      { success: false, error: 'An error occurred' },
+      { status: 500 }
+    );
+  }
+}

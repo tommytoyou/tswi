@@ -26,6 +26,7 @@ import {
   Plus,
   Link2,
   Activity,
+  Trash2,
 } from 'lucide-react';
 import { ActivityFeed } from '@/components/admin/ActivityFeed';
 import { ActivitySummary } from '@/components/admin/ActivitySummary';
@@ -192,6 +193,25 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDeleteRequest = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this access request?')) return;
+
+    setActionLoading(id);
+    try {
+      const response = await fetch(`/api/admin/requests/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setRequests(requests.filter(r => r._id !== id));
+      }
+    } catch (error) {
+      console.error('Error deleting request:', error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleToggleAI = async (userId: string, currentRole: string) => {
     setActionLoading(userId);
     try {
@@ -213,7 +233,7 @@ export default function AdminDashboard() {
   };
 
   const handleRemoveUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to remove this user?')) return;
+    if (!confirm('Are you sure you want to remove this user? They will lose all access.')) return;
 
     setActionLoading(userId);
     try {
@@ -222,7 +242,7 @@ export default function AdminDashboard() {
       });
 
       if (response.ok) {
-        await fetchUsers();
+        setUsers(users.filter(u => u._id !== userId));
       }
     } catch (error) {
       console.error('Error removing user:', error);
@@ -521,38 +541,50 @@ export default function AdminDashboard() {
                           </div>
                         </div>
 
-                        {request.status === 'pending' && (
-                          <div className="flex flex-col sm:flex-row gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => handleApprove(request._id, false)}
-                              disabled={actionLoading === request._id}
-                              className="bg-green-600 hover:bg-green-700"
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => handleApprove(request._id, true)}
-                              disabled={actionLoading === request._id}
-                              className="bg-purple-600 hover:bg-purple-700"
-                            >
-                              <Sparkles className="h-4 w-4 mr-1" />
-                              Approve + AI
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleReject(request._id)}
-                              disabled={actionLoading === request._id}
-                              className="border-red-600 text-red-400 hover:bg-red-600/20"
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Reject
-                            </Button>
-                          </div>
-                        )}
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          {request.status === 'pending' && (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => handleApprove(request._id, false)}
+                                disabled={actionLoading === request._id}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleApprove(request._id, true)}
+                                disabled={actionLoading === request._id}
+                                className="bg-purple-600 hover:bg-purple-700"
+                              >
+                                <Sparkles className="h-4 w-4 mr-1" />
+                                Approve + AI
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleReject(request._id)}
+                                disabled={actionLoading === request._id}
+                                className="border-red-600 text-red-400 hover:bg-red-600/20"
+                              >
+                                <XCircle className="h-4 w-4 mr-1" />
+                                Reject
+                              </Button>
+                            </>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteRequest(request._id)}
+                            disabled={actionLoading === request._id}
+                            className="border-red-600 text-red-400 hover:bg-red-600/20"
+                            title="Delete request"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -655,8 +687,9 @@ export default function AdminDashboard() {
                                 onClick={() => handleRemoveUser(user._id)}
                                 disabled={actionLoading === user._id}
                                 className="border-red-600 text-red-400 hover:bg-red-600/20"
+                                title="Remove user"
                               >
-                                <XCircle className="h-4 w-4" />
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </td>
