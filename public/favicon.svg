@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#60a5fa"/>
+      <stop offset="100%" style="stop-color:#a855f7"/>
+    </linearGradient>
+    <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#93c5fd"/>
+      <stop offset="100%" style="stop-color:#c084fc"/>
+    </linearGradient>
+  </defs>
+  <!-- Shield shape -->
+  <path d="M256 28 L462 108 C462 108 472 280 256 484 C40 280 50 108 50 108 Z" 
+        fill="url(#shieldGrad)" stroke="#1e3a5f" stroke-width="12"/>
+  <!-- Inner shield border -->
+  <path d="M256 60 L432 128 C432 128 440 272 256 448 C72 272 80 128 80 128 Z" 
+        fill="none" stroke="#93c5fd" stroke-width="4" opacity="0.5"/>
+  <!-- Central star (5-point) -->
+  <polygon points="256,120 279,200 364,200 296,248 320,328 256,280 192,328 216,248 148,200 233,200" 
+           fill="url(#starGrad)" opacity="0.9"/>
+</svg>

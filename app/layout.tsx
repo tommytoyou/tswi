@@ -8,6 +8,9 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'TSWI - Tactical Space Weather Intelligence',
   description: 'Real-time monitoring of solar activity, geomagnetic conditions, and AI-powered predictions for space weather events that impact Earth.',
+  icons: {
+    icon: { url: '/favicon.svg', type: 'image/svg+xml' },
+  },
   metadataBase: new URL('https://www.tswi-ai.com'),
   openGraph: {
     title: 'TSWI - Tactical Space Weather Intelligence',
