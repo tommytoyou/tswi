@@ -12,13 +12,21 @@ declare global {
 let cachedDb: Db | null = null;
 
 function createClient(): MongoClient {
-  return new MongoClient(config.mongodb.uri, {
+  const uri = config.mongodb.uri;
+  if (!uri) {
+    throw new Error(
+      'MONGODB_URI environment variable is not set. ' +
+      'Ensure it is configured in Vercel for all environments (Production, Preview, Development).'
+    );
+  }
+
+  return new MongoClient(uri, {
     maxPoolSize: 10,
     minPoolSize: 1,
     maxIdleTimeMS: 30000,
-    serverSelectionTimeoutMS: 10000,
-    socketTimeoutMS: 45000,
-    connectTimeoutMS: 10000,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 30000,
+    connectTimeoutMS: 5000,
     retryWrites: true,
     retryReads: true,
   });
