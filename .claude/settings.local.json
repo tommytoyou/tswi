@@ -46,7 +46,19 @@
       "WebFetch(domain:theskylive.com)",
       "WebSearch",
       "WebFetch(domain:www.solarsystemscope.com)",
-      "Bash(npm audit:*)"
+      "Bash(npm audit:*)",
+      "Bash(git checkout:*)",
+      "Bash(npx next dev:*)",
+      "Bash(./node_modules/.bin/next dev:*)",
+      "Bash(ls:*)",
+      "Bash(git restore:*)",
+      "Bash(npx dotenv-cli:*)",
+      "Bash(npx vercel:*)",
+      "Bash(gh auth:*)",
+      "Bash(gh repo:*)",
+      "Bash(gh api:*)",
+      "Bash(node:*)",
+      "Bash(npx next:*)"
     ],
     "deny": [],
     "ask": []
