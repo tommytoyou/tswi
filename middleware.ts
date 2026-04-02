@@ -103,18 +103,26 @@ export async function middleware(request: NextRequest) {
   }
 
   // Protected routes - require NextAuth session
+  console.log('[MIDDLEWARE DEBUG] Checking token for:', pathname);
+  console.log('[MIDDLEWARE DEBUG] NEXTAUTH_SECRET set:', !!process.env.NEXTAUTH_SECRET);
+  console.log('[MIDDLEWARE DEBUG] Cookies:', request.cookies.getAll().map(c => c.name).join(', '));
+
   const token = await getToken({
     req: request,
     secret: process.env.NEXTAUTH_SECRET,
   });
 
+  console.log('[MIDDLEWARE DEBUG] Token result:', token ? { email: token.email, role: token.role } : 'NULL');
+
   if (!token) {
     // Not authenticated - redirect to login
+    console.log('[MIDDLEWARE DEBUG] No token found, redirecting to /login');
     const loginUrl = new URL('/login', request.url);
     return NextResponse.redirect(loginUrl);
   }
 
   // User is authenticated - allow access to protected routes
+  console.log('[MIDDLEWARE DEBUG] Token valid, allowing access');
   return NextResponse.next();
 }
 

@@ -206,6 +206,7 @@ export const authOptions: NextAuthOptions = {
     },
 
     async jwt({ token, user, account }) {
+      console.log('[AUTH DEBUG] JWT callback - account:', account?.provider, 'user:', user?.email, 'existing token email:', token?.email);
       if (account && user) {
         // Fetch user role from database
         try {
@@ -213,19 +214,23 @@ export const authOptions: NextAuthOptions = {
           const usersCollection = db.collection<User>('users');
           const dbUser = await usersCollection.findOne({ email: user.email!.toLowerCase() });
 
+          console.log('[AUTH DEBUG] JWT - DB user found:', dbUser ? { email: dbUser.email, role: dbUser.role } : 'NOT FOUND');
+
           if (dbUser) {
             token.id = dbUser._id?.toString() || '';
             token.role = dbUser.role || 'user';
             token.company = dbUser.company || '';
           }
         } catch (error) {
-          console.error('Error fetching user role:', error);
+          console.error('[AUTH DEBUG] JWT - Error fetching user role:', error);
         }
       }
+      console.log('[AUTH DEBUG] JWT callback returning token:', { email: token.email, role: token.role, id: token.id });
       return token;
     },
 
     async session({ session, token }) {
+      console.log('[AUTH DEBUG] Session callback - token:', { email: token.email, role: token.role });
       if (token && session.user) {
         session.user.id = token.id;
         session.user.role = token.role;
