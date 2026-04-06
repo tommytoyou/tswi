@@ -42,17 +42,24 @@ async function fetchFromNOAA(limit: number): Promise<{ data: DstDoc[]; source: s
   }
 
   const rawData = await response.json();
-  // Data format: [["time_tag","dst"], ["2025-11-26 03:00:00","-22"], ...]
+  // NOAA returns either:
+  //   - array of objects: [{"time_tag":"2026-03-29T23:00:00","dst":3}, ...]
+  //   - legacy array-of-arrays with header row: [["time_tag","dst"], ["...","..."], ...]
 
   const documents: DstDoc[] = [];
-  // Skip header row
-  for (let i = 1; i < rawData.length; i++) {
-    const item = rawData[i];
-    if (!item[0] || item[1] === null) continue;
+  for (const item of rawData) {
+    // Handle both formats
+    const timeTag = Array.isArray(item) ? item[0] : item?.time_tag;
+    const dstRaw = Array.isArray(item) ? item[1] : item?.dst;
+    if (!timeTag || dstRaw === null || dstRaw === undefined) continue;
+    // Skip legacy header row
+    if (timeTag === 'time_tag') continue;
 
-    const dst = parseInt(item[1]) || 0;
+    const dst = parseInt(String(dstRaw));
+    if (isNaN(dst)) continue;
+
     documents.push({
-      ts: new Date(item[0]),
+      ts: new Date(timeTag),
       dst_nt: dst,
       storm_level: getStormLevel(dst),
     });

@@ -79,19 +79,57 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Return cached data from MongoDB
-    const collection = await getTimeSeriesCollection<NoaaSolarWindMag>('timeseries_noaa_solarwind_mag');
-    const data = await collection
-      .find({})
-      .sort({ ts: -1 })
-      .limit(limit)
-      .toArray();
+    // Try cached data from MongoDB first
+    try {
+      const collection = await getTimeSeriesCollection<NoaaSolarWindMag>('timeseries_noaa_solarwind_mag');
+      const data = await collection
+        .find({})
+        .sort({ ts: -1 })
+        .limit(limit)
+        .toArray();
+
+      if (data.length > 0) {
+        return NextResponse.json({
+          success: true,
+          data: data.reverse(), // Return chronological order
+          count: data.length,
+          source: 'mongodb-cache',
+        });
+      }
+    } catch (dbError) {
+      console.log('MongoDB unavailable, falling back to NOAA direct fetch');
+    }
+
+    // Fallback to NOAA if cache is empty or MongoDB unavailable
+    const noaaUrl = 'https://services.swpc.noaa.gov/json/rtsw/rtsw_mag_1m.json';
+    const response = await fetch(noaaUrl, { cache: 'no-store' });
+
+    if (!response.ok) {
+      throw new Error(`NOAA API returned ${response.status}`);
+    }
+
+    const rawData = await response.json();
+    const documents: any[] = [];
+
+    for (const item of rawData) {
+      if (!item.time_tag || item.bx_gsm === null) continue;
+
+      documents.push({
+        ts: new Date(item.time_tag),
+        bx_gsm: parseFloat(item.bx_gsm) || 0,
+        by_gsm: parseFloat(item.by_gsm) || 0,
+        bz_gsm: parseFloat(item.bz_gsm) || 0,
+        lon_gsm: parseFloat(item.lon_gsm) || 0,
+        lat_gsm: parseFloat(item.lat_gsm) || 0,
+        bt: parseFloat(item.bt) || 0,
+      });
+    }
 
     return NextResponse.json({
       success: true,
-      data: data.reverse(), // Return chronological order
-      count: data.length,
-      source: 'mongodb-cache',
+      data: documents.slice(-limit),
+      count: documents.length,
+      source: 'noaa-live-fallback',
     });
   } catch (error: any) {
     console.error('Solar wind API error:', error);
