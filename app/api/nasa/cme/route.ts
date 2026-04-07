@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
     const cmeUrl = `https://api.nasa.gov/DONKI/CME?startDate=${formatDate(startDate)}&endDate=${formatDate(endDate)}&api_key=${apiKey}`;
 
     const response = await fetch(cmeUrl, {
-      next: { revalidate: 900 }, // Cache for 15 minutes
+      cache: 'no-store',
     });
 
     if (!response.ok) {

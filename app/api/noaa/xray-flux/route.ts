@@ -48,7 +48,7 @@ async function fetchFromNOAA(limit: number): Promise<{ data: any[]; source: stri
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const fetchMode = searchParams.get('fetch') || 'cached';
+  const fetchMode = searchParams.get('fetch') || 'latest';
   const limit = Math.min(parseInt(searchParams.get('limit') || '360'), 720);
 
   // If fetch=latest, always fetch from NOAA directly

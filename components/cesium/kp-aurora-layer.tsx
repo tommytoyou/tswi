@@ -134,13 +134,15 @@ export function KpAuroraLayer({ viewer, Cesium }: KpAuroraLayerProps) {
 
   // Render aurora heatmap when data changes
   useEffect(() => {
-    if (!viewer || !Cesium || !auroraData) return;
+    if (!viewer || viewer.isDestroyed() || !Cesium || !auroraData) return;
 
     // Remove existing entities
     entitiesRef.current.forEach((entity) => {
-      if (viewer.entities.contains(entity)) {
-        viewer.entities.remove(entity);
-      }
+      try {
+        if (!viewer.isDestroyed() && viewer.entities.contains(entity)) {
+          viewer.entities.remove(entity);
+        }
+      } catch { /* viewer may be destroyed */ }
     });
     entitiesRef.current = [];
 
@@ -282,9 +284,11 @@ export function KpAuroraLayer({ viewer, Cesium }: KpAuroraLayerProps) {
 
     return () => {
       newEntities.forEach((entity) => {
-        if (viewer.entities.contains(entity)) {
-          viewer.entities.remove(entity);
-        }
+        try {
+          if (!viewer.isDestroyed() && viewer.entities.contains(entity)) {
+            viewer.entities.remove(entity);
+          }
+        } catch { /* viewer may be destroyed */ }
       });
     };
   }, [viewer, Cesium, auroraData]);

@@ -94,12 +94,14 @@ export function HfBlackoutLayer({ viewer, Cesium, visible = true }: HfBlackoutLa
 
   // Render the blackout zone when data changes
   useEffect(() => {
-    if (!viewer || !Cesium || !visible) {
+    if (!viewer || viewer.isDestroyed() || !Cesium || !visible) {
       // Clean up if not visible
       entitiesRef.current.forEach((entity) => {
-        if (viewer?.entities?.contains(entity)) {
-          viewer.entities.remove(entity);
-        }
+        try {
+          if (viewer && !viewer.isDestroyed() && viewer.entities?.contains(entity)) {
+            viewer.entities.remove(entity);
+          }
+        } catch { /* viewer may be destroyed */ }
       });
       entitiesRef.current = [];
       return;
@@ -107,9 +109,11 @@ export function HfBlackoutLayer({ viewer, Cesium, visible = true }: HfBlackoutLa
 
     // Remove existing entities
     entitiesRef.current.forEach((entity) => {
-      if (viewer.entities.contains(entity)) {
-        viewer.entities.remove(entity);
-      }
+      try {
+        if (!viewer.isDestroyed() && viewer.entities.contains(entity)) {
+          viewer.entities.remove(entity);
+        }
+      } catch { /* viewer may be destroyed */ }
     });
     entitiesRef.current = [];
 
@@ -208,16 +212,18 @@ export function HfBlackoutLayer({ viewer, Cesium, visible = true }: HfBlackoutLa
 
     return () => {
       newEntities.forEach((entity) => {
-        if (viewer.entities.contains(entity)) {
-          viewer.entities.remove(entity);
-        }
+        try {
+          if (!viewer.isDestroyed() && viewer.entities.contains(entity)) {
+            viewer.entities.remove(entity);
+          }
+        } catch { /* viewer may be destroyed */ }
       });
     };
   }, [viewer, Cesium, fluxData, visible]);
 
   // Update subsolar point periodically (every minute)
   useEffect(() => {
-    if (!viewer || !Cesium || !visible || !isActiveFlare(fluxData?.flareClass)) {
+    if (!viewer || viewer.isDestroyed() || !Cesium || !visible || !isActiveFlare(fluxData?.flareClass)) {
       return;
     }
 
