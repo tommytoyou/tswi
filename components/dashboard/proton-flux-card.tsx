@@ -7,7 +7,7 @@ import { TrendingUp, TrendingDown, Minus, Radiation } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
 import { format } from 'date-fns';
 import { CardSkeleton } from './card-skeleton';
-import { chartTheme, calculateTrend, riskColors } from '@/lib/design-system';
+import { chartColors, chartTheme, calculateTrend, riskColors } from '@/lib/design-system';
 
 interface ProtonFluxDataPoint {
   ts: string;
@@ -220,31 +220,31 @@ export function ProtonFluxCard() {
                 wrapperStyle={{ fontSize: chartTheme.fontSize }}
                 iconType="line"
               />
-              {/* S1 threshold line + series strokes still hardcoded hex; leave for a later chart-color pass (same as kp-card-v2.tsx). */}
+              {/* S1 threshold line */}
               <ReferenceLine
                 y={10}
-                stroke="#eab308"
+                stroke={chartColors.warning}
                 strokeDasharray="3 3"
-                label={{ value: 'S1', position: 'right', fill: '#eab308', fontSize: 10 }}
+                label={{ value: 'S1', position: 'right', fill: chartColors.warning, fontSize: 10 }}
               />
               <Line
                 type="monotone"
                 dataKey=">10 MeV"
-                stroke="#f97316"
+                stroke={chartColors.proton}
                 dot={false}
                 strokeWidth={2}
               />
               <Line
                 type="monotone"
                 dataKey=">50 MeV"
-                stroke="#f59e0b"
+                stroke={chartColors.warning}
                 dot={false}
                 strokeWidth={1.5}
               />
               <Line
                 type="monotone"
                 dataKey=">100 MeV"
-                stroke="#eab308"
+                stroke={chartColors.warning}
                 dot={false}
                 strokeWidth={1}
               />

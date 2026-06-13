@@ -7,7 +7,7 @@ import { Sun, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { format } from 'date-fns';
 import { CardSkeleton } from './card-skeleton';
-import { getFlareColor, chartTheme, calculateTrend } from '@/lib/design-system';
+import { getFlareColor, chartColors, chartTheme, calculateTrend } from '@/lib/design-system';
 
 interface XRayDataPoint {
   ts: string;
@@ -197,11 +197,11 @@ export function XRayFluxCardV2() {
                   'X-ray Flux'
                 ]}
               />
-              {/* Reference lines for flare classes — strokes still hardcoded hex; leave for a later chart-color pass (same as kp-card-v2.tsx). */}
-              <ReferenceLine y={-8} stroke="#22c55e" strokeDasharray="2 2" opacity={0.3} />
-              <ReferenceLine y={-7} stroke="#eab308" strokeDasharray="2 2" opacity={0.3} />
-              <ReferenceLine y={-6} stroke="#f97316" strokeDasharray="2 2" opacity={0.3} />
-              <ReferenceLine y={-5} stroke="#ef4444" strokeDasharray="2 2" opacity={0.3} />
+              {/* Reference lines for flare classes */}
+              <ReferenceLine y={-8} stroke={chartColors.success} strokeDasharray="2 2" opacity={0.3} />
+              <ReferenceLine y={-7} stroke={chartColors.warning} strokeDasharray="2 2" opacity={0.3} />
+              <ReferenceLine y={-6} stroke={chartColors.proton} strokeDasharray="2 2" opacity={0.3} />
+              <ReferenceLine y={-5} stroke={chartColors.danger} strokeDasharray="2 2" opacity={0.3} />
               <Area
                 type="monotone"
                 dataKey="logFlux"

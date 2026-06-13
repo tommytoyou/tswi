@@ -7,7 +7,7 @@ import { TrendingUp, TrendingDown, Minus, Compass } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { format } from 'date-fns';
 import { CardSkeleton } from './card-skeleton';
-import { chartTheme, calculateTrend, riskColors } from '@/lib/design-system';
+import { chartColors, chartTheme, calculateTrend, riskColors } from '@/lib/design-system';
 
 interface DstDataPoint {
   ts: string;
@@ -174,12 +174,10 @@ export function DstCard() {
         <div className="flex-1 min-h-0 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
-              {/* TODO: chart still uses hardcoded #8b5cf6 (violet) for the gradient + Area stroke, and ReferenceLine hex below.
-                  Out of scope for this text/token pass — sweep to chartColors in the chart-color pass to remove the last purple. */}
               <defs>
                 <linearGradient id="dstGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                  <stop offset="5%" stopColor={chartColors.secondary} stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor={chartColors.secondary} stopOpacity={0}/>
                 </linearGradient>
               </defs>
               <CartesianGrid
@@ -213,13 +211,13 @@ export function DstCard() {
                 formatter={(value: any) => [`${value} nT`, 'Dst']}
               />
               {/* Storm thresholds */}
-              <ReferenceLine y={-20} stroke="#eab308" strokeDasharray="3 3" />
-              <ReferenceLine y={-50} stroke="#f97316" strokeDasharray="3 3" />
-              <ReferenceLine y={-100} stroke="#ef4444" strokeDasharray="3 3" />
+              <ReferenceLine y={-20} stroke={chartColors.warning} strokeDasharray="3 3" />
+              <ReferenceLine y={-50} stroke={chartColors.proton} strokeDasharray="3 3" />
+              <ReferenceLine y={-100} stroke={chartColors.danger} strokeDasharray="3 3" />
               <Area
                 type="monotone"
                 dataKey="Dst"
-                stroke="#8b5cf6"
+                stroke={chartColors.secondary}
                 fill="url(#dstGradient)"
                 strokeWidth={2}
               />

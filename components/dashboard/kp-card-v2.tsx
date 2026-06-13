@@ -7,7 +7,7 @@ import { TrendingUp, TrendingDown, Minus, Zap } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
 import { format, subHours } from 'date-fns';
 import { CardSkeleton } from './card-skeleton';
-import { getKpLevel, chartTheme, calculateTrend, riskColors } from '@/lib/design-system';
+import { getKpLevel, chartColors, chartTheme, calculateTrend, riskColors } from '@/lib/design-system';
 
 interface KpDataPoint {
   ts: string;
@@ -173,10 +173,9 @@ export function KpCardV2() {
                 }}
                 formatter={(value: any) => [`Kp ${value}`, 'Index']}
               />
-              <ReferenceLine y={4} stroke="#eab308" strokeDasharray="3 3" label={{ value: 'Active', position: 'right', fill: '#eab308', fontSize: 10 }} />
-              <ReferenceLine y={5} stroke="#f97316" strokeDasharray="3 3" label={{ value: 'Storm', position: 'right', fill: '#f97316', fontSize: 10 }} />
-              {/* Cell fills derive from getKpLevel().color (token-driven, already updated in the design-system pass) — no hardcoded colors here.
-                  NOTE: the ReferenceLine strokes/labels above still use hardcoded hex (#eab308, #f97316); leave for a later chart-color pass. */}
+              <ReferenceLine y={4} stroke={chartColors.warning} strokeDasharray="3 3" label={{ value: 'Active', position: 'right', fill: chartColors.warning, fontSize: 10 }} />
+              <ReferenceLine y={5} stroke={chartColors.proton} strokeDasharray="3 3" label={{ value: 'Storm', position: 'right', fill: chartColors.proton, fontSize: 10 }} />
+              {/* Cell fills derive from getKpLevel().color (token-driven) — no hardcoded colors here. */}
               <Bar dataKey="kp" radius={[4, 4, 0, 0]}>
                 {chartData.map((entry, index) => {
                   const level = getKpLevel(entry.kp);
