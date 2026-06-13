@@ -22,9 +22,11 @@ interface NOAASolarProbability {
   x_class_1_day: number;
   x_class_2_day: number;
   x_class_3_day: number;
-  proton_1_day: number;
-  proton_2_day: number;
-  proton_3_day: number;
+  // NOAA keys these as "10mev_protons_*", which are not valid TS identifiers.
+  '10mev_protons_1_day': number;
+  '10mev_protons_2_day': number;
+  '10mev_protons_3_day': number;
+  polar_cap_absorption: string;
 }
 
 interface XRayFluxData {
@@ -51,6 +53,15 @@ interface PredictionResult {
     X: number;
   };
   confidence: number;
+}
+
+interface FluxTimelinePoint {
+  time: string;
+  flux: number;
+  flare_probability: number;
+  C: number;
+  M: number;
+  X: number;
 }
 
 /**
@@ -85,21 +96,28 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch real NOAA data in parallel
-    const [solarProbabilities, xrayFlux, activeRegions, dbXray] = await Promise.allSettled([
+    const [solarProbabilities, xrayHistory, activeRegions, dbXray] = await Promise.allSettled([
       fetchNOAASolarProbabilities(),
-      fetchCurrentXRayFlux(),
+      fetchXRayFluxHistory(),
       fetchActiveRegions(),
       fetchDBXrayData(),
     ]);
 
     const noaaProbs = solarProbabilities.status === 'fulfilled' ? solarProbabilities.value : null;
-    const currentXray = xrayFlux.status === 'fulfilled' ? xrayFlux.value : null;
+    const xrayFluxHistory = xrayHistory.status === 'fulfilled' ? xrayHistory.value : [];
+    // The most recent measurement is the last element (feed is chronological).
+    const currentXray = xrayFluxHistory.length > 0 ? xrayFluxHistory[xrayFluxHistory.length - 1] : null;
     const regions = activeRegions.status === 'fulfilled' ? activeRegions.value : null;
     const dbXrayData = dbXray.status === 'fulfilled' ? dbXray.value : null;
 
+    // Build a real, time-resolved class-probability timeline from observed X-ray flux.
+    const fluxTimeline = buildFluxTimeline(xrayFluxHistory);
+
     // If we have NOAA probabilities, use them as the primary source
     if (noaaProbs && noaaProbs.length > 0) {
-      const latestProbs = noaaProbs[noaaProbs.length - 1];
+      // NOAA's solar_probabilities.json is sorted newest-first (descending date).
+      // Sort defensively and take the most recent forecast row.
+      const latestProbs = [...noaaProbs].sort((a, b) => b.date.localeCompare(a.date))[0];
 
       // Enhance NOAA predictions with real-time X-ray flux analysis
       const xrayModifier = calculateXRayModifier(currentXray);
@@ -115,6 +133,7 @@ export async function GET(request: NextRequest) {
           prediction_time: new Date().toISOString(),
           forecast_horizon_hours: 2,
           predictions,
+          flux_timeline: fluxTimeline,
           source: 'noaa-swpc-enhanced',
           metadata: {
             noaa_forecast_date: latestProbs.date,
@@ -144,6 +163,7 @@ export async function GET(request: NextRequest) {
           prediction_time: new Date().toISOString(),
           forecast_horizon_hours: 2,
           predictions,
+          flux_timeline: fluxTimeline,
           source: 'statistical-fallback',
           metadata: {
             data_points_used: dbXrayData.length,
@@ -192,25 +212,26 @@ async function fetchNOAASolarProbabilities(): Promise<NOAASolarProbability[] | n
 }
 
 /**
- * Fetch current GOES X-ray flux
+ * Fetch the full GOES X-ray flux history for the past day (1-minute cadence).
+ * Returns the 0.1-0.8nm (short wavelength) channel in chronological order.
  */
-async function fetchCurrentXRayFlux(): Promise<XRayFluxData | null> {
+async function fetchXRayFluxHistory(): Promise<XRayFluxData[]> {
   try {
     const response = await fetch(NOAA_XRAY_FLUX_URL, {
       next: { revalidate: 60 }, // Cache for 1 minute
     });
 
     if (!response.ok) {
-      return null;
+      console.error('NOAA X-ray flux fetch failed:', response.status);
+      return [];
     }
 
     const data = await response.json();
-    // Get most recent 1-8A (short wavelength) measurement
-    const shortWave = data.filter((d: any) => d.energy === '0.1-0.8nm');
-    return shortWave.length > 0 ? shortWave[shortWave.length - 1] : null;
+    // Keep only the 1-8A (short wavelength) channel used for flare classification.
+    return data.filter((d: any) => d.energy === '0.1-0.8nm');
   } catch (error) {
     console.error('Error fetching X-ray flux:', error);
-    return null;
+    return [];
   }
 }
 
@@ -291,6 +312,58 @@ function calculateRegionRisk(regions: ActiveRegion[] | null): number {
   }
 
   return Math.min(riskScore, 2.0); // Cap at 2x
+}
+
+/**
+ * Map an observed GOES X-ray flux level to per-class "at or above" probabilities.
+ *
+ * Flare class is defined by short-wavelength flux magnitude:
+ *   B < 1e-6, C 1e-6..1e-5, M 1e-5..1e-4, X >= 1e-4 (W/m²).
+ * We use a logistic curve centred just below each class threshold so that, as the
+ * real flux rises, each class probability climbs smoothly toward 1. Because the
+ * input is the live flux history, the resulting series genuinely varies over time.
+ */
+function fluxToClassProbabilities(flux: number): { C: number; M: number; X: number } {
+  const logF = Math.log10(Math.max(flux, 1e-9));
+  const logistic = (center: number) => 1 / (1 + Math.exp(-(logF - center) * 3));
+  return {
+    C: logistic(-6.3),
+    M: logistic(-5.3),
+    X: logistic(-4.3),
+  };
+}
+
+/**
+ * Build a real, time-resolved timeline from the observed X-ray flux history.
+ * The raw feed is ~1 reading/minute over 24h; we bucket it down to `targetPoints`
+ * and keep the PEAK flux per bucket (flares are short spikes that averaging hides).
+ */
+function buildFluxTimeline(history: XRayFluxData[], targetPoints = 48): FluxTimelinePoint[] {
+  if (!history || history.length === 0) return [];
+
+  const bucketSize = Math.max(1, Math.ceil(history.length / targetPoints));
+  const timeline: FluxTimelinePoint[] = [];
+
+  for (let i = 0; i < history.length; i += bucketSize) {
+    const bucket = history.slice(i, i + bucketSize);
+    // Peak flux drives flare classification, so summarise each bucket by its max.
+    const peak = bucket.reduce((max, d) => (d.flux > max.flux ? d : max), bucket[0]);
+    const probs = fluxToClassProbabilities(peak.flux);
+
+    // P(any flare) = 1 - P(no flare of any class).
+    const flareProbability = 1 - (1 - probs.C) * (1 - probs.M) * (1 - probs.X);
+
+    timeline.push({
+      time: peak.time_tag,
+      flux: peak.flux,
+      flare_probability: flareProbability,
+      C: probs.C,
+      M: probs.M,
+      X: probs.X,
+    });
+  }
+
+  return timeline;
 }
 
 /**

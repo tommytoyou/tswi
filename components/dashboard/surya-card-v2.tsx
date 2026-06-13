@@ -30,11 +30,21 @@ interface SuryaMetadata {
   processing_time_ms?: number;
 }
 
+interface FluxTimelinePoint {
+  time: string;
+  flux: number;
+  flare_probability: number;
+  C: number;
+  M: number;
+  X: number;
+}
+
 interface SuryaData {
   model: string;
   model_type: string;
   prediction_time: string;
   predictions: Prediction[];
+  flux_timeline?: FluxTimelinePoint[];
   source: string;
   metadata?: SuryaMetadata;
 }
@@ -102,15 +112,26 @@ export function SuryaCardV2() {
 
   const riskColor = riskColors[riskLevel];
 
-  // Format data for timeline chart
-  const chartData = data.predictions.map((p, idx) => ({
+  // Format data for the timeline charts. Prefer the real, time-resolved X-ray flux
+  // history (24h, varies genuinely); fall back to the 4-point forecast if it's absent.
+  const timelineSource =
+    data.flux_timeline && data.flux_timeline.length > 0
+      ? data.flux_timeline
+      : data.predictions.map((p) => ({
+          time: p.time,
+          flare_probability: p.flare_probability,
+          C: p.class_probabilities.C,
+          M: p.class_probabilities.M,
+          X: p.class_probabilities.X,
+        }));
+
+  const chartData = timelineSource.map((p) => ({
     time: format(new Date(p.time), 'HH:mm'),
     timestamp: new Date(p.time).getTime(),
     probability: p.flare_probability * 100,
-    confidence: p.confidence * 100,
-    cClass: Math.max(0, p.class_probabilities.C * 100),
-    mClass: Math.max(0, p.class_probabilities.M * 100),
-    xClass: Math.max(0, p.class_probabilities.X * 100),
+    cClass: Math.max(0, p.C * 100),
+    mClass: Math.max(0, p.M * 100),
+    xClass: Math.max(0, p.X * 100),
   }));
 
   // Determine model badge info
@@ -220,7 +241,7 @@ export function SuryaCardV2() {
 
         {/* Prediction Timeline - Flare Probability */}
         <div className="space-y-2">
-          <div className="text-xs font-semibold text-slate-300">Flare Probability Timeline</div>
+          <div className="text-xs font-semibold text-slate-300">Flare Probability Timeline <span className="text-slate-500 font-normal">· observed X-ray flux, past 24h</span></div>
           <div className="h-[140px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
@@ -240,6 +261,8 @@ export function SuryaCardV2() {
                   stroke={chartTheme.textColor}
                   style={{ fontSize: chartTheme.fontSize }}
                   tickLine={false}
+                  interval="preserveStartEnd"
+                  minTickGap={40}
                 />
                 <YAxis
                   stroke={chartTheme.textColor}
@@ -272,7 +295,7 @@ export function SuryaCardV2() {
 
         {/* Flare Class Breakdown */}
         <div className="space-y-2">
-          <div className="text-xs font-semibold text-slate-300">Flare Class Probabilities</div>
+          <div className="text-xs font-semibold text-slate-300">Flare Class Probabilities <span className="text-slate-500 font-normal">· derived from observed flux, past 24h</span></div>
           <div className="h-[120px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
@@ -286,6 +309,8 @@ export function SuryaCardV2() {
                   stroke={chartTheme.textColor}
                   style={{ fontSize: chartTheme.fontSize }}
                   tickLine={false}
+                  interval="preserveStartEnd"
+                  minTickGap={40}
                 />
                 <YAxis
                   stroke={chartTheme.textColor}
