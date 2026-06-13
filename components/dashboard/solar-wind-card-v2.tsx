@@ -60,7 +60,7 @@ export function SolarWindCardV2() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-red-400">{error || 'No data'}</p>
+          <p className="text-sm text-intel-red">{error || 'No data'}</p>
         </CardContent>
       </Card>
     );
@@ -93,7 +93,7 @@ export function SolarWindCardV2() {
       <CardHeader className="flex-shrink-0 py-2 px-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Activity className="h-4 w-4 text-blue-400" />
+            <Activity className="h-4 w-4 text-intel-cyan" />
             Solar Wind Magnetic Field
           </CardTitle>
           <Badge variant="outline" className={`${bzColor.text} ${bzColor.border}`}>
@@ -106,44 +106,44 @@ export function SolarWindCardV2() {
         <div className="grid grid-cols-4 gap-3">
           <div className="space-y-1">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">Bx</span>
+              <span className="text-xs text-intel-muted">Bx</span>
               <TrendIcon className={`h-3 w-3 ${btTrend === 'up' ? 'text-green-400' : btTrend === 'down' ? 'text-red-400' : 'text-slate-400'}`} />
             </div>
             <div className="text-lg font-bold font-mono" style={{ color: chartColors.bx }}>
               {latest.bx_gsm.toFixed(1)}
             </div>
-            <div className="text-xs text-slate-500">nT</div>
+            <div className="text-xs text-intel-muted">nT</div>
           </div>
 
           <div className="space-y-1">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">By</span>
+              <span className="text-xs text-intel-muted">By</span>
             </div>
             <div className="text-lg font-bold font-mono" style={{ color: chartColors.by }}>
               {latest.by_gsm.toFixed(1)}
             </div>
-            <div className="text-xs text-slate-500">nT</div>
+            <div className="text-xs text-intel-muted">nT</div>
           </div>
 
           <div className="space-y-1">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">Bz</span>
+              <span className="text-xs text-intel-muted">Bz</span>
               <TrendIcon className={`h-3 w-3 ${bzTrend === 'up' ? 'text-green-400' : bzTrend === 'down' ? 'text-red-400' : 'text-slate-400'}`} />
             </div>
             <div className="text-lg font-bold font-mono" style={{ color: chartColors.bz }}>
               {latest.bz_gsm.toFixed(1)}
             </div>
-            <div className="text-xs text-slate-500">nT</div>
+            <div className="text-xs text-intel-muted">nT</div>
           </div>
 
           <div className="space-y-1">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">Bt</span>
+              <span className="text-xs text-intel-muted">Bt</span>
             </div>
             <div className="text-lg font-bold font-mono" style={{ color: chartColors.bt }}>
               {latest.bt.toFixed(1)}
             </div>
-            <div className="text-xs text-slate-500">nT</div>
+            <div className="text-xs text-intel-muted">nT</div>
           </div>
         </div>
 
@@ -215,10 +215,10 @@ export function SolarWindCardV2() {
 
         {/* Footer Info */}
         <div className="flex justify-between items-center text-xs flex-shrink-0">
-          <div className="text-slate-500">
+          <div className="text-intel-muted">
             Last 3h • NOAA SWPC
           </div>
-          <div className="text-slate-400">
+          <div className="text-intel-muted">
             {format(new Date(latest.ts), 'HH:mm')} UTC
           </div>
         </div>

@@ -58,7 +58,7 @@ export function KpCardV2() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-red-400">{error || 'No data'}</p>
+          <p className="text-sm text-intel-red">{error || 'No data'}</p>
         </CardContent>
       </Card>
     );
@@ -93,7 +93,7 @@ export function KpCardV2() {
       <CardHeader className="flex-shrink-0 py-2 px-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Zap className="h-4 w-4 text-yellow-400" />
+            <Zap className="h-4 w-4 text-intel-cyan" />
             Kp Index
           </CardTitle>
           <Badge
@@ -115,7 +115,7 @@ export function KpCardV2() {
                 trend === 'up' ? 'text-red-400' : trend === 'down' ? 'text-green-400' : 'text-slate-400'
               }`}
             />
-            <div className="text-xs text-slate-400">
+            <div className="text-xs text-intel-muted">
               <div>3-hour Kp</div>
             </div>
           </div>
@@ -175,6 +175,8 @@ export function KpCardV2() {
               />
               <ReferenceLine y={4} stroke="#eab308" strokeDasharray="3 3" label={{ value: 'Active', position: 'right', fill: '#eab308', fontSize: 10 }} />
               <ReferenceLine y={5} stroke="#f97316" strokeDasharray="3 3" label={{ value: 'Storm', position: 'right', fill: '#f97316', fontSize: 10 }} />
+              {/* Cell fills derive from getKpLevel().color (token-driven, already updated in the design-system pass) — no hardcoded colors here.
+                  NOTE: the ReferenceLine strokes/labels above still use hardcoded hex (#eab308, #f97316); leave for a later chart-color pass. */}
               <Bar dataKey="kp" radius={[4, 4, 0, 0]}>
                 {chartData.map((entry, index) => {
                   const level = getKpLevel(entry.kp);
@@ -187,10 +189,10 @@ export function KpCardV2() {
 
         {/* Footer Info */}
         <div className="flex justify-between items-center text-xs flex-shrink-0">
-          <div className="text-slate-500">
+          <div className="text-intel-muted">
             24h • NOAA SWPC
           </div>
-          <div className="text-slate-400">
+          <div className="text-intel-muted">
             {format(new Date(latest.ts), 'HH:mm')} UTC
           </div>
         </div>

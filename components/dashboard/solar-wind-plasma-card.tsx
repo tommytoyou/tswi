@@ -68,7 +68,7 @@ export function SolarWindPlasmaCard() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-red-400">{error || 'No data'}</p>
+          <p className="text-sm text-intel-red">{error || 'No data'}</p>
         </CardContent>
       </Card>
     );
@@ -107,7 +107,7 @@ export function SolarWindPlasmaCard() {
       <CardHeader className="flex-shrink-0 py-2 px-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Wind className="h-4 w-4 text-cyan-400" />
+            <Wind className="h-4 w-4 text-intel-cyan" />
             Solar Wind Plasma
           </CardTitle>
           <Badge variant="outline" className={`${speedColor.text} ${speedColor.border}`}>
@@ -120,18 +120,18 @@ export function SolarWindPlasmaCard() {
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">Speed</span>
+              <span className="text-xs text-intel-muted">Speed</span>
               <TrendIcon className={`h-3 w-3 ${speedTrend === 'up' ? 'text-orange-400' : speedTrend === 'down' ? 'text-green-400' : 'text-slate-400'}`} />
             </div>
             <div className="text-lg font-bold font-mono text-cyan-400">
               {latest.speed_kms.toFixed(0)}
             </div>
-            <div className="text-xs text-slate-500">km/s</div>
+            <div className="text-xs text-intel-muted">km/s</div>
           </div>
 
           <div className="space-y-1">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">Density</span>
+              <span className="text-xs text-intel-muted">Density</span>
               {densityTrend !== 'stable' && (
                 <TrendIcon className={`h-3 w-3 ${densityTrend === 'up' ? 'text-orange-400' : 'text-green-400'}`} />
               )}
@@ -139,23 +139,23 @@ export function SolarWindPlasmaCard() {
             <div className="text-lg font-bold font-mono text-violet-400">
               {latest.density_cm3.toFixed(1)}
             </div>
-            <div className="text-xs text-slate-500">/cm³</div>
+            <div className="text-xs text-intel-muted">/cm³</div>
           </div>
 
           <div className="space-y-1">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">Temp</span>
+              <span className="text-xs text-intel-muted">Temp</span>
             </div>
             <div className="text-lg font-bold font-mono text-amber-400">
               {formatTemp(latest.temp_k)}
             </div>
-            <div className="text-xs text-slate-500">K</div>
+            <div className="text-xs text-intel-muted">K</div>
           </div>
         </div>
 
         {/* Speed indicator bar */}
         <div className="space-y-0.5 flex-shrink-0">
-          <div className="flex justify-between text-[10px] text-slate-500">
+          <div className="flex justify-between text-[10px] text-intel-muted">
             <span>300</span>
             <span>500</span>
             <span>700</span>
@@ -248,10 +248,10 @@ export function SolarWindPlasmaCard() {
 
         {/* Footer Info */}
         <div className="flex justify-between items-center text-xs flex-shrink-0">
-          <div className="text-slate-500">
+          <div className="text-intel-muted">
             3h • NOAA SWPC
           </div>
-          <div className="text-slate-400">
+          <div className="text-intel-muted">
             {format(new Date(latest.ts), 'HH:mm')} UTC
           </div>
         </div>
