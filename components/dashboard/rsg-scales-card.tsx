@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Sun, Radiation, Zap, TrendingUp, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
+import { riskColors } from '@/lib/design-system';
 
 interface ScaleData {
   current: number;
@@ -18,32 +19,32 @@ const scaleDefinitions = {
   R: {
     name: 'Radio Blackout',
     icon: Sun,
-    iconColor: 'text-yellow-400',
+    iconColor: 'text-intel-cyan',
     levels: ['R0', 'R1', 'R2', 'R3', 'R4', 'R5'],
     descriptions: ['None', 'Minor', 'Moderate', 'Strong', 'Severe', 'Extreme'],
   },
   S: {
     name: 'Solar Radiation Storm',
     icon: Radiation,
-    iconColor: 'text-orange-400',
+    iconColor: 'text-intel-cyan',
     levels: ['S0', 'S1', 'S2', 'S3', 'S4', 'S5'],
     descriptions: ['None', 'Minor', 'Moderate', 'Strong', 'Severe', 'Extreme'],
   },
   G: {
     name: 'Geomagnetic Storm',
     icon: Zap,
-    iconColor: 'text-blue-400',
+    iconColor: 'text-intel-cyan',
     levels: ['G0', 'G1', 'G2', 'G3', 'G4', 'G5'],
     descriptions: ['None', 'Minor', 'Moderate', 'Strong', 'Severe', 'Extreme'],
   },
 };
 
-// Color coding based on scale level
-function getScaleColor(level: number): { bg: string; text: string; border: string } {
-  if (level === 0) return { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/50' };
-  if (level <= 2) return { bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/50' };
-  if (level === 3) return { bg: 'bg-orange-500/20', text: 'text-orange-400', border: 'border-orange-500/50' };
-  return { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/50' };
+// Color coding based on scale level — maps to the muted intel riskColors token set.
+function getScaleColor(level: number): typeof riskColors[keyof typeof riskColors] {
+  if (level === 0) return riskColors.LOW;
+  if (level === 1 || level === 2) return riskColors.MODERATE;
+  if (level === 3) return riskColors.HIGH;
+  return riskColors.SEVERE;
 }
 
 // Calculate R-Scale from X-ray flux (W/m²)
@@ -92,7 +93,7 @@ function ScaleBox({ type, current, max24h, loading, error }: ScaleBoxProps) {
 
   if (loading) {
     return (
-      <div className="flex-1 p-4 rounded-lg bg-slate-800/50 border border-slate-700 animate-pulse">
+      <div className="flex-1 p-4 rounded-lg bg-intel-panel/50 border border-intel-border animate-pulse">
         <div className="flex items-center gap-2 mb-3">
           <div className="w-5 h-5 bg-slate-700 rounded" />
           <div className="w-24 h-4 bg-slate-700 rounded" />
@@ -104,14 +105,14 @@ function ScaleBox({ type, current, max24h, loading, error }: ScaleBoxProps) {
 
   if (error) {
     return (
-      <div className="flex-1 p-4 rounded-lg bg-slate-800/50 border border-slate-700">
+      <div className="flex-1 p-4 rounded-lg bg-intel-panel/50 border border-intel-border">
         <div className="flex items-center gap-2 mb-3">
           <Icon className={`h-5 w-5 ${def.iconColor}`} />
-          <span className="text-xs text-slate-400 font-medium">{def.name}</span>
+          <span className="text-xs text-intel-muted font-medium">{def.name}</span>
         </div>
         <div className="text-center">
           <div className="text-2xl font-bold text-slate-600">{type}--</div>
-          <div className="text-xs text-red-400 mt-1">No data</div>
+          <div className="text-xs text-intel-red mt-1">No data</div>
         </div>
       </div>
     );
@@ -127,7 +128,7 @@ function ScaleBox({ type, current, max24h, loading, error }: ScaleBoxProps) {
           <span className="text-xs text-slate-300 font-medium hidden sm:inline">{def.name}</span>
         </div>
         {current >= 3 && (
-          <AlertTriangle className="h-4 w-4 text-orange-400 animate-pulse" />
+          <AlertTriangle className="h-4 w-4 text-intel-red animate-pulse" />
         )}
       </div>
 
@@ -136,7 +137,7 @@ function ScaleBox({ type, current, max24h, loading, error }: ScaleBoxProps) {
         <div className={`text-4xl sm:text-5xl font-bold font-mono ${currentColors.text}`}>
           {type}{current}
         </div>
-        <div className="text-xs text-slate-400 mt-1">
+        <div className="text-xs text-intel-muted mt-1">
           {def.descriptions[current]}
         </div>
       </div>
@@ -144,8 +145,8 @@ function ScaleBox({ type, current, max24h, loading, error }: ScaleBoxProps) {
       {/* 24h Max (if different from current) */}
       {showMax && (
         <div className={`mt-3 pt-2 border-t ${currentColors.border} flex items-center justify-center gap-2`}>
-          <TrendingUp className="h-3 w-3 text-slate-400" />
-          <span className="text-xs text-slate-400">24h max:</span>
+          <TrendingUp className="h-3 w-3 text-intel-muted" />
+          <span className="text-xs text-intel-muted">24h max:</span>
           <span className={`text-sm font-bold font-mono ${max24hColors.text}`}>
             {type}{max24h}
           </span>
@@ -161,7 +162,7 @@ function ScaleBox({ type, current, max24h, loading, error }: ScaleBoxProps) {
             <div
               key={level}
               className={`flex-1 h-1.5 rounded-full transition-colors ${
-                isActive ? colors.bg.replace('/20', '') : 'bg-slate-700'
+                isActive ? colors.badge : 'bg-intel-border'
               }`}
             />
           );
@@ -292,20 +293,20 @@ export function RsgScalesCard() {
   const isElevated = maxScale >= 1;
 
   return (
-    <Card className={`border-slate-800 bg-slate-900/50 ${isElevated ? 'ring-1 ring-yellow-500/30' : ''}`}>
+    <Card className={isElevated ? 'ring-1 ring-intel-amber/30' : ''}>
       <CardContent className="p-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-white">NOAA Space Weather Scales</span>
             {isElevated && (
-              <span className="px-2 py-0.5 text-xs font-medium bg-yellow-500/20 text-yellow-400 rounded">
+              <span className="px-2 py-0.5 text-xs font-medium bg-intel-amber/15 text-intel-amber rounded">
                 ACTIVE
               </span>
             )}
           </div>
           {latestUpdate && (
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-intel-muted">
               {format(latestUpdate, 'HH:mm')} UTC
             </span>
           )}
@@ -338,18 +339,18 @@ export function RsgScalesCard() {
 
         {/* Footer legend */}
         <div className="mt-4 pt-3 border-t border-slate-800">
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 justify-center">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-intel-muted justify-center">
             <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-green-500" /> 0: None
+              <span className="w-2 h-2 rounded-full bg-intel-cyan" /> 0: None
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-yellow-500" /> 1-2: Minor/Moderate
+              <span className="w-2 h-2 rounded-full bg-intel-amber" /> 1-2: Minor/Moderate
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-orange-500" /> 3: Strong
+              <span className="w-2 h-2 rounded-full bg-[#C9744D]" /> 3: Strong
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-red-500" /> 4-5: Severe/Extreme
+              <span className="w-2 h-2 rounded-full bg-intel-red" /> 4-5: Severe/Extreme
             </span>
           </div>
         </div>

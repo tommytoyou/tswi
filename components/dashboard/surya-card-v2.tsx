@@ -94,7 +94,7 @@ export function SuryaCardV2() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-red-400">{error || 'No data'}</p>
+          <p className="text-sm text-intel-red">{error || 'No data'}</p>
         </CardContent>
       </Card>
     );
@@ -138,13 +138,13 @@ export function SuryaCardV2() {
   const getModelBadge = () => {
     switch (data.source) {
       case 'noaa-swpc-enhanced':
-        return { label: 'NOAA SWPC', color: 'text-green-400 border-green-500/30' };
+        return { label: 'NOAA SWPC', color: 'text-intel-cyan border-intel-cyan/30' };
       case 'statistical-fallback':
-        return { label: 'Statistical', color: 'text-yellow-400 border-yellow-500/30' };
+        return { label: 'Statistical', color: 'text-intel-amber border-intel-amber/30' };
       case 'mock-prediction':
-        return { label: 'Mock Data', color: 'text-slate-400 border-slate-500/30' };
+        return { label: 'Mock Data', color: 'text-intel-muted border-intel-border' };
       default:
-        return { label: data.model, color: 'text-purple-400 border-purple-500/30' };
+        return { label: data.model, color: 'text-intel-cyan border-intel-cyan/30' };
     }
   };
 
@@ -158,11 +158,11 @@ export function SuryaCardV2() {
   };
 
   return (
-    <Card className="border-slate-800 bg-slate-900/50 lg:col-span-2">
+    <Card className="lg:col-span-2">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
-            <Brain className="h-4 w-4 text-purple-400" />
+            <Brain className="h-4 w-4 text-intel-cyan" />
             Solar Flare Predictions
           </CardTitle>
           <div className="flex items-center gap-2">
@@ -175,7 +175,7 @@ export function SuryaCardV2() {
           </div>
         </div>
         {warning && (
-          <div className="flex items-center gap-2 text-xs text-yellow-400/80 mt-2">
+          <div className="flex items-center gap-2 text-xs text-intel-amber/80 mt-2">
             <AlertCircle className="h-3 w-3" />
             <span>{warning}</span>
           </div>
@@ -185,35 +185,35 @@ export function SuryaCardV2() {
         {/* Key Metrics */}
         <div className="grid grid-cols-4 gap-4">
           <div className="space-y-1">
-            <div className="text-xs text-slate-400">Max Probability</div>
+            <div className="text-xs text-intel-muted">Max Probability</div>
             <div className="text-2xl font-bold font-mono" style={{ color: riskColor.chart }}>
               {(maxProbability * 100).toFixed(1)}%
             </div>
-            <div className="text-xs text-slate-500">Next 2 hours</div>
+            <div className="text-xs text-intel-muted">Next 2 hours</div>
           </div>
 
           <div className="space-y-1">
-            <div className="text-xs text-slate-400">Confidence</div>
-            <div className="text-2xl font-bold font-mono text-blue-400">
+            <div className="text-xs text-intel-muted">Confidence</div>
+            <div className="text-2xl font-bold font-mono text-intel-cyan">
               {(avgConfidence * 100).toFixed(0)}%
             </div>
-            <div className="text-xs text-slate-500">Model certainty</div>
+            <div className="text-xs text-intel-muted">Model certainty</div>
           </div>
 
           <div className="space-y-1">
-            <div className="text-xs text-slate-400">Dominant Class</div>
-            <div className="text-2xl font-bold font-mono text-yellow-400">
+            <div className="text-xs text-intel-muted">Dominant Class</div>
+            <div className="text-2xl font-bold font-mono text-intel-cyan">
               {data.predictions[0].class_probabilities.C > data.predictions[0].class_probabilities.M ? 'C' : 'M'}
             </div>
-            <div className="text-xs text-slate-500">Expected type</div>
+            <div className="text-xs text-intel-muted">Expected type</div>
           </div>
 
           <div className="space-y-1">
-            <div className="text-xs text-slate-400">Active Regions</div>
-            <div className="text-2xl font-bold font-mono text-orange-400">
+            <div className="text-xs text-intel-muted">Active Regions</div>
+            <div className="text-2xl font-bold font-mono text-intel-cyan">
               {data.metadata?.active_regions_count ?? '-'}
             </div>
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-intel-muted">
               {data.metadata?.complex_regions ? `${data.metadata.complex_regions} complex` : 'On sun'}
             </div>
           </div>
@@ -223,16 +223,16 @@ export function SuryaCardV2() {
         {isRealData && data.metadata && (
           <div className="flex flex-wrap gap-3 text-xs">
             {data.metadata.current_xray_flux !== null && data.metadata.current_xray_flux !== undefined && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-slate-800/50 rounded">
-                <Activity className="h-3 w-3 text-red-400" />
-                <span className="text-slate-400">X-ray:</span>
+              <div className="flex items-center gap-1 px-2 py-1 bg-intel-panel/50 rounded">
+                <Activity className="h-3 w-3 text-intel-cyan" />
+                <span className="text-intel-muted">X-ray:</span>
                 <span className="text-slate-300 font-mono">{formatXRayFlux(data.metadata.current_xray_flux)}</span>
               </div>
             )}
             {data.metadata.noaa_forecast_date && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-slate-800/50 rounded">
-                <Sun className="h-3 w-3 text-yellow-400" />
-                <span className="text-slate-400">NOAA:</span>
+              <div className="flex items-center gap-1 px-2 py-1 bg-intel-panel/50 rounded">
+                <Sun className="h-3 w-3 text-intel-cyan" />
+                <span className="text-intel-muted">NOAA:</span>
                 <span className="text-slate-300">{data.metadata.noaa_forecast_date}</span>
               </div>
             )}
@@ -241,7 +241,7 @@ export function SuryaCardV2() {
 
         {/* Prediction Timeline - Flare Probability */}
         <div className="space-y-2">
-          <div className="text-xs font-semibold text-slate-300">Flare Probability Timeline <span className="text-slate-500 font-normal">· observed X-ray flux, past 24h</span></div>
+          <div className="text-xs font-semibold text-slate-300">Flare Probability Timeline <span className="text-intel-muted font-normal">· observed X-ray flux, past 24h</span></div>
           <div className="h-[140px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
@@ -295,7 +295,7 @@ export function SuryaCardV2() {
 
         {/* Flare Class Breakdown */}
         <div className="space-y-2">
-          <div className="text-xs font-semibold text-slate-300">Flare Class Probabilities <span className="text-slate-500 font-normal">· derived from observed flux, past 24h</span></div>
+          <div className="text-xs font-semibold text-slate-300">Flare Class Probabilities <span className="text-intel-muted font-normal">· derived from observed flux, past 24h</span></div>
           <div className="h-[120px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
@@ -335,7 +335,7 @@ export function SuryaCardV2() {
                 <Line
                   type="monotone"
                   dataKey="cClass"
-                  stroke="#eab308"
+                  stroke={chartColors.warning}
                   dot={false}
                   strokeWidth={2}
                   name="C-class"
@@ -343,7 +343,7 @@ export function SuryaCardV2() {
                 <Line
                   type="monotone"
                   dataKey="mClass"
-                  stroke="#f97316"
+                  stroke={chartColors.proton}
                   dot={false}
                   strokeWidth={2}
                   name="M-class"
@@ -351,7 +351,7 @@ export function SuryaCardV2() {
                 <Line
                   type="monotone"
                   dataKey="xClass"
-                  stroke="#ef4444"
+                  stroke={chartColors.danger}
                   dot={false}
                   strokeWidth={2}
                   name="X-class"
@@ -363,7 +363,7 @@ export function SuryaCardV2() {
 
         {/* Footer Info */}
         <div className="flex justify-between items-center text-xs">
-          <div className="text-slate-500 flex items-center gap-1">
+          <div className="text-intel-muted flex items-center gap-1">
             <Info className="h-3 w-3" />
             <span>{data.model}</span>
             {data.metadata?.data_sources && (
@@ -372,7 +372,7 @@ export function SuryaCardV2() {
               </span>
             )}
           </div>
-          <div className="text-slate-400">
+          <div className="text-intel-muted">
             {format(new Date(data.prediction_time), 'HH:mm:ss')} UTC
             {data.metadata?.processing_time_ms !== undefined && (
               <span className="text-slate-600 ml-2">
