@@ -6,68 +6,68 @@
 // Risk Level Color System
 export const riskColors = {
   LOW: {
-    bg: 'bg-green-500/10',
-    border: 'border-green-500/30',
-    text: 'text-green-400',
-    badge: 'bg-green-500',
-    chart: '#10b981', // green-500
+    bg: 'bg-[#5B9BD5]/8',
+    border: 'border-[#5B9BD5]/25',
+    text: 'text-[#5B9BD5]',
+    badge: 'bg-[#5B9BD5]',
+    chart: '#5B9BD5', // muted steel blue
   },
   MODERATE: {
-    bg: 'bg-yellow-500/10',
-    border: 'border-yellow-500/30',
-    text: 'text-yellow-400',
-    badge: 'bg-yellow-500',
-    chart: '#eab308', // yellow-500
+    bg: 'bg-[#C9A875]/8',
+    border: 'border-[#C9A875]/25',
+    text: 'text-[#C9A875]',
+    badge: 'bg-[#C9A875]',
+    chart: '#C9A875', // muted amber
   },
   HIGH: {
-    bg: 'bg-orange-500/10',
-    border: 'border-orange-500/30',
-    text: 'text-orange-400',
-    badge: 'bg-orange-500',
-    chart: '#f97316', // orange-500
+    bg: 'bg-[#D9534F]/8',
+    border: 'border-[#D9534F]/25',
+    text: 'text-[#D9534F]',
+    badge: 'bg-[#D9534F]',
+    chart: '#D9534F', // safety red
   },
   SEVERE: {
-    bg: 'bg-red-500/10',
-    border: 'border-red-500/30',
-    text: 'text-red-400',
-    badge: 'bg-red-500',
-    chart: '#ef4444', // red-500
+    bg: 'bg-[#FF3B30]/8',
+    border: 'border-[#FF3B30]/25',
+    text: 'text-[#FF3B30]',
+    badge: 'bg-[#FF3B30]',
+    chart: '#FF3B30', // alert red
   },
 } as const;
 
-// Chart Color Palette (NASA-inspired)
+// Chart Color Palette (muted intel console)
 export const chartColors = {
-  primary: '#3b82f6', // blue-500
-  secondary: '#8b5cf6', // violet-500
-  success: '#10b981', // green-500
-  warning: '#f59e0b', // amber-500
-  danger: '#ef4444', // red-500
-  info: '#06b6d4', // cyan-500
+  primary: '#5B9BD5', // muted steel blue
+  secondary: '#7FA8A3', // muted slate cyan
+  success: '#6B9080', // muted sage green
+  warning: '#C9A875', // muted amber
+  danger: '#D9534F', // safety red - alerts/threats only
+  info: '#5EA8C7', // muted cyan
 
   // Magnetic field components
-  bx: '#3b82f6', // blue-500
-  by: '#8b5cf6', // violet-500
-  bz: '#10b981', // green-500
-  bt: '#f59e0b', // amber-500
+  bx: '#5B9BD5', // muted steel blue
+  by: '#7FA8A3', // muted slate cyan
+  bz: '#6B9080', // muted sage green
+  bt: '#C9A875', // muted amber
 
   // Solar metrics
-  xray: '#ef4444', // red-500
-  proton: '#f97316', // orange-500
-  electron: '#06b6d4', // cyan-500
+  xray: '#D9534F', // safety red
+  proton: '#C9744D', // muted burnt orange
+  electron: '#5EA8C7', // muted cyan
 
   // Grid and axis
-  grid: '#334155', // slate-700
-  axis: '#64748b', // slate-500
-  background: '#0f172a', // slate-900
+  grid: '#2A3744', // intel border
+  axis: '#6B7E8F', // muted steel
+  background: '#0F1923', // deep console navy
 } as const;
 
 // Flare Classification Colors
 export const flareColors = {
-  A: '#10b981', // green-500 - Background
-  B: '#22c55e', // green-400 - Quiet
-  C: '#eab308', // yellow-500 - Minor
-  M: '#f97316', // orange-500 - Moderate
-  X: '#ef4444', // red-500 - Major
+  A: '#6B9080', // muted sage green - Background
+  B: '#7FA8A3', // muted slate cyan - Quiet
+  C: '#C9A875', // muted amber - Minor
+  M: '#C9744D', // muted burnt orange - Moderate
+  X: '#FF3B30', // alert red - Major
 } as const;
 
 // Kp Index Classification
@@ -95,9 +95,9 @@ export function getFlareColor(flareClass: string): string {
 export const chartTheme = {
   fontSize: 11,
   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-  textColor: '#94a3b8', // slate-400
+  textColor: '#8DA3B5', // muted steel
   gridColor: '#334155', // slate-700
-  tooltipBg: '#1e293b', // slate-800
+  tooltipBg: '#1A2333', // intel panel
   tooltipBorder: '#475569', // slate-600
 };
 

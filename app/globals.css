@@ -28,9 +28,9 @@
 }
 
 .dark {
-  --background: 222.2 84% 4.9%;
+  --background: 220 60% 9.8%; /* #0A1428 intel base navy */
   --foreground: 210 40% 98%;
-  --card: 222.2 84% 4.9%;
+  --card: 218 32.5% 15.1%; /* #1A2333 intel panel */
   --card-foreground: 210 40% 98%;
   --popover: 222.2 84% 4.9%;
   --popover-foreground: 210 40% 98%;

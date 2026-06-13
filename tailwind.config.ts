@@ -39,6 +39,17 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        intel: {
+          bg: '#0A1428',
+          panel: '#1A2333',
+          border: '#2A3744',
+          muted: '#8DA3B5',
+          cyan: '#5EA8C7',
+          blue: '#5B9BD5',
+          amber: '#C9A875',
+          red: '#FF3B30',
+          orange: '#FF9500',
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
