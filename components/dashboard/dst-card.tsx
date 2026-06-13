@@ -16,11 +16,11 @@ interface DstDataPoint {
 }
 
 const stormLevelInfo: Record<string, { label: string; color: string; risk: keyof typeof riskColors }> = {
-  'quiet': { label: 'Quiet', color: 'text-green-400', risk: 'LOW' },
-  'minor': { label: 'Minor Storm', color: 'text-yellow-400', risk: 'MODERATE' },
-  'moderate': { label: 'Moderate Storm', color: 'text-orange-400', risk: 'HIGH' },
-  'intense': { label: 'Intense Storm', color: 'text-red-400', risk: 'SEVERE' },
-  'super-storm': { label: 'Super-Storm', color: 'text-red-500', risk: 'SEVERE' },
+  'quiet': { label: 'Quiet', color: riskColors.LOW.text, risk: 'LOW' },
+  'minor': { label: 'Minor Storm', color: riskColors.MODERATE.text, risk: 'MODERATE' },
+  'moderate': { label: 'Moderate Storm', color: riskColors.HIGH.text, risk: 'HIGH' },
+  'intense': { label: 'Intense Storm', color: riskColors.SEVERE.text, risk: 'SEVERE' },
+  'super-storm': { label: 'Super-Storm', color: riskColors.SEVERE.text, risk: 'SEVERE' },
 };
 
 export function DstCard() {
@@ -66,7 +66,7 @@ export function DstCard() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-red-400">{error || 'No data'}</p>
+          <p className="text-sm text-intel-red">{error || 'No data'}</p>
         </CardContent>
       </Card>
     );
@@ -92,11 +92,11 @@ export function DstCard() {
   const minDst = Math.min(...chartData.map(d => d.Dst));
 
   return (
-    <Card className="border-slate-800 bg-slate-900/50 h-full flex flex-col overflow-hidden">
+    <Card className="h-full flex flex-col overflow-hidden">
       <CardHeader className="flex-shrink-0 py-2 px-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Compass className="h-4 w-4 text-purple-400" />
+            <Compass className="h-4 w-4 text-intel-cyan" />
             Dst Index
           </CardTitle>
           <Badge
@@ -112,10 +112,10 @@ export function DstCard() {
         <div className="flex items-baseline gap-3 flex-shrink-0">
           <div className="space-y-0.5">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">Current</span>
+              <span className="text-xs text-intel-muted">Current</span>
               <TrendIcon className={`h-3 w-3 ${
-                latest.dst_nt < previous.dst_nt ? 'text-red-400' :
-                latest.dst_nt > previous.dst_nt ? 'text-green-400' : 'text-slate-400'
+                latest.dst_nt < previous.dst_nt ? 'text-intel-red' :
+                latest.dst_nt > previous.dst_nt ? 'text-intel-cyan' : 'text-intel-muted'
               }`} />
             </div>
             <div className={`text-2xl font-bold font-mono ${
@@ -123,21 +123,21 @@ export function DstCard() {
               latest.dst_nt > -50 ? 'text-yellow-400' :
               latest.dst_nt > -100 ? 'text-orange-400' : 'text-red-400'
             }`}>
-              {latest.dst_nt} <span className="text-xs text-slate-500 font-normal">nT</span>
+              {latest.dst_nt} <span className="text-xs text-intel-muted font-normal">nT</span>
             </div>
           </div>
 
           <div className="space-y-0.5">
-            <span className="text-xs text-slate-400">72h Min</span>
+            <span className="text-xs text-intel-muted">72h Min</span>
             <div className="text-lg font-bold font-mono text-slate-300">
-              {minDst} <span className="text-xs text-slate-500 font-normal">nT</span>
+              {minDst} <span className="text-xs text-intel-muted font-normal">nT</span>
             </div>
           </div>
         </div>
 
         {/* Storm Level Indicator */}
         <div className="space-y-0.5 flex-shrink-0">
-          <div className="flex justify-between text-[10px] text-slate-500">
+          <div className="flex justify-between text-[10px] text-intel-muted">
             <span>Quiet</span>
             <span>-20</span>
             <span>-50</span>
@@ -174,6 +174,8 @@ export function DstCard() {
         <div className="flex-1 min-h-0 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
+              {/* TODO: chart still uses hardcoded #8b5cf6 (violet) for the gradient + Area stroke, and ReferenceLine hex below.
+                  Out of scope for this text/token pass — sweep to chartColors in the chart-color pass to remove the last purple. */}
               <defs>
                 <linearGradient id="dstGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
@@ -227,10 +229,10 @@ export function DstCard() {
 
         {/* Footer Info */}
         <div className="flex justify-between items-center text-xs flex-shrink-0">
-          <div className="text-slate-500">
+          <div className="text-intel-muted">
             72h • Kyoto WDC
           </div>
-          <div className="text-slate-400">
+          <div className="text-intel-muted">
             {format(new Date(latest.ts), 'MMM d HH:mm')} UTC
           </div>
         </div>

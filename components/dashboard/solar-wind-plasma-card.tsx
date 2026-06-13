@@ -7,7 +7,7 @@ import { TrendingUp, TrendingDown, Minus, Wind } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format } from 'date-fns';
 import { CardSkeleton } from './card-skeleton';
-import { chartTheme, calculateTrend, getRiskLevel, riskColors } from '@/lib/design-system';
+import { chartColors, chartTheme, calculateTrend, getRiskLevel, riskColors } from '@/lib/design-system';
 
 interface SolarWindPlasmaDataPoint {
   ts: string;
@@ -123,7 +123,7 @@ export function SolarWindPlasmaCard() {
               <span className="text-xs text-intel-muted">Speed</span>
               <TrendIcon className={`h-3 w-3 ${speedTrend === 'up' ? 'text-orange-400' : speedTrend === 'down' ? 'text-green-400' : 'text-slate-400'}`} />
             </div>
-            <div className="text-lg font-bold font-mono text-cyan-400">
+            <div className="text-lg font-bold font-mono" style={{ color: chartColors.info }}>
               {latest.speed_kms.toFixed(0)}
             </div>
             <div className="text-xs text-intel-muted">km/s</div>
@@ -136,7 +136,7 @@ export function SolarWindPlasmaCard() {
                 <TrendIcon className={`h-3 w-3 ${densityTrend === 'up' ? 'text-orange-400' : 'text-green-400'}`} />
               )}
             </div>
-            <div className="text-lg font-bold font-mono text-violet-400">
+            <div className="text-lg font-bold font-mono" style={{ color: chartColors.secondary }}>
               {latest.density_cm3.toFixed(1)}
             </div>
             <div className="text-xs text-intel-muted">/cm³</div>
@@ -146,7 +146,7 @@ export function SolarWindPlasmaCard() {
             <div className="flex items-center gap-1">
               <span className="text-xs text-intel-muted">Temp</span>
             </div>
-            <div className="text-lg font-bold font-mono text-amber-400">
+            <div className="text-lg font-bold font-mono" style={{ color: chartColors.warning }}>
               {formatTemp(latest.temp_k)}
             </div>
             <div className="text-xs text-intel-muted">K</div>
@@ -228,7 +228,7 @@ export function SolarWindPlasmaCard() {
                 yAxisId="speed"
                 type="monotone"
                 dataKey="Speed"
-                stroke="#06b6d4"
+                stroke={chartColors.info}
                 dot={false}
                 strokeWidth={2}
                 name="Speed"
@@ -237,7 +237,7 @@ export function SolarWindPlasmaCard() {
                 yAxisId="density"
                 type="monotone"
                 dataKey="Density"
-                stroke="#8b5cf6"
+                stroke={chartColors.secondary}
                 dot={false}
                 strokeWidth={1.5}
                 name="Density"

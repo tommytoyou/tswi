@@ -61,7 +61,7 @@ export function XRayFluxCardV2() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-red-400">{error || 'No data'}</p>
+          <p className="text-sm text-intel-red">{error || 'No data'}</p>
         </CardContent>
       </Card>
     );
@@ -84,11 +84,11 @@ export function XRayFluxCardV2() {
   const flareLevel = flareClass.charAt(0);
 
   return (
-    <Card className="border-slate-800 bg-slate-900/50 h-full flex flex-col overflow-hidden">
+    <Card className="h-full flex flex-col overflow-hidden">
       <CardHeader className="flex-shrink-0 py-2 px-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Sun className="h-4 w-4 text-orange-400" />
+            <Sun className="h-4 w-4 text-intel-cyan" />
             X-ray Flux
           </CardTitle>
           <Badge
@@ -108,10 +108,10 @@ export function XRayFluxCardV2() {
           <div className="flex items-center gap-2">
             <TrendIcon
               className={`h-4 w-4 ${
-                trend === 'up' ? 'text-red-400' : trend === 'down' ? 'text-green-400' : 'text-slate-400'
+                trend === 'up' ? 'text-intel-red' : trend === 'down' ? 'text-intel-cyan' : 'text-intel-muted'
               }`}
             />
-            <div className="text-xs text-slate-400">
+            <div className="text-xs text-intel-muted">
               <div>{latest.flux.toExponential(2)} W/m²</div>
             </div>
           </div>
@@ -119,7 +119,7 @@ export function XRayFluxCardV2() {
 
         {/* Flare Class Reference Bar */}
         <div className="space-y-0.5 flex-shrink-0">
-          <div className="flex justify-between text-[10px] text-slate-500">
+          <div className="flex justify-between text-[10px] text-intel-muted">
             <span>A</span>
             <span>B</span>
             <span>C</span>
@@ -197,7 +197,7 @@ export function XRayFluxCardV2() {
                   'X-ray Flux'
                 ]}
               />
-              {/* Reference lines for flare classes */}
+              {/* Reference lines for flare classes — strokes still hardcoded hex; leave for a later chart-color pass (same as kp-card-v2.tsx). */}
               <ReferenceLine y={-8} stroke="#22c55e" strokeDasharray="2 2" opacity={0.3} />
               <ReferenceLine y={-7} stroke="#eab308" strokeDasharray="2 2" opacity={0.3} />
               <ReferenceLine y={-6} stroke="#f97316" strokeDasharray="2 2" opacity={0.3} />
@@ -215,10 +215,10 @@ export function XRayFluxCardV2() {
 
         {/* Footer Info */}
         <div className="flex justify-between items-center text-xs flex-shrink-0">
-          <div className="text-slate-500">
+          <div className="text-intel-muted">
             6h • GOES-{data.find(d => d.satellite !== undefined)?.satellite ?? 18}
           </div>
-          <div className="text-slate-400">
+          <div className="text-intel-muted">
             {format(new Date(latest.ts), 'HH:mm')} UTC
           </div>
         </div>

@@ -18,12 +18,12 @@ interface ProtonFluxDataPoint {
 }
 
 const sScaleLabels: Record<number, { label: string; color: string; risk: keyof typeof riskColors }> = {
-  0: { label: 'None', color: 'text-green-400', risk: 'LOW' },
-  1: { label: 'S1 Minor', color: 'text-yellow-400', risk: 'MODERATE' },
-  2: { label: 'S2 Moderate', color: 'text-orange-400', risk: 'HIGH' },
-  3: { label: 'S3 Strong', color: 'text-orange-500', risk: 'HIGH' },
-  4: { label: 'S4 Severe', color: 'text-red-400', risk: 'SEVERE' },
-  5: { label: 'S5 Extreme', color: 'text-red-500', risk: 'SEVERE' },
+  0: { label: 'None', color: riskColors.LOW.text, risk: 'LOW' },
+  1: { label: 'S1 Minor', color: riskColors.MODERATE.text, risk: 'MODERATE' },
+  2: { label: 'S2 Moderate', color: riskColors.HIGH.text, risk: 'HIGH' },
+  3: { label: 'S3 Strong', color: riskColors.HIGH.text, risk: 'HIGH' },
+  4: { label: 'S4 Severe', color: riskColors.SEVERE.text, risk: 'SEVERE' },
+  5: { label: 'S5 Extreme', color: riskColors.SEVERE.text, risk: 'SEVERE' },
 };
 
 export function ProtonFluxCard() {
@@ -69,7 +69,7 @@ export function ProtonFluxCard() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-red-400">{error || 'No data'}</p>
+          <p className="text-sm text-intel-red">{error || 'No data'}</p>
         </CardContent>
       </Card>
     );
@@ -101,11 +101,11 @@ export function ProtonFluxCard() {
   };
 
   return (
-    <Card className="border-slate-800 bg-slate-900/50 h-full flex flex-col overflow-hidden">
+    <Card className="h-full flex flex-col overflow-hidden">
       <CardHeader className="flex-shrink-0 py-2 px-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Radiation className="h-4 w-4 text-orange-400" />
+            <Radiation className="h-4 w-4 text-intel-cyan" />
             Proton Flux
           </CardTitle>
           <Badge
@@ -121,39 +121,39 @@ export function ProtonFluxCard() {
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">&gt;10 MeV</span>
-              <TrendIcon className={`h-3 w-3 ${p10Trend === 'up' ? 'text-red-400' : p10Trend === 'down' ? 'text-green-400' : 'text-slate-400'}`} />
+              <span className="text-xs text-intel-muted">&gt;10 MeV</span>
+              <TrendIcon className={`h-3 w-3 ${p10Trend === 'up' ? 'text-intel-red' : p10Trend === 'down' ? 'text-intel-cyan' : 'text-intel-muted'}`} />
             </div>
             <div className="text-lg font-bold font-mono text-orange-400">
               {formatFlux(latest.p10_pfu)}
             </div>
-            <div className="text-xs text-slate-500">pfu</div>
+            <div className="text-xs text-intel-muted">pfu</div>
           </div>
 
           <div className="space-y-1">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">&gt;50 MeV</span>
+              <span className="text-xs text-intel-muted">&gt;50 MeV</span>
             </div>
             <div className="text-lg font-bold font-mono text-amber-400">
               {formatFlux(latest.p50_pfu)}
             </div>
-            <div className="text-xs text-slate-500">pfu</div>
+            <div className="text-xs text-intel-muted">pfu</div>
           </div>
 
           <div className="space-y-1">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">&gt;100 MeV</span>
+              <span className="text-xs text-intel-muted">&gt;100 MeV</span>
             </div>
             <div className="text-lg font-bold font-mono text-yellow-400">
               {formatFlux(latest.p100_pfu)}
             </div>
-            <div className="text-xs text-slate-500">pfu</div>
+            <div className="text-xs text-intel-muted">pfu</div>
           </div>
         </div>
 
         {/* S-Scale Threshold Indicator */}
         <div className="space-y-0.5 flex-shrink-0">
-          <div className="flex justify-between text-[10px] text-slate-500">
+          <div className="flex justify-between text-[10px] text-intel-muted">
             <span>S1</span>
             <span>S2</span>
             <span>S3</span>
@@ -220,7 +220,7 @@ export function ProtonFluxCard() {
                 wrapperStyle={{ fontSize: chartTheme.fontSize }}
                 iconType="line"
               />
-              {/* S1 threshold line */}
+              {/* S1 threshold line + series strokes still hardcoded hex; leave for a later chart-color pass (same as kp-card-v2.tsx). */}
               <ReferenceLine
                 y={10}
                 stroke="#eab308"
@@ -254,10 +254,10 @@ export function ProtonFluxCard() {
 
         {/* Footer Info */}
         <div className="flex justify-between items-center text-xs flex-shrink-0">
-          <div className="text-slate-500">
+          <div className="text-intel-muted">
             12h • GOES SWPC
           </div>
-          <div className="text-slate-400">
+          <div className="text-intel-muted">
             {format(new Date(latest.ts), 'HH:mm')} UTC
           </div>
         </div>
