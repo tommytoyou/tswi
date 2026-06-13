@@ -33,17 +33,31 @@ export function Header() {
   const hasAIAccess = session?.user?.role === 'user_ai' || session?.user?.role === 'admin';
 
   return (
-    <header className="h-12 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 flex-shrink-0">
+    <>
+      {/* Classification / handling strip */}
+      <div className="w-full h-5 bg-intel-panel border-b border-intel-border flex items-center justify-center flex-shrink-0">
+        <span className="text-[10px] tracking-widest text-intel-muted uppercase font-mono">
+          TSWI // OFFICIAL USE ONLY // SPACE WEATHER INTELLIGENCE
+        </span>
+      </div>
+
+      <header className="h-12 bg-intel-bg border-b border-intel-border flex items-center justify-between px-4 flex-shrink-0">
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">
-          <Satellite className="h-5 w-5 text-blue-400" />
+          <Satellite className="h-5 w-5 text-intel-cyan" />
           <span className="font-bold text-white tracking-tight">TSWI</span>
         </div>
-        <span className="text-xs text-slate-500 hidden sm:inline">Tactical Space Weather Intelligence</span>
+        <span className="text-xs font-mono text-intel-muted hidden sm:inline">Tactical Space Weather Intelligence</span>
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2 text-slate-400">
+        {/* System status — TODO: wire up to /api/health (bg-intel-amber = degraded, bg-intel-red = down) */}
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-intel-cyan" />
+          <span className="text-[10px] font-mono uppercase text-intel-muted">SYSTEM NOMINAL</span>
+        </div>
+
+        <div className="flex items-center gap-2 text-intel-muted">
           <Clock className="h-4 w-4" />
           <span className="text-sm font-mono">{formatUTC(currentTime)}</span>
         </div>
@@ -51,7 +65,7 @@ export function Header() {
         {session?.user && (
           <div className="flex items-center gap-2 border-l border-slate-700 pl-4">
             {hasAIAccess && (
-              <span className="flex items-center gap-1 px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs">
+              <span className="flex items-center gap-1 px-2 py-0.5 bg-intel-cyan/15 text-intel-cyan rounded text-xs">
                 <Sparkles className="h-3 w-3" />
                 AI
               </span>
@@ -79,6 +93,7 @@ export function Header() {
           </div>
         )}
       </div>
-    </header>
+      </header>
+    </>
   );
 }

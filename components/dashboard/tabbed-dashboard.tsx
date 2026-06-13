@@ -33,7 +33,7 @@ import {
 const GlobeViewer = dynamic(() => import('@/components/cesium/globe-viewer'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-slate-900">
+    <div className="w-full h-full flex items-center justify-center bg-intel-bg">
       <div className="text-slate-400">Loading Globe...</div>
     </div>
   ),
@@ -42,9 +42,9 @@ const GlobeViewer = dynamic(() => import('@/components/cesium/globe-viewer'), {
 const AuroraGlobe = dynamic(() => import('@/components/cesium/aurora-globe'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-[#050520]">
+    <div className="w-full h-full flex items-center justify-center bg-intel-bg">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-500 mx-auto mb-4" />
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-intel-cyan mx-auto mb-4" />
         <p className="text-slate-400">Loading Aurora Globe...</p>
       </div>
     </div>
@@ -54,7 +54,7 @@ const AuroraGlobe = dynamic(() => import('@/components/cesium/aurora-globe'), {
 const NationalAssetsGlobe = dynamic(() => import('@/components/cesium/national-assets-globe'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-slate-900">
+    <div className="w-full h-full flex items-center justify-center bg-intel-bg">
       <div className="text-slate-400">Loading National Assets...</div>
     </div>
   ),
@@ -65,9 +65,9 @@ const HeliocentricViewer = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-full flex items-center justify-center bg-[#050520]">
+      <div className="w-full h-full flex items-center justify-center bg-intel-bg">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-500 mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-intel-cyan mx-auto mb-4" />
           <p className="text-slate-400">Loading NASA Eyes...</p>
         </div>
       </div>
@@ -81,17 +81,24 @@ interface TabConfig {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-const tabs: TabConfig[] = [
+// Operational intelligence tabs (primary nav row)
+const primaryTabs: TabConfig[] = [
   { id: 'solar-wind', label: 'Solar Wind', icon: Wind },
-  { id: 'predictive-modelling', label: 'Predictive Modelling', icon: LayoutDashboard },
+  { id: 'predictive-modelling', label: 'Threat Forecast', icon: LayoutDashboard },
   { id: 'events', label: 'Events', icon: Flame },
+  { id: 'sda', label: 'SDA / Threat Catalog', icon: Satellite },
+  { id: 'alerts', label: 'Alerts', icon: Bell },
+];
+
+// Advanced visualization tabs (secondary, recessed nav row)
+const vizTabs: TabConfig[] = [
   { id: 'globe', label: 'Globe', icon: Globe2 },
   { id: 'national-assets', label: 'National Assets', icon: Flag },
   { id: 'heliocentric', label: 'Heliocentric', icon: Sun },
   { id: 'aurora', label: 'Aurora', icon: Sparkles },
-  { id: 'sda', label: 'SDA', icon: Satellite },
-  { id: 'alerts', label: 'Alerts', icon: Bell },
 ];
+
+const tabs: TabConfig[] = [...primaryTabs, ...vizTabs];
 
 export function TabbedDashboard() {
   const searchParams = useSearchParams();
@@ -118,20 +125,42 @@ export function TabbedDashboard() {
   }, []);
 
   return (
-    <div className="h-screen flex flex-col bg-slate-950 overflow-hidden">
+    <div className="h-screen flex flex-col bg-intel-bg overflow-hidden">
       <Header />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-        {/* Tab Navigation */}
-        <div className="bg-slate-900/50 border-b border-slate-800 px-4 py-2 flex-shrink-0">
-          <TabsList className="bg-transparent gap-1">
-            {tabs.map((tab) => {
+        {/* Primary operational navigation */}
+        <div className="border-b border-intel-border px-4 py-2 flex-shrink-0">
+          <TabsList className="bg-intel-panel gap-1">
+            {primaryTabs.map((tab) => {
               const Icon = tab.icon;
               return (
                 <TabsTrigger
                   key={tab.id}
                   value={tab.id}
-                  className="gap-2 px-4 py-2 data-[state=active]:bg-slate-800 data-[state=active]:text-white text-slate-400 hover:text-slate-200"
+                  className="gap-2 px-4 py-2 data-[state=active]:bg-intel-border data-[state=active]:text-white text-intel-muted hover:text-white"
+                >
+                  <Icon className="h-4 w-4" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </div>
+
+        {/* Advanced visualization navigation (recessed secondary row) */}
+        <div className="bg-intel-bg border-t border-intel-border px-4 py-1 flex items-center gap-3 flex-shrink-0">
+          <span className="text-[10px] font-mono uppercase tracking-widest text-intel-muted">
+            Advanced Visualization
+          </span>
+          <TabsList className="bg-transparent gap-1">
+            {vizTabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <TabsTrigger
+                  key={tab.id}
+                  value={tab.id}
+                  className="gap-2 px-3 py-1 text-xs data-[state=active]:bg-intel-border data-[state=active]:text-white text-intel-muted hover:text-white"
                 >
                   <Icon className="h-4 w-4" />
                   <span className="hidden sm:inline">{tab.label}</span>
