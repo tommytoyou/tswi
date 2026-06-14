@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Sun, Radiation, Zap, TrendingUp, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { riskColors } from '@/lib/design-system';
+import { calculateRScale, calculateSScale, calculateGScale } from '@/lib/noaa-scales';
 
 interface ScaleData {
   current: number;
@@ -45,36 +46,6 @@ function getScaleColor(level: number): typeof riskColors[keyof typeof riskColors
   if (level === 1 || level === 2) return riskColors.MODERATE;
   if (level === 3) return riskColors.HIGH;
   return riskColors.SEVERE;
-}
-
-// Calculate R-Scale from X-ray flux (W/m²)
-function calculateRScale(flux: number): number {
-  if (flux >= 2e-3) return 5;  // X20+
-  if (flux >= 1e-3) return 4;  // X10-X19
-  if (flux >= 1e-4) return 3;  // X1-X9
-  if (flux >= 5e-5) return 2;  // M5-M9
-  if (flux >= 1e-5) return 1;  // M1-M4
-  return 0;                     // Below M-class
-}
-
-// Calculate S-Scale from >10 MeV proton flux (pfu)
-function calculateSScale(pfu: number): number {
-  if (pfu >= 100000) return 5;
-  if (pfu >= 10000) return 4;
-  if (pfu >= 1000) return 3;
-  if (pfu >= 100) return 2;
-  if (pfu >= 10) return 1;
-  return 0;
-}
-
-// Calculate G-Scale from Kp index
-function calculateGScale(kp: number): number {
-  if (kp >= 9) return 5;
-  if (kp >= 8) return 4;
-  if (kp >= 7) return 3;
-  if (kp >= 6) return 2;
-  if (kp >= 5) return 1;
-  return 0;
 }
 
 interface ScaleBoxProps {

@@ -17,6 +17,7 @@ import { SolarImageryCard } from '@/components/dashboard/solar-imagery-card';
 import { CmeCard } from '@/components/dashboard/cme-card';
 import { AlertsPanel } from '@/components/dashboard/alerts-panel';
 import { SDAPanel } from '@/components/dashboard/sda-panel';
+import { ThreatPostureStrip } from '@/components/dashboard/threat-posture-strip';
 import {
   LayoutDashboard,
   Wind,
@@ -169,6 +170,9 @@ export function TabbedDashboard() {
             })}
           </TabsList>
         </div>
+
+        {/* Persistent Threat Posture strip - visible on every tab */}
+        <ThreatPostureStrip key={`posture-${refreshTrigger}`} />
 
         {/* Tab Content - fills remaining space */}
         <div className="flex-1 min-h-0 overflow-hidden">
