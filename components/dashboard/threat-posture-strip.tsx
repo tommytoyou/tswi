@@ -129,7 +129,7 @@ export function ThreatPostureStrip() {
         const json = await res.json();
         const alerts = json?.data;
         if (Array.isArray(alerts)) {
-          next.alertCount = alerts.length;
+          next.alertCount = json?.stats?.unacknowledged ?? alerts.length;
           let top: string | null = null;
           for (const a of alerts) {
             const sev = a?.severity;
