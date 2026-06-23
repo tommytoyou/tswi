@@ -34,10 +34,10 @@ interface CmeResponse {
 }
 
 const speedCategoryInfo: Record<string, { label: string; color: string; risk: keyof typeof riskColors }> = {
-  slow: { label: 'Slow', color: 'text-green-400', risk: 'LOW' },
-  moderate: { label: 'Moderate', color: 'text-yellow-400', risk: 'MODERATE' },
-  fast: { label: 'Fast', color: 'text-orange-400', risk: 'HIGH' },
-  extreme: { label: 'Extreme', color: 'text-red-400', risk: 'SEVERE' },
+  slow: { label: 'Slow', color: riskColors.LOW.text, risk: 'LOW' },
+  moderate: { label: 'Moderate', color: riskColors.MODERATE.text, risk: 'MODERATE' },
+  fast: { label: 'Fast', color: riskColors.HIGH.text, risk: 'HIGH' },
+  extreme: { label: 'Extreme', color: riskColors.SEVERE.text, risk: 'SEVERE' },
 };
 
 function formatArrivalTime(arrivalHours: number | null | undefined): string {
@@ -90,7 +90,7 @@ export function CmeCard() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-red-400">{error || 'No data'}</p>
+          <p className="text-sm text-intel-red">{error || 'No data'}</p>
         </CardContent>
       </Card>
     );
@@ -106,11 +106,11 @@ export function CmeCard() {
   const riskLevel = hasIncoming && hasFast ? 'SEVERE' : hasIncoming ? 'HIGH' : earthDirectedCmes.length > 0 ? 'MODERATE' : 'LOW';
 
   return (
-    <Card className="border-slate-800 bg-slate-900/50">
+    <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
-            <Sun className="h-4 w-4 text-orange-400" />
+            <Sun className="h-4 w-4 text-intel-cyan" />
             CME Tracking
           </CardTitle>
           <Badge
@@ -125,20 +125,20 @@ export function CmeCard() {
         {/* Summary Stats */}
         <div className="grid grid-cols-3 gap-4">
           <div className="space-y-1">
-            <span className="text-xs text-slate-400">Total (7d)</span>
+            <span className="text-xs text-intel-muted">Total (7d)</span>
             <div className="text-2xl font-bold font-mono text-slate-200">
               {data.count}
             </div>
           </div>
           <div className="space-y-1">
-            <span className="text-xs text-slate-400">Earth-Directed</span>
-            <div className={`text-2xl font-bold font-mono ${data.earthDirectedCount > 0 ? 'text-orange-400' : 'text-slate-200'}`}>
+            <span className="text-xs text-intel-muted">Earth-Directed</span>
+            <div className={`text-2xl font-bold font-mono ${data.earthDirectedCount > 0 ? 'text-intel-amber' : 'text-slate-200'}`}>
               {data.earthDirectedCount}
             </div>
           </div>
           <div className="space-y-1">
-            <span className="text-xs text-slate-400">Incoming</span>
-            <div className={`text-2xl font-bold font-mono ${data.incomingCount > 0 ? 'text-red-400' : 'text-slate-200'}`}>
+            <span className="text-xs text-intel-muted">Incoming</span>
+            <div className={`text-2xl font-bold font-mono ${data.incomingCount > 0 ? 'text-intel-red' : 'text-slate-200'}`}>
               {data.incomingCount}
             </div>
           </div>
@@ -146,10 +146,10 @@ export function CmeCard() {
 
         {/* Incoming CME Alert */}
         {data.incomingCount > 0 && (
-          <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+          <div className="p-3 rounded-lg bg-intel-red/10 border border-intel-red/30">
             <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="h-4 w-4 text-red-400" />
-              <span className="text-sm font-semibold text-red-400">Incoming CME Detected</span>
+              <AlertTriangle className="h-4 w-4 text-intel-red" />
+              <span className="text-sm font-semibold text-intel-red">Incoming CME Detected</span>
             </div>
             {earthDirectedCmes
               .filter(cme => cme.arrivalHours && cme.arrivalHours > 0)
@@ -159,7 +159,7 @@ export function CmeCard() {
                   <span className="text-slate-300 font-mono">
                     {cme.speed ? `${cme.speed} km/s` : 'Speed TBD'}
                   </span>
-                  <span className="text-red-300">
+                  <span className="text-intel-red">
                     <Clock className="inline h-3 w-3 mr-1" />
                     ETA: {formatArrivalTime(cme.arrivalHours)}
                   </span>
@@ -170,10 +170,10 @@ export function CmeCard() {
 
         {/* Recent CME List */}
         <div className="space-y-2">
-          <span className="text-xs text-slate-400 uppercase tracking-wider">Recent CMEs</span>
+          <span className="text-xs text-intel-muted uppercase tracking-wider">Recent CMEs</span>
           <div className="space-y-2 max-h-[200px] overflow-y-auto">
             {data.data.length === 0 ? (
-              <div className="text-sm text-slate-500 text-center py-4">
+              <div className="text-sm text-intel-muted text-center py-4">
                 No CMEs detected in the last 7 days
               </div>
             ) : (
@@ -184,14 +184,14 @@ export function CmeCard() {
                     key={cme.id}
                     className={`p-2 rounded border ${
                       cme.isEarthDirected
-                        ? 'border-orange-500/30 bg-orange-500/5'
-                        : 'border-slate-700 bg-slate-800/30'
+                        ? 'border-intel-amber/30 bg-intel-amber/5'
+                        : 'border-intel-border bg-intel-panel/30'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
                         {cme.isEarthDirected && (
-                          <span className="text-orange-400" title="Earth-Directed">
+                          <span className="text-intel-amber" title="Earth-Directed">
                             <AlertTriangle className="h-3 w-3" />
                           </span>
                         )}
@@ -207,22 +207,22 @@ export function CmeCard() {
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-400">
+                      <span className="text-intel-muted">
                         {cme.sourceLocation || 'Location N/A'}
                         {cme.activeRegion && ` (AR${cme.activeRegion})`}
                       </span>
                       {cme.isEarthDirected && cme.arrivalHours && cme.arrivalHours > 0 ? (
-                        <span className="text-orange-300">
+                        <span className="text-intel-amber">
                           ETA: {formatArrivalTime(cme.arrivalHours)}
                         </span>
                       ) : cme.isEarthDirected && cme.estimatedArrival ? (
-                        <span className="text-slate-400">
+                        <span className="text-intel-muted">
                           Arrived: {formatDistanceToNow(new Date(cme.estimatedArrival), { addSuffix: true })}
                         </span>
                       ) : null}
                     </div>
                     {cme.linkedFlare && (
-                      <div className="flex items-center gap-1 mt-1 text-xs text-yellow-400">
+                      <div className="flex items-center gap-1 mt-1 text-xs text-intel-amber">
                         <Zap className="h-3 w-3" />
                         Linked: {cme.linkedFlare}
                       </div>
@@ -237,23 +237,23 @@ export function CmeCard() {
         {/* Speed Legend */}
         <div className="flex justify-between items-center text-xs">
           <div className="flex gap-3">
-            <span className="text-green-400">&lt;500: Slow</span>
-            <span className="text-yellow-400">500-1000: Mod</span>
-            <span className="text-orange-400">1000-2000: Fast</span>
-            <span className="text-red-400">&gt;2000: Extreme</span>
+            <span className={riskColors.LOW.text}>&lt;500: Slow</span>
+            <span className={riskColors.MODERATE.text}>500-1000: Mod</span>
+            <span className={riskColors.HIGH.text}>1000-2000: Fast</span>
+            <span className={riskColors.SEVERE.text}>&gt;2000: Extreme</span>
           </div>
         </div>
 
         {/* Footer Info */}
         <div className="flex justify-between items-center text-xs">
-          <div className="text-slate-500">
+          <div className="text-intel-muted">
             Last 7 days • NASA DONKI
           </div>
           <a
             href="https://kauai.ccmc.gsfc.nasa.gov/DONKI/"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-400 hover:text-blue-300 flex items-center gap-1"
+            className="text-intel-cyan hover:text-intel-cyan/80 flex items-center gap-1"
           >
             DONKI <ExternalLink className="h-3 w-3" />
           </a>

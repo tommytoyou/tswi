@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2, RefreshCw } from 'lucide-react';
+import { chartColors } from '@/lib/design-system';
 
 interface WavelengthOption {
   id: string;
@@ -25,28 +26,28 @@ const WAVELENGTHS: WavelengthOption[] = [
     label: 'AIA 304',
     description: 'Chromosphere',
     url: 'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0304.jpg',
-    color: 'text-orange-400',
+    color: chartColors.proton,
   },
   {
     id: '0171',
     label: 'AIA 171',
     description: 'Corona (Blue)',
     url: 'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0171.jpg',
-    color: 'text-blue-400',
+    color: chartColors.primary,
   },
   {
     id: '0193',
     label: 'AIA 193',
     description: 'Corona (Green)',
     url: 'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0193.jpg',
-    color: 'text-green-400',
+    color: chartColors.success,
   },
   {
     id: 'HMIIC',
     label: 'HMI',
     description: 'Sunspots',
     url: 'https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_HMIIC.jpg',
-    color: 'text-yellow-400',
+    color: chartColors.warning,
   },
 ];
 
@@ -96,36 +97,36 @@ export function SolarImageryCard() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="relative">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-              <div className="absolute inset-0 w-2 h-2 bg-emerald-500 rounded-full animate-ping opacity-75" />
+              <div className="w-2 h-2 bg-intel-cyan rounded-full animate-pulse" />
+              <div className="absolute inset-0 w-2 h-2 bg-intel-cyan rounded-full animate-ping opacity-75" />
             </div>
             <CardTitle className="text-sm">Solar Imagery</CardTitle>
-            <span className="text-xs text-emerald-400 font-medium">LIVE</span>
+            <span className="text-xs text-intel-cyan font-medium">LIVE</span>
           </div>
           <div className="flex items-center gap-2">
             <Select value={selectedWavelength} onValueChange={setSelectedWavelength}>
-              <SelectTrigger className="w-[140px] h-7 text-xs bg-slate-800 border-slate-700">
+              <SelectTrigger className="w-[140px] h-7 text-xs bg-intel-panel border-intel-border">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-slate-800 border-slate-700">
+              <SelectContent className="bg-intel-panel border-intel-border">
                 {WAVELENGTHS.map((wavelength) => (
                   <SelectItem
                     key={wavelength.id}
                     value={wavelength.id}
-                    className="text-xs hover:bg-slate-700"
+                    className="text-xs hover:bg-intel-border"
                   >
-                    <span className={wavelength.color}>{wavelength.label}</span>
-                    <span className="text-slate-400 ml-2">- {wavelength.description}</span>
+                    <span style={{ color: wavelength.color }}>{wavelength.label}</span>
+                    <span className="text-intel-muted ml-2">- {wavelength.description}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <button
               onClick={refreshImage}
-              className="p-1 rounded hover:bg-slate-700 transition-colors"
+              className="p-1 rounded hover:bg-intel-border transition-colors"
               title="Refresh image"
             >
-              <RefreshCw className={`h-3.5 w-3.5 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-3.5 w-3.5 text-intel-muted ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
@@ -133,16 +134,16 @@ export function SolarImageryCard() {
       <CardContent className="flex-1 flex flex-col p-1 min-h-0">
         <div className="relative flex-1 flex items-center justify-center -mt-1.5 pb-6">
           {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50 z-10">
-              <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+            <div className="absolute inset-0 flex items-center justify-center bg-intel-panel/50 z-10">
+              <Loader2 className="h-8 w-8 animate-spin text-intel-muted" />
             </div>
           )}
           {error ? (
-            <div className="text-center text-slate-400">
+            <div className="text-center text-intel-muted">
               <p className="mb-2">Failed to load solar image</p>
               <button
                 onClick={refreshImage}
-                className="text-sm text-blue-400 hover:text-blue-300 underline"
+                className="text-sm text-intel-cyan hover:text-intel-cyan/80 underline"
               >
                 Try again
               </button>
@@ -158,13 +159,13 @@ export function SolarImageryCard() {
             />
           )}
         </div>
-        <div className="flex items-center justify-center gap-2 text-xs text-slate-500 mt-1 flex-shrink-0">
+        <div className="flex items-center justify-center gap-2 text-xs text-intel-muted mt-1 flex-shrink-0">
           <span>Last updated:</span>
-          <span className="text-slate-400 font-mono">
+          <span className="text-intel-muted font-mono">
             {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </span>
-          <span className="text-slate-600">•</span>
-          <span className="text-slate-500">Auto-refresh: 60s</span>
+          <span className="text-intel-muted">•</span>
+          <span className="text-intel-muted">Auto-refresh: 60s</span>
         </div>
       </CardContent>
     </Card>
