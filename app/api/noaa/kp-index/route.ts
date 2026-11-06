@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTimeSeriesCollection } from '@/lib/db';
+import { getTimeSeriesCollection, upsertNoaaDocs } from '@/lib/db';
+import { parseNoaaTime } from '@/lib/noaa-rtsw';
 import { NoaaKpIndex } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -23,7 +24,7 @@ async function fetchFromNOAA(limit: number): Promise<{ data: any[]; source: stri
     if (!item.time_tag || item.kp_index === null) continue;
 
     documents.push({
-      ts: new Date(item.time_tag),
+      ts: parseNoaaTime(item.time_tag),
       kp: parseFloat(item.kp_index) || 0,
       kp_index: parseFloat(item.kp_index) || 0,
       a_running: parseFloat(item.a_running) || 0,
@@ -54,16 +55,20 @@ export async function GET(request: NextRequest) {
     try {
       const result = await fetchFromNOAA(limit);
 
-      // Try to store in MongoDB (non-blocking, ignore errors)
-      getTimeSeriesCollection<NoaaKpIndex>('timeseries_noaa_kp_index')
-        .then(collection => {
-          const docsWithMeta = result.data.map(d => ({
-            ...d,
-            meta: { source: 'NOAA-SWPC', fetched_at: new Date() }
-          }));
-          return collection.insertMany(docsWithMeta, { ordered: false });
-        })
-        .catch(() => { /* Ignore MongoDB errors */ });
+      // Store in MongoDB. Upsert on the natural key so re-fetching the same
+      // NOAA window never duplicates readings. Failures are logged, not hidden.
+      try {
+        const fetchedAt = new Date();
+        await upsertNoaaDocs(
+          'timeseries_noaa_kp_index',
+          result.data.map(d => ({ ...d, meta: { source: 'NOAA-SWPC', fetched_at: fetchedAt } }))
+        );
+      } catch (dbError) {
+        console.error(
+          '[NOAA] Write to timeseries_noaa_kp_index failed:',
+          dbError instanceof Error ? dbError.message : String(dbError)
+        );
+      }
 
       return NextResponse.json({
         success: true,

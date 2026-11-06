@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTimeSeriesCollection } from '@/lib/db';
+import { getTimeSeriesCollection, upsertNoaaDocs } from '@/lib/db';
+import { parseNoaaTime } from '@/lib/noaa-rtsw';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -73,7 +74,7 @@ async function fetchFromNOAA(limit: number): Promise<{ data: ProtonFluxDoc[]; so
   const documents: ProtonFluxDoc[] = [];
   for (const [ts, values] of timestampMap) {
     documents.push({
-      ts: new Date(ts),
+      ts: parseNoaaTime(ts),
       p10_pfu: values.p10,
       p50_pfu: values.p50,
       p100_pfu: values.p100,
@@ -106,16 +107,20 @@ export async function GET(request: NextRequest) {
     try {
       const result = await fetchFromNOAA(limit);
 
-      // Try to store in MongoDB (non-blocking, ignore errors)
-      getTimeSeriesCollection<ProtonFluxDoc>('timeseries_noaa_proton_flux')
-        .then(collection => {
-          const docsWithMeta = result.data.map(d => ({
-            ...d,
-            meta: { source: 'NOAA-SWPC-GOES', fetched_at: new Date() }
-          }));
-          return collection.insertMany(docsWithMeta, { ordered: false });
-        })
-        .catch(() => { /* Ignore MongoDB errors */ });
+      // Store in MongoDB. Upsert on the natural key so re-fetching the same
+      // NOAA window never duplicates readings. Failures are logged, not hidden.
+      try {
+        const fetchedAt = new Date();
+        await upsertNoaaDocs(
+          'timeseries_noaa_proton_flux',
+          result.data.map(d => ({ ...d, meta: { source: 'NOAA-SWPC-GOES', fetched_at: fetchedAt } }))
+        );
+      } catch (dbError) {
+        console.error(
+          '[NOAA] Write to timeseries_noaa_proton_flux failed:',
+          dbError instanceof Error ? dbError.message : String(dbError)
+        );
+      }
 
       return NextResponse.json({
         success: true,

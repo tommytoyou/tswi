@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTimeSeriesCollection } from '@/lib/db';
+import { getTimeSeriesCollection, upsertNoaaDocs } from '@/lib/db';
+import { parseNoaaTime } from '@/lib/noaa-rtsw';
 import { NoaaXrayFlux } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -23,7 +24,7 @@ async function fetchFromNOAA(limit: number): Promise<{ data: any[]; source: stri
     if (!item.time_tag || item.flux === null) continue;
 
     documents.push({
-      ts: new Date(item.time_tag),
+      ts: parseNoaaTime(item.time_tag),
       satellite: parseInt(item.satellite) || 0,
       flux: parseFloat(item.flux) || 0,
       observed_flux: parseFloat(item.observed_flux) || 0,
@@ -56,16 +57,20 @@ export async function GET(request: NextRequest) {
     try {
       const result = await fetchFromNOAA(limit);
 
-      // Try to store in MongoDB (non-blocking, ignore errors)
-      getTimeSeriesCollection<NoaaXrayFlux>('timeseries_noaa_xray_flux')
-        .then(collection => {
-          const docsWithMeta = result.data.map(d => ({
-            ...d,
-            meta: { source: 'NOAA-GOES', fetched_at: new Date() }
-          }));
-          return collection.insertMany(docsWithMeta, { ordered: false });
-        })
-        .catch(() => { /* Ignore MongoDB errors */ });
+      // Store in MongoDB. Upsert on the natural key so re-fetching the same
+      // NOAA window never duplicates readings. Failures are logged, not hidden.
+      try {
+        const fetchedAt = new Date();
+        await upsertNoaaDocs(
+          'timeseries_noaa_xray_flux',
+          result.data.map(d => ({ ...d, meta: { source: 'NOAA-GOES', fetched_at: fetchedAt } }))
+        );
+      } catch (dbError) {
+        console.error(
+          '[NOAA] Write to timeseries_noaa_xray_flux failed:',
+          dbError instanceof Error ? dbError.message : String(dbError)
+        );
+      }
 
       const latest = result.data[result.data.length - 1] || null;
       const flareClass = latest ? getFlareClass(latest.flux) : null;

@@ -1,9 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTimeSeriesCollection } from '@/lib/db';
+import { getTimeSeriesCollection, upsertNoaaDocs } from '@/lib/db';
 import { NoaaSolarWindMag } from '@/lib/types';
+import { selectRtswByMinute, num, type RtswRecord } from '@/lib/noaa-rtsw';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+const NOAA_MAG_URL = 'https://services.swpc.noaa.gov/json/rtsw/rtsw_mag_1m.json';
+
+/**
+ * Parse rtsw_mag_1m.json: one record per minute, preferring the active spacecraft.
+ * RTSW names the GSM angles phi_gsm (longitude) and theta_gsm (latitude).
+ */
+function parseMagRecords(rawData: unknown): Array<NoaaSolarWindMag & { source: string }> {
+  if (!Array.isArray(rawData)) {
+    throw new Error('NOAA mag response is not an array');
+  }
+
+  const selected = selectRtswByMinute(rawData as RtswRecord[], ['bt', 'bx_gsm', 'by_gsm', 'bz_gsm']);
+  const documents: Array<NoaaSolarWindMag & { source: string }> = [];
+
+  for (const { ts, record } of selected) {
+    const bz = num(record.bz_gsm);
+    const bt = num(record.bt);
+    // Bz and Bt drive every consumer (storm coupling); skip minutes without them
+    if (bz === null || bt === null) continue;
+
+    documents.push({
+      ts,
+      bx_gsm: num(record.bx_gsm) ?? 0,
+      by_gsm: num(record.by_gsm) ?? 0,
+      bz_gsm: bz,
+      lon_gsm: num(record.phi_gsm) ?? 0,
+      lat_gsm: num(record.theta_gsm) ?? 0,
+      bt,
+      source: record.source,
+    });
+  }
+
+  return documents;
+}
 
 /**
  * GET /api/noaa/solar-wind
@@ -23,48 +59,27 @@ export async function GET(request: NextRequest) {
 
     // If fetch=latest, get from NOAA and store in DB
     if (fetchMode === 'latest') {
-      const noaaUrl = 'https://services.swpc.noaa.gov/json/rtsw/rtsw_mag_1m.json';
-
       try {
-        const response = await fetch(noaaUrl, {
-          next: { revalidate: 60 }, // Cache for 1 minute
-        });
+        const response = await fetch(NOAA_MAG_URL, { cache: 'no-store' });
 
         if (!response.ok) {
           throw new Error(`NOAA API returned ${response.status}`);
         }
 
-        const rawData = await response.json();
+        const documents = parseMagRecords(await response.json());
 
-        // Transform NOAA data to our schema
-        const collection = await getTimeSeriesCollection<NoaaSolarWindMag>('timeseries_noaa_solarwind_mag');
-        const documents: any[] = [];
-
-        for (const item of rawData) {
-          if (!item.time_tag || item.bx_gsm === null) continue;
-
-          const doc = {
-            ts: new Date(item.time_tag),
-            bx_gsm: parseFloat(item.bx_gsm) || 0,
-            by_gsm: parseFloat(item.by_gsm) || 0,
-            bz_gsm: parseFloat(item.bz_gsm) || 0,
-            lon_gsm: parseFloat(item.lon_gsm) || 0,
-            lat_gsm: parseFloat(item.lat_gsm) || 0,
-            bt: parseFloat(item.bt) || 0,
-            meta: {
-              source: 'NOAA-SWPC',
-              fetched_at: new Date(),
-            },
-          };
-
-          documents.push(doc);
-        }
-
-        // Insert new data (upsert by timestamp)
-        if (documents.length > 0) {
-          await collection.insertMany(documents, { ordered: false }).catch(() => {
-            // Ignore duplicate key errors
-          });
+        // Upsert on the natural key so re-fetching never duplicates; failures are logged
+        try {
+          const fetchedAt = new Date();
+          await upsertNoaaDocs(
+            'timeseries_noaa_solarwind_mag',
+            documents.map((d) => ({ ...d, meta: { source: 'NOAA-SWPC-RTSW', fetched_at: fetchedAt } }))
+          );
+        } catch (dbError) {
+          console.error(
+            '[NOAA] Write to timeseries_noaa_solarwind_mag failed:',
+            dbError instanceof Error ? dbError.message : String(dbError)
+          );
         }
 
         return NextResponse.json({
@@ -101,29 +116,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Fallback to NOAA if cache is empty or MongoDB unavailable
-    const noaaUrl = 'https://services.swpc.noaa.gov/json/rtsw/rtsw_mag_1m.json';
-    const response = await fetch(noaaUrl, { cache: 'no-store' });
+    const response = await fetch(NOAA_MAG_URL, { cache: 'no-store' });
 
     if (!response.ok) {
       throw new Error(`NOAA API returned ${response.status}`);
     }
 
-    const rawData = await response.json();
-    const documents: any[] = [];
-
-    for (const item of rawData) {
-      if (!item.time_tag || item.bx_gsm === null) continue;
-
-      documents.push({
-        ts: new Date(item.time_tag),
-        bx_gsm: parseFloat(item.bx_gsm) || 0,
-        by_gsm: parseFloat(item.by_gsm) || 0,
-        bz_gsm: parseFloat(item.bz_gsm) || 0,
-        lon_gsm: parseFloat(item.lon_gsm) || 0,
-        lat_gsm: parseFloat(item.lat_gsm) || 0,
-        bt: parseFloat(item.bt) || 0,
-      });
-    }
+    const documents = parseMagRecords(await response.json());
 
     return NextResponse.json({
       success: true,

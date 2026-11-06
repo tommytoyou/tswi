@@ -1,5 +1,89 @@
-import { MongoClient, Db, Collection, Document } from 'mongodb';
+import { MongoClient, Db, Collection, Document, AnyBulkWriteOperation } from 'mongodb';
 import { config } from './config';
+
+// ============================================================================
+// NOAA REAL-TIME COLLECTIONS
+// Plain collections (time-series collections cannot have unique indexes).
+// Each has a unique index on its natural key so a re-fetched NOAA window
+// never stores the same reading twice, and a TTL index on ts.
+// ============================================================================
+
+export const NOAA_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+
+export const NOAA_REALTIME_COLLECTIONS = {
+  // plasma-1-day: one row per minute
+  timeseries_noaa_solarwind_plasma: ['ts'],
+  // xrays feed: two energy bands per time_tag, possibly several GOES satellites
+  timeseries_noaa_xray_flux: ['ts', 'satellite', 'energy'],
+  // route merges >=10/>=50/>=100 MeV into one doc per time_tag
+  timeseries_noaa_proton_flux: ['ts'],
+  // Kyoto Dst: one hourly value per time_tag
+  timeseries_noaa_dst: ['ts'],
+  // planetary_k_index_1m: one row per minute
+  timeseries_noaa_kp_index: ['ts'],
+  // rtsw_mag_1m: one active-spacecraft record per minute
+  timeseries_noaa_solarwind_mag: ['ts'],
+} as const;
+
+export type NoaaRealtimeCollection = keyof typeof NOAA_REALTIME_COLLECTIONS;
+
+/**
+ * Create the unique natural-key index and 30-day TTL index on each NOAA
+ * collection. Errors are logged, not swallowed; returns false if any failed.
+ */
+export async function ensureNoaaIndexes(): Promise<boolean> {
+  const database = await getDb();
+  let ok = true;
+
+  for (const [name, keyFields] of Object.entries(NOAA_REALTIME_COLLECTIONS)) {
+    const collection = database.collection(name);
+    const keySpec = Object.fromEntries(keyFields.map((f) => [f, 1 as const]));
+
+    try {
+      await collection.createIndex(keySpec, { unique: true, name: 'natural_key_unique' });
+    } catch (error) {
+      ok = false;
+      console.error(`[DB] Failed to create unique index on ${name}:`, (error as Error).message);
+    }
+
+    try {
+      await collection.createIndex(
+        { ts: 1 },
+        { expireAfterSeconds: NOAA_TTL_SECONDS, name: 'ts_ttl_30d' }
+      );
+    } catch (error) {
+      ok = false;
+      console.error(`[DB] Failed to create TTL index on ${name}:`, (error as Error).message);
+    }
+  }
+
+  return ok;
+}
+
+/**
+ * Upsert NOAA readings on their natural key. $set (not $setOnInsert) so a
+ * value NOAA revises after first publishing overwrites the stored one.
+ * Throws on failure; callers log with the collection name.
+ */
+export async function upsertNoaaDocs<T extends Document>(
+  name: NoaaRealtimeCollection,
+  docs: T[]
+): Promise<{ inserted: number; updated: number }> {
+  if (docs.length === 0) return { inserted: 0, updated: 0 };
+
+  const keyFields = NOAA_REALTIME_COLLECTIONS[name];
+  const ops: AnyBulkWriteOperation<Document>[] = docs.map((doc) => ({
+    updateOne: {
+      filter: Object.fromEntries(keyFields.map((f) => [f, (doc as Document)[f]])),
+      update: { $set: doc },
+      upsert: true,
+    },
+  }));
+
+  const collection = await getCollection(name);
+  const result = await collection.bulkWrite(ops, { ordered: false });
+  return { inserted: result.upsertedCount, updated: result.modifiedCount };
+}
 
 // Global cache for serverless environments
 // In serverless, each invocation may reuse the same runtime
@@ -112,117 +196,11 @@ export async function getCollection<T extends Document = Document>(name: string)
   return database.collection<T>(name);
 }
 
-// Initialize time series collections if they don't exist
+// Create indexes for the app's standard collections.
+// NOTE: not called at startup; NOAA real-time indexes are created by
+// ensureNoaaIndexes() from instrumentation.ts.
 export async function initializeCollections(): Promise<void> {
   const database = await getDb();
-  const collections = await database.listCollections().toArray();
-  const collectionNames = collections.map((c) => c.name);
-
-  const timeSeriesCollections = [
-    {
-      name: 'timeseries_kp',
-      timeField: 'ts',
-      metaField: 'meta',
-      granularity: 'minutes' as const,
-      expireAfterSeconds: 90 * 24 * 60 * 60, // 90 days
-    },
-    {
-      name: 'timeseries_dst',
-      timeField: 'ts',
-      metaField: 'meta',
-      granularity: 'hours' as const,
-      expireAfterSeconds: 180 * 24 * 60 * 60, // 180 days
-    },
-    {
-      name: 'timeseries_solarwind_plasma',
-      timeField: 'ts',
-      metaField: 'meta',
-      granularity: 'minutes' as const,
-      expireAfterSeconds: 30 * 24 * 60 * 60, // 30 days
-    },
-    {
-      name: 'timeseries_solarwind_mag',
-      timeField: 'ts',
-      metaField: 'meta',
-      granularity: 'minutes' as const,
-      expireAfterSeconds: 30 * 24 * 60 * 60, // 30 days
-    },
-    {
-      name: 'timeseries_goes_protons',
-      timeField: 'ts',
-      metaField: 'meta',
-      granularity: 'minutes' as const,
-      expireAfterSeconds: 90 * 24 * 60 * 60, // 90 days
-    },
-    {
-      name: 'timeseries_tec_regional',
-      timeField: 'ts',
-      metaField: 'meta',
-      granularity: 'minutes' as const,
-      expireAfterSeconds: 90 * 24 * 60 * 60, // 90 days
-    },
-    // NOAA Real-Time Data Collections (7-day TTL to stay within 512MB free tier)
-    {
-      name: 'timeseries_noaa_solarwind_mag',
-      timeField: 'ts',
-      metaField: 'meta',
-      granularity: 'minutes' as const,
-      expireAfterSeconds: 7 * 24 * 60 * 60, // 7 days
-    },
-    {
-      name: 'timeseries_noaa_solarwind_plasma',
-      timeField: 'ts',
-      metaField: 'meta',
-      granularity: 'minutes' as const,
-      expireAfterSeconds: 7 * 24 * 60 * 60, // 7 days
-    },
-    {
-      name: 'timeseries_noaa_kp_index',
-      timeField: 'ts',
-      metaField: 'meta',
-      granularity: 'minutes' as const,
-      expireAfterSeconds: 7 * 24 * 60 * 60, // 7 days
-    },
-    {
-      name: 'timeseries_noaa_xray_flux',
-      timeField: 'ts',
-      metaField: 'meta',
-      granularity: 'minutes' as const,
-      expireAfterSeconds: 7 * 24 * 60 * 60, // 7 days
-    },
-    {
-      name: 'timeseries_noaa_proton_flux',
-      timeField: 'ts',
-      metaField: 'meta',
-      granularity: 'minutes' as const,
-      expireAfterSeconds: 7 * 24 * 60 * 60, // 7 days
-    },
-    {
-      name: 'timeseries_noaa_dst',
-      timeField: 'ts',
-      metaField: 'meta',
-      granularity: 'hours' as const,
-      expireAfterSeconds: 7 * 24 * 60 * 60, // 7 days
-    },
-  ];
-
-  for (const tsConfig of timeSeriesCollections) {
-    if (!collectionNames.includes(tsConfig.name)) {
-      try {
-        await database.createCollection(tsConfig.name, {
-          timeseries: {
-            timeField: tsConfig.timeField,
-            metaField: tsConfig.metaField,
-            granularity: tsConfig.granularity,
-          },
-          expireAfterSeconds: tsConfig.expireAfterSeconds,
-        });
-        console.log(`✅ Created time series collection: ${tsConfig.name}`);
-      } catch (error) {
-        console.error(`❌ Error creating ${tsConfig.name}:`, error);
-      }
-    }
-  }
 
   // Create indexes
   const eventsObserved = database.collection('events_observed');
@@ -271,32 +249,9 @@ export async function initializeCollections(): Promise<void> {
 
   console.log('✅ Indexes created');
 
-  // Update TTL (expireAfterSeconds) on existing timeseries collections
-  // This ensures existing collections get updated TTL settings
-  const ttlUpdates = [
-    { name: 'timeseries_noaa_xray_flux', expireAfterSeconds: 7 * 24 * 60 * 60 },
-    { name: 'timeseries_noaa_solarwind_plasma', expireAfterSeconds: 7 * 24 * 60 * 60 },
-    { name: 'timeseries_noaa_solarwind_mag', expireAfterSeconds: 7 * 24 * 60 * 60 },
-    { name: 'timeseries_noaa_proton_flux', expireAfterSeconds: 7 * 24 * 60 * 60 },
-    { name: 'timeseries_noaa_dst', expireAfterSeconds: 7 * 24 * 60 * 60 },
-    { name: 'timeseries_noaa_kp_index', expireAfterSeconds: 7 * 24 * 60 * 60 },
-  ];
-
-  for (const update of ttlUpdates) {
-    if (collectionNames.includes(update.name)) {
-      try {
-        await database.command({
-          collMod: update.name,
-          expireAfterSeconds: update.expireAfterSeconds,
-        });
-        console.log(`✅ Updated TTL for ${update.name} to ${update.expireAfterSeconds / 86400} days`);
-      } catch (error: any) {
-        // Ignore errors if TTL is already set or collection doesn't support it
-        if (!error.message?.includes('already set')) {
-          console.log(`Note: Could not update TTL for ${update.name}: ${error.message}`);
-        }
-      }
-    }
+  // NOAA real-time collections: unique natural-key + 30-day TTL indexes
+  if (!(await ensureNoaaIndexes())) {
+    console.error('[DB] One or more NOAA indexes failed to create; see errors above');
   }
 
   console.log('✅ TTL indexes configured');

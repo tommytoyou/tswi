@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTimeSeriesCollection } from '@/lib/db';
+import { getTimeSeriesCollection, upsertNoaaDocs } from '@/lib/db';
+import { selectRtswByMinute, num, type RtswRecord } from '@/lib/noaa-rtsw';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -9,6 +10,7 @@ interface SolarWindPlasmaDoc {
   speed_kms: number;
   density_cm3: number;
   temp_k: number;
+  source?: string; // RTSW spacecraft (SOLAR1, ACE, IMAP)
   meta?: {
     source: string;
     fetched_at: Date;
@@ -19,8 +21,8 @@ interface SolarWindPlasmaDoc {
  * Helper function to fetch and parse NOAA solar wind plasma data
  */
 async function fetchFromNOAA(limit: number): Promise<{ data: SolarWindPlasmaDoc[]; source: string }> {
-  // Use 1-day endpoint for more data (5-minute endpoint only has ~3 entries)
-  const noaaUrl = 'https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json';
+  // RTSW 1-minute feed (replaced products/solar-wind/plasma-1-day.json, NOAA SCN 26-21)
+  const noaaUrl = 'https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json';
 
   console.log('[NOAA Plasma] Fetching from:', noaaUrl);
 
@@ -58,47 +60,40 @@ async function fetchFromNOAA(limit: number): Promise<{ data: SolarWindPlasmaDoc[
     throw new Error('NOAA response is not an array');
   }
 
-  console.log('[NOAA Plasma] Raw data rows:', rawData.length);
-  if (rawData.length > 1) {
-    console.log('[NOAA Plasma] Header:', JSON.stringify(rawData[0]));
-    console.log('[NOAA Plasma] First data row:', JSON.stringify(rawData[1]));
-  }
+  // Records: { time_tag, active, source, proton_density, proton_speed, proton_temperature, ... }
+  // One record per spacecraft per minute; keep the active one (see selectRtswByMinute).
+  const selected = selectRtswByMinute(rawData as RtswRecord[], [
+    'proton_density',
+    'proton_speed',
+    'proton_temperature',
+  ]);
 
-  // Data format: [["time_tag","density","speed","temperature"], ["2025-12-03 01:58:00.000","10.81","401.6","39242"], ...]
   const documents: SolarWindPlasmaDoc[] = [];
   let skippedCount = 0;
 
-  for (let i = 1; i < rawData.length; i++) {
-    const item = rawData[i];
+  for (const { ts, record } of selected) {
+    const density = num(record.proton_density);
+    const speed = num(record.proton_speed);
+    const temp = num(record.proton_temperature);
 
-    // Check for null or empty values - NOAA sometimes returns null for missing data
-    if (!item || !item[0] || item[1] === null || item[1] === '' || item[2] === null || item[2] === '') {
+    // Density and speed are required for every consumer of this series
+    if (density === null || speed === null) {
       skippedCount++;
       continue;
     }
 
-    const density = parseFloat(item[1]);
-    const speed = parseFloat(item[2]);
-    const temp = parseFloat(item[3]);
-
-    // Skip if parsing failed (NaN values)
-    if (isNaN(density) || isNaN(speed)) {
-      skippedCount++;
-      continue;
-    }
-
+    // Map renamed RTSW fields to the existing stored names so consumers keep working
     documents.push({
-      ts: new Date(item[0]),
+      ts,
       density_cm3: density,
       speed_kms: speed,
-      temp_k: isNaN(temp) ? 0 : temp,
+      temp_k: temp ?? 0,
+      source: record.source,
     });
   }
 
-  console.log('[NOAA Plasma] Parsed documents:', documents.length, '| Skipped:', skippedCount);
-
-  if (documents.length === 0 && rawData.length > 1) {
-    console.error('[NOAA Plasma] All rows skipped! Sample row:', JSON.stringify(rawData[1]));
+  if (documents.length === 0 && rawData.length > 0) {
+    console.error('[NOAA Plasma] All rows skipped! Sample row:', JSON.stringify(rawData[0]));
   }
 
   return { data: documents.slice(-limit), source: 'noaa-live' };
@@ -108,7 +103,7 @@ async function fetchFromNOAA(limit: number): Promise<{ data: SolarWindPlasmaDoc[
  * GET /api/noaa/solar-wind-plasma
  *
  * Fetches NOAA real-time solar wind plasma data from SWPC
- * Source: https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json
+ * Source: https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json
  *
  * Query params:
  * - fetch: 'latest' | 'cached' (default: 'cached')
@@ -124,16 +119,20 @@ export async function GET(request: NextRequest) {
     try {
       const result = await fetchFromNOAA(limit);
 
-      // Try to store in MongoDB (non-blocking, ignore errors)
-      getTimeSeriesCollection<SolarWindPlasmaDoc>('timeseries_noaa_solarwind_plasma')
-        .then(collection => {
-          const docsWithMeta = result.data.map(d => ({
-            ...d,
-            meta: { source: 'NOAA-SWPC', fetched_at: new Date() }
-          }));
-          return collection.insertMany(docsWithMeta, { ordered: false });
-        })
-        .catch(() => { /* Ignore MongoDB errors */ });
+      // Store in MongoDB. Upsert on the natural key so re-fetching the same
+      // NOAA window never duplicates readings. Failures are logged, not hidden.
+      try {
+        const fetchedAt = new Date();
+        await upsertNoaaDocs(
+          'timeseries_noaa_solarwind_plasma',
+          result.data.map(d => ({ ...d, meta: { source: 'NOAA-SWPC', fetched_at: fetchedAt } }))
+        );
+      } catch (dbError) {
+        console.error(
+          '[NOAA] Write to timeseries_noaa_solarwind_plasma failed:',
+          dbError instanceof Error ? dbError.message : String(dbError)
+        );
+      }
 
       return NextResponse.json({
         success: true,
