@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getApiSession } from '@/lib/auth/api';
 import {
   GPData,
   CDMData,
@@ -87,7 +88,10 @@ async function authenticate(): Promise<string> {
 // QUERY BUILDERS
 // ============================================================================
 
-type QueryType = 'debris' | 'catalog' | 'cdm' | 'decay' | 'launch' | 'gp' | 'tle-history' | 'boxscore';
+const QUERY_TYPES = ['debris', 'catalog', 'cdm', 'decay', 'launch', 'gp', 'tle-history', 'boxscore'] as const;
+type QueryType = (typeof QUERY_TYPES)[number];
+
+const OBJECT_TYPES = ['PAYLOAD', 'ROCKET BODY', 'DEBRIS', 'UNKNOWN'] as const;
 
 interface QueryConfig {
   endpoint: string;
@@ -175,12 +179,12 @@ function buildQueryUrl(queryType: QueryType, params: Record<string, string>): st
   // Add parameters to the URL path (Space-Track uses path-based params)
   for (const [key, value] of Object.entries(mergedParams)) {
     if (value && key !== 'format') {
-      url += `/${key}/${value}`;
+      url += `/${encodeURIComponent(key)}/${encodeURIComponent(value)}`;
     }
   }
 
   // Format is always at the end
-  url += `/format/${mergedParams.format || 'json'}`;
+  url += `/format/${encodeURIComponent(mergedParams.format || 'json')}`;
 
   return url;
 }
@@ -242,15 +246,63 @@ async function fetchSpaceTrackData<T>(queryType: QueryType, params: Record<strin
  * - country: Filter by country code (e.g., 'PRC', 'RUS', 'US')
  * - object_type: Filter by object type ('PAYLOAD', 'ROCKET BODY', 'DEBRIS')
  */
+function badRequest(error: string) {
+  return NextResponse.json({ success: false, error }, { status: 400 });
+}
+
+/** Parse an optional integer param within [min, max]; null means invalid. */
+function parseBoundedInt(raw: string | null, min: number, max: number, fallback: number): number | null {
+  if (raw === null || raw === '') return fallback;
+  if (!/^\d+$/.test(raw)) return null;
+  const n = parseInt(raw, 10);
+  return n >= min && n <= max ? n : null;
+}
+
 export async function GET(request: NextRequest) {
+  const session = await getApiSession();
+  if (!session) {
+    return NextResponse.json(
+      { success: false, error: 'Authentication required' },
+      { status: 401 }
+    );
+  }
+
   try {
     const { searchParams } = new URL(request.url);
-    const queryType = (searchParams.get('query') || 'gp') as QueryType;
+
+    const rawQuery = searchParams.get('query') || 'gp';
+    if (!(QUERY_TYPES as readonly string[]).includes(rawQuery)) {
+      return badRequest('Invalid query');
+    }
+    const queryType = rawQuery as QueryType;
+
     const noradId = searchParams.get('norad_id');
-    const days = searchParams.get('days') || '30';
-    const limit = searchParams.get('limit') || '100';
+    if (noradId !== null && !/^\d{1,9}$/.test(noradId)) {
+      return badRequest('Invalid norad_id');
+    }
+
+    const daysNum = parseBoundedInt(searchParams.get('days'), 1, 90, 30);
+    if (daysNum === null) {
+      return badRequest('days must be an integer from 1 to 90');
+    }
+
+    const limitNum = parseBoundedInt(searchParams.get('limit'), 1, 500, 100);
+    if (limitNum === null) {
+      return badRequest('limit must be an integer from 1 to 500');
+    }
+
     const country = searchParams.get('country');
+    if (country !== null && !/^[A-Z]{2,6}$/.test(country)) {
+      return badRequest('Invalid country');
+    }
+
     const objectType = searchParams.get('object_type');
+    if (objectType !== null && !(OBJECT_TYPES as readonly string[]).includes(objectType)) {
+      return badRequest('Invalid object_type');
+    }
+
+    const days = String(daysNum);
+    const limit = String(limitNum);
 
     // Build query parameters
     const params: Record<string, string> = {
@@ -335,10 +387,7 @@ export async function GET(request: NextRequest) {
         break;
 
       default:
-        return NextResponse.json(
-          { success: false, error: `Unknown query type: ${queryType}` },
-          { status: 400 }
-        );
+        return badRequest('Invalid query');
     }
 
     const response: SpaceTrackResponse<unknown> = {
@@ -350,31 +399,20 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(response);
   } catch (error: unknown) {
+    // Log detail server-side only; never return internal messages to the client
     console.error('Space-Track API error:', error);
 
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-    // Check if it's a credentials error
-    if (errorMessage.includes('credentials not configured')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: errorMessage,
-          data: [],
-          count: 0,
-        },
-        { status: 503 }
-      );
-    }
+    const errorMessage = error instanceof Error ? error.message : '';
+    const notConfigured = errorMessage.includes('credentials not configured');
 
     return NextResponse.json(
       {
         success: false,
-        error: errorMessage,
+        error: notConfigured ? 'Service unavailable' : 'Failed to fetch Space-Track data',
         data: [],
         count: 0,
       },
-      { status: 500 }
+      { status: notConfigured ? 503 : 500 }
     );
   }
 }

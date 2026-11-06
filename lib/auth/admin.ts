@@ -2,7 +2,14 @@ import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
 
 const ADMIN_SESSION_COOKIE = 'tswi_admin_session';
-const JWT_SECRET = new TextEncoder().encode(process.env.NEXTAUTH_SECRET || 'admin-secret-key');
+
+function getJwtSecret(): Uint8Array {
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    throw new Error('NEXTAUTH_SECRET is not set');
+  }
+  return new TextEncoder().encode(secret);
+}
 
 export interface AdminSession {
   email: string;
@@ -19,9 +26,10 @@ export async function getAdminSession(): Promise<AdminSession | null> {
       return null;
     }
 
-    const { payload } = await jwtVerify(token, JWT_SECRET);
+    // Throws if NEXTAUTH_SECRET is unset; caught below and treated as no session
+    const { payload } = await jwtVerify(token, getJwtSecret());
 
-    if (!payload.isAdmin) {
+    if (payload.isAdmin !== true) {
       return null;
     }
 

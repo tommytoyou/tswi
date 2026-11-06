@@ -7,15 +7,19 @@ import { SignJWT } from 'jose';
 export const dynamic = 'force-dynamic';
 
 const ADMIN_SESSION_COOKIE = 'tswi_admin_session';
-const JWT_SECRET = new TextEncoder().encode(process.env.NEXTAUTH_SECRET || 'admin-secret-key');
+
+function getJwtSecret(): Uint8Array {
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    throw new Error('NEXTAUTH_SECRET is not set');
+  }
+  return new TextEncoder().encode(secret);
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { email, password } = body;
-
-    console.log('[Admin Login] Incoming email:', email);
-    console.log('[Admin Login] MONGODB_DB env:', process.env.MONGODB_DB || 'NOT SET (defaulting to tswi)');
 
     if (!email || !password) {
       return NextResponse.json(
@@ -28,14 +32,7 @@ export async function POST(request: NextRequest) {
     const adminsCollection = db.collection('admins');
 
     // Find admin by email
-    console.log('[Admin Login] Querying for email:', email.toLowerCase());
     const admin = await adminsCollection.findOne({ email: email.toLowerCase() });
-    console.log('[Admin Login] Admin found:', admin ? 'YES' : 'NO');
-    if (admin) {
-      console.log('[Admin Login] Admin email in DB:', admin.email);
-      console.log('[Admin Login] Has password_hash:', !!admin.password_hash);
-      console.log('[Admin Login] Hash starts with $2:', admin.password_hash?.startsWith('$2'));
-    }
 
     if (!admin) {
       return NextResponse.json(
@@ -45,9 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify password
-    console.log('[Admin Login] Comparing password...');
     const isValidPassword = await bcrypt.compare(password, admin.password_hash);
-    console.log('[Admin Login] Password valid:', isValidPassword);
 
     if (!isValidPassword) {
       return NextResponse.json(
@@ -65,7 +60,7 @@ export async function POST(request: NextRequest) {
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('24h')
-      .sign(JWT_SECRET);
+      .sign(getJwtSecret());
 
     // Set admin session cookie
     const cookieStore = await cookies();

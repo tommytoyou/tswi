@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth/admin';
 import { ObjectId } from 'mongodb';
+import { createPasswordToken, buildSetPasswordUrl } from '@/lib/auth/password-tokens';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,7 +98,9 @@ export async function POST(
       console.log('[APPROVAL] RESEND_API_KEY length:', process.env.RESEND_API_KEY?.length || 0);
 
       const appUrl = process.env.NEXTAUTH_URL || 'https://www.tswi-ai.com';
-      const html = generateApprovalEmail(accessRequest.name, appUrl);
+      // Single-use, 60-minute link so the approved user can set a password in one click
+      const setPasswordUrl = buildSetPasswordUrl(await createPasswordToken(accessRequest.email));
+      const html = generateApprovalEmail(accessRequest.name, appUrl, setPasswordUrl);
 
       // Call Resend API directly to bypass any issues with lib/notifications
       const resendApiKey = process.env.RESEND_API_KEY;
@@ -153,7 +156,7 @@ export async function POST(
   }
 }
 
-function generateApprovalEmail(name: string, appUrl: string): string {
+function generateApprovalEmail(name: string, appUrl: string, setPasswordUrl: string): string {
   return `
 <!DOCTYPE html>
 <html>
@@ -206,14 +209,15 @@ function generateApprovalEmail(name: string, appUrl: string): string {
       <p style="color: #64748b; margin: 0 0 15px; font-size: 13px;">
         You can also set up a password to sign in with your email address instead of Google.
       </p>
-      <a href="${appUrl}/set-password"
+      <a href="${setPasswordUrl}"
          style="display: inline-block; background: #475569; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px;">
         Set Up Password
       </a>
     </div>
 
     <p style="color: #9ca3af; font-size: 13px; margin: 30px 0 0; text-align: center;">
-      Use the same email address you used to request access.
+      The password setup link expires in 60 minutes and can be used once.
+      If it expires, use "Set up or reset password" on the login page.
     </p>
 
   </div>

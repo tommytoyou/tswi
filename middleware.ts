@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
+import { jwtVerify } from 'jose';
 
 // Public routes - no auth required
 const PUBLIC_ROUTES = [
@@ -9,32 +10,43 @@ const PUBLIC_ROUTES = [
   '/invite',
   '/request-access',
   '/access-denied',
+  '/set-password',
   '/api/health',
   '/api/auth',
   '/api/access-requests',
   '/api/invite',
 ];
 
-// Admin routes - require admin cookie
+// Admin routes - require a verified admin JWT
 const ADMIN_ROUTES = ['/admin'];
 
 // Admin API routes that don't need admin auth (like login)
 const ADMIN_PUBLIC_API = ['/api/admin/login'];
 
+const ADMIN_SESSION_COOKIE = 'tswi_admin_session';
+
+/**
+ * Verify the admin session cookie. Fails closed: returns false when the
+ * cookie is missing, the signature/expiry is invalid, isAdmin is not true,
+ * or NEXTAUTH_SECRET is unset.
+ */
+async function isVerifiedAdmin(request: NextRequest): Promise<boolean> {
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (!secret) return false;
+
+  const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+  if (!token) return false;
+
+  try {
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
+    return payload.isAdmin === true;
+  } catch {
+    return false;
+  }
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-
-  // Handle CORS preflight for API routes
-  if (pathname.startsWith('/api/') && request.method === 'OPTIONS') {
-    return new NextResponse(null, {
-      status: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      },
-    });
-  }
 
   // Allow static assets
   if (
@@ -45,17 +57,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check if this is an API route
+  // API routes
   if (pathname.startsWith('/api/')) {
-    const response = NextResponse.next();
-    response.headers.set('Access-Control-Allow-Origin', '*');
-    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-    // Admin API routes - check admin session
+    // Admin API routes - require verified admin JWT
     if (pathname.startsWith('/api/admin/') && !ADMIN_PUBLIC_API.includes(pathname)) {
-      const adminSession = request.cookies.get('tswi_admin_session');
-      if (!adminSession?.value) {
+      if (!(await isVerifiedAdmin(request))) {
         return NextResponse.json(
           { success: false, error: 'Admin authentication required' },
           { status: 401 }
@@ -63,7 +69,7 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-    return response;
+    return NextResponse.next();
   }
 
   // Check if route is public
@@ -78,19 +84,16 @@ export async function middleware(request: NextRequest) {
 
   // Handle admin routes
   if (isAdminRoute) {
-    // Admin login page doesn't need auth
+    // Admin login page doesn't need auth; skip it if already verified
     if (pathname === '/admin/login') {
-      const adminSession = request.cookies.get('tswi_admin_session');
-      if (adminSession?.value) {
-        // Already logged in, redirect to admin dashboard
+      if (await isVerifiedAdmin(request)) {
         return NextResponse.redirect(new URL('/admin', request.url));
       }
       return NextResponse.next();
     }
 
-    // All other admin routes require admin session
-    const adminSession = request.cookies.get('tswi_admin_session');
-    if (!adminSession?.value) {
+    // All other admin routes require a verified admin session
+    if (!(await isVerifiedAdmin(request))) {
       return NextResponse.redirect(new URL('/admin/login', request.url));
     }
 
@@ -103,26 +106,15 @@ export async function middleware(request: NextRequest) {
   }
 
   // Protected routes - require NextAuth session
-  console.log('[MIDDLEWARE DEBUG] Checking token for:', pathname);
-  console.log('[MIDDLEWARE DEBUG] NEXTAUTH_SECRET set:', !!process.env.NEXTAUTH_SECRET);
-  console.log('[MIDDLEWARE DEBUG] Cookies:', request.cookies.getAll().map(c => c.name).join(', '));
-
   const token = await getToken({
     req: request,
     secret: process.env.NEXTAUTH_SECRET,
   });
 
-  console.log('[MIDDLEWARE DEBUG] Token result:', token ? { email: token.email, role: token.role } : 'NULL');
-
   if (!token) {
-    // Not authenticated - redirect to login
-    console.log('[MIDDLEWARE DEBUG] No token found, redirecting to /login');
-    const loginUrl = new URL('/login', request.url);
-    return NextResponse.redirect(loginUrl);
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // User is authenticated - allow access to protected routes
-  console.log('[MIDDLEWARE DEBUG] Token valid, allowing access');
   return NextResponse.next();
 }
 

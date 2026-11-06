@@ -1,51 +1,75 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { getDb } from '@/lib/db';
+import { consumePasswordToken } from '@/lib/auth/password-tokens';
 import type { User } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
+const MIN_PASSWORD_LENGTH = 12;
+const MAX_PASSWORD_LENGTH = 72; // bcrypt ignores bytes beyond 72
+
+/**
+ * POST /api/auth/set-password  { token, password }
+ *
+ * The email comes only from the single-use token, never from the client.
+ */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { email, password } = body;
+    const body = await request.json().catch(() => null);
 
-    if (!email || !password) {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ success: false, error: 'Invalid request' }, { status: 400 });
+    }
+
+    if ('email' in body) {
+      return NextResponse.json({ success: false, error: 'Invalid request' }, { status: 400 });
+    }
+
+    const { token, password } = body as { token?: unknown; password?: unknown };
+
+    if (typeof token !== 'string' || typeof password !== 'string') {
       return NextResponse.json(
-        { success: false, error: 'Email and password are required' },
+        { success: false, error: 'Token and password are required' },
         { status: 400 }
       );
     }
 
-    // Validate password strength
-    if (password.length < 8) {
+    // Validate the password before consuming the token so a typo doesn't burn the link
+    if (password.length < MIN_PASSWORD_LENGTH) {
       return NextResponse.json(
-        { success: false, error: 'Password must be at least 8 characters' },
+        { success: false, error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` },
+        { status: 400 }
+      );
+    }
+    if (Buffer.byteLength(password, 'utf8') > MAX_PASSWORD_LENGTH) {
+      return NextResponse.json(
+        { success: false, error: `Password must be at most ${MAX_PASSWORD_LENGTH} bytes` },
         { status: 400 }
       );
     }
 
-    const db = await getDb();
-    const usersCollection = db.collection<User>('users');
-
-    // Find approved user by email
-    const user = await usersCollection.findOne({ email: email.toLowerCase() });
-
-    if (!user) {
+    const email = await consumePasswordToken(token);
+    if (!email) {
       return NextResponse.json(
-        { success: false, error: 'Email not found. You must be an approved user to set a password.' },
-        { status: 404 }
+        { success: false, error: 'Link invalid or expired' },
+        { status: 400 }
       );
     }
 
-    // Hash the password
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // Update user with password hash
-    await usersCollection.updateOne(
-      { email: email.toLowerCase() },
-      { $set: { password_hash: passwordHash } }
-    );
+    const db = await getDb();
+    const result = await db
+      .collection<User>('users')
+      .updateOne({ email }, { $set: { password_hash: passwordHash } });
+
+    if (result.matchedCount === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Link invalid or expired' },
+        { status: 400 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
