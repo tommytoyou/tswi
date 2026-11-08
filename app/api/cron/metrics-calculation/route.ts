@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkCronAuth } from '@/lib/cron-auth';
 import { calculateAgentMetrics } from '@/lib/agent';
 
 /**
@@ -7,10 +8,8 @@ import { calculateAgentMetrics } from '@/lib/agent';
  * Tracks precision, recall, prediction accuracy, etc.
  */
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = checkCronAuth(request, 'metrics-calculation');
+  if (denied) return denied;
 
   try {
     console.log('[Metrics] Calculating agent performance metrics...');

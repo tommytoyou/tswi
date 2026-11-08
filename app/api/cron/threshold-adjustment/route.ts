@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkCronAuth } from '@/lib/cron-auth';
 import { getDb } from '@/lib/db';
 
 /**
@@ -7,10 +8,8 @@ import { getDb } from '@/lib/db';
  * Self-tuning system to minimize false positives
  */
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = checkCronAuth(request, 'threshold-adjustment');
+  if (denied) return denied;
 
   try {
     const db = await getDb();
