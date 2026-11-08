@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkCronAuth } from '@/lib/cron-auth';
 import { ObjectId } from 'mongodb';
 import { getDb } from '@/lib/db';
 import { evaluateAlertConditions } from '@/lib/agent';
@@ -10,10 +11,8 @@ import type { Alert } from '@/lib/types';
  * Triggers notifications when conditions are met
  */
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = checkCronAuth(request, 'alert-evaluation');
+  if (denied) return denied;
 
   try {
     const db = await getDb();

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { checkCronAuth } from '@/lib/cron-auth';
 import { getCollection, getTimeSeriesCollection } from '@/lib/db';
 import { AlertRule, AlertOperator, AlertMetric, TriggeredAlert } from '@/lib/types';
 import { sendAlertRuleNotifications } from '@/lib/notifications';
@@ -6,8 +7,7 @@ import { sendAlertRuleNotifications } from '@/lib/notifications';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Vercel Cron configuration - runs every 5 minutes
-// Add to vercel.json: { "crons": [{ "path": "/api/cron/check-alerts", "schedule": "*/5 * * * *" }] }
+// Scheduled externally (cron-job.org) every 5 minutes
 
 interface CurrentMetrics {
   kp_index: number | null;
@@ -144,27 +144,17 @@ async function wasRecentlyTriggered(ruleId: string, cooldownMinutes: number = 60
  *
  * Query params:
  * - cooldown: minutes to wait before re-triggering same rule (default: 60)
- * - secret: optional secret for authentication (CRON_SECRET env var)
+ *
+ * Auth: requires header `Authorization: Bearer <CRON_SECRET>` (fails closed if unset)
  */
 export async function GET(request: Request) {
   const startTime = Date.now();
 
-  try {
-    // Optional authentication via secret
-    const url = new URL(request.url);
-    const secret = url.searchParams.get('secret');
-    const cronSecret = process.env.CRON_SECRET;
+  const denied = checkCronAuth(request, 'check-alerts');
+  if (denied) return denied;
 
-    if (cronSecret && secret !== cronSecret) {
-      // Check for Vercel cron header as alternative
-      const authHeader = request.headers.get('authorization');
-      if (authHeader !== `Bearer ${cronSecret}`) {
-        return NextResponse.json(
-          { success: false, error: 'Unauthorized' },
-          { status: 401 }
-        );
-      }
-    }
+  try {
+    const url = new URL(request.url);
 
     const cooldownMinutes = parseInt(url.searchParams.get('cooldown') || '60');
 

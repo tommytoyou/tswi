@@ -25,7 +25,7 @@ export function SolarWindCardV2() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/noaa/solar-wind?limit=1440'); // 24 hours
+      const response = await fetch('/api/noaa/solar-wind?fetch=latest&limit=1440'); // 24 hours, refreshed from NOAA
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
 

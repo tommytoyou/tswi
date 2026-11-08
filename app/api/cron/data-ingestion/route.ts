@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkCronAuth } from '@/lib/cron-auth';
 import { getDb } from '@/lib/db';
 
 /**
@@ -7,11 +8,8 @@ import { getDb } from '@/lib/db';
  * Called by Vercel Cron or can be triggered manually with CRON_SECRET
  */
 export async function GET(request: NextRequest) {
-  // Verify cron secret for security
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = checkCronAuth(request, 'data-ingestion');
+  if (denied) return denied;
 
   try {
     const results = {

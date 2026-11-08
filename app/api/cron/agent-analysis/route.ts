@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkCronAuth } from '@/lib/cron-auth';
 import { analyzeSpaceWeather } from '@/lib/agent';
 
 /**
@@ -7,10 +8,8 @@ import { analyzeSpaceWeather } from '@/lib/agent';
  * Makes autonomous decisions about alert priorities
  */
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = checkCronAuth(request, 'agent-analysis');
+  if (denied) return denied;
 
   try {
     console.log('[Agent] Starting autonomous analysis...');
