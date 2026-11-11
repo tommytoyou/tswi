@@ -103,7 +103,8 @@ export function ThreatPostureStrip() {
       try {
         const res = await fetch('/api/ai/surya-prediction');
         const json = await res.json();
-        const predictions = json?.data?.predictions;
+        // A 503 / success:false means flare data is unavailable; leave it unset (shown as N/A)
+        const predictions = res.ok && json?.success ? json?.data?.predictions : null;
         if (Array.isArray(predictions) && predictions.length > 0) {
           next.maxProbability = Math.max(
             ...predictions.map((p: { flare_probability: number }) => p.flare_probability)
@@ -212,8 +213,10 @@ export function ThreatPostureStrip() {
       {/* Segment 3 — Flare forecast */}
       <div className="flex flex-col justify-center px-4 min-w-[150px] flex-1 border-l border-intel-border">
         <span className={labelClass}>Flare Max (2H)</span>
-        {state.loading || maxProbability === null ? (
+        {state.loading ? (
           <span className="text-sm font-bold font-mono text-intel-muted">--</span>
+        ) : maxProbability === null ? (
+          <span className="text-sm font-bold font-mono text-intel-muted" title="Flare data unavailable">N/A</span>
         ) : (
           <span className={`text-sm font-bold font-mono ${tierToRiskColors[suryaTier].text}`}>
             {(maxProbability * 100).toFixed(1)}%{dominantClass ? ` ${dominantClass}` : ''}

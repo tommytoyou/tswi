@@ -84,17 +84,6 @@ export async function GET(request: NextRequest) {
   const startTime = Date.now();
 
   try {
-    const { searchParams } = new URL(request.url);
-    const useMock = searchParams.get('mock') === 'true';
-
-    if (useMock) {
-      return NextResponse.json({
-        success: true,
-        data: getMockPrediction(),
-        warning: 'Using mock predictions (requested via query param)',
-      });
-    }
-
     // Fetch real NOAA data in parallel
     const [solarProbabilities, xrayHistory, activeRegions, dbXray] = await Promise.allSettled([
       fetchNOAASolarProbabilities(),
@@ -174,12 +163,12 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Last resort: return mock data with warning
-    return NextResponse.json({
-      success: true,
-      data: getMockPrediction(),
-      warning: 'All data sources unavailable, using mock predictions',
-    });
+    // Neither NOAA nor stored X-ray data is available: say so rather than inventing numbers
+    console.error('[Flare] NOAA probabilities and stored X-ray flux both unavailable');
+    return NextResponse.json(
+      { success: false, error: 'Flare data unavailable' },
+      { status: 503 }
+    );
 
   } catch (error: any) {
     console.error('Surya prediction API error:', error);
@@ -455,48 +444,4 @@ function generateStatisticalPrediction(
   }
 
   return predictions;
-}
-
-/**
- * Mock prediction data for testing
- */
-function getMockPrediction() {
-  const now = Date.now();
-  return {
-    model: 'Mock Model',
-    model_type: 'mock',
-    prediction_time: new Date().toISOString(),
-    forecast_horizon_hours: 2,
-    predictions: [
-      {
-        time: new Date(now + 30 * 60 * 1000).toISOString(),
-        flare_probability: 0.12,
-        class_probabilities: { C: 0.08, M: 0.03, X: 0.01 },
-        confidence: 0.85,
-      },
-      {
-        time: new Date(now + 60 * 60 * 1000).toISOString(),
-        flare_probability: 0.18,
-        class_probabilities: { C: 0.11, M: 0.05, X: 0.02 },
-        confidence: 0.82,
-      },
-      {
-        time: new Date(now + 90 * 60 * 1000).toISOString(),
-        flare_probability: 0.22,
-        class_probabilities: { C: 0.14, M: 0.06, X: 0.02 },
-        confidence: 0.78,
-      },
-      {
-        time: new Date(now + 120 * 60 * 1000).toISOString(),
-        flare_probability: 0.15,
-        class_probabilities: { C: 0.10, M: 0.04, X: 0.01 },
-        confidence: 0.75,
-      },
-    ],
-    source: 'mock-prediction',
-    metadata: {
-      data_sources: ['Mock data'],
-      processing_time_ms: 0,
-    },
-  };
 }

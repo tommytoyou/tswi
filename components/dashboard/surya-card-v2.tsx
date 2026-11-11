@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Brain, Activity, Sun, AlertCircle, Info } from 'lucide-react';
+import { Activity, Sun, AlertCircle, Info } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, Legend } from 'recharts';
 import { format } from 'date-fns';
 import { CardSkeleton } from './card-skeleton';
@@ -59,18 +59,20 @@ export function SuryaCardV2() {
     try {
       setLoading(true);
       const response = await fetch('/api/ai/surya-prediction');
-      if (!response.ok) throw new Error('Failed to fetch');
-      const result = await response.json();
+      const result = await response.json().catch(() => null);
 
-      if (result.success && result.data) {
-        setData(result.data);
-        setWarning(result.warning || null);
-      } else {
-        throw new Error('Invalid data format');
+      // 503 / success:false means neither NOAA nor stored X-ray data is available.
+      // Show no numbers rather than stale or invented ones.
+      if (!response.ok || !result?.success || !result.data) {
+        throw new Error(result?.error || `HTTP ${response.status}`);
       }
+
+      setData(result.data);
+      setWarning(result.warning || null);
       setError(null);
     } catch (err) {
-      setError('Failed to load data');
+      setData(null);
+      setError('Flare data unavailable. Retrying.');
     } finally {
       setLoading(false);
     }
@@ -89,12 +91,12 @@ export function SuryaCardV2() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Brain className="h-4 w-4" />
-            Solar Flare Predictions
+            <Sun className="h-4 w-4" />
+            Solar Flare Probability
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-intel-red">{error || 'No data'}</p>
+          <p className="text-sm text-intel-muted">{error || 'Flare data unavailable. Retrying.'}</p>
         </CardContent>
       </Card>
     );
@@ -141,8 +143,6 @@ export function SuryaCardV2() {
         return { label: 'NOAA SWPC', color: 'text-intel-cyan border-intel-cyan/30' };
       case 'statistical-fallback':
         return { label: 'Statistical', color: 'text-intel-amber border-intel-amber/30' };
-      case 'mock-prediction':
-        return { label: 'Mock Data', color: 'text-intel-muted border-intel-border' };
       default:
         return { label: data.model, color: 'text-intel-cyan border-intel-cyan/30' };
     }
@@ -150,6 +150,20 @@ export function SuryaCardV2() {
 
   const modelBadge = getModelBadge();
   const isRealData = data.source === 'noaa-swpc-enhanced';
+
+  const confidenceLabel =
+    data.source === 'noaa-swpc-enhanced'
+      ? 'Forecast confidence (NOAA)'
+      : data.source === 'statistical-fallback'
+        ? 'Estimate confidence'
+        : 'Confidence';
+
+  const sourceNote =
+    data.source === 'noaa-swpc-enhanced'
+      ? 'Source: NOAA SWPC flare probabilities'
+      : data.source === 'statistical-fallback'
+        ? 'Source: TSWI statistical estimate from stored X-ray flux'
+        : null;
 
   // Format X-ray flux for display
   const formatXRayFlux = (flux: number | null | undefined) => {
@@ -162,8 +176,8 @@ export function SuryaCardV2() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
-            <Brain className="h-4 w-4 text-intel-cyan" />
-            Solar Flare Predictions
+            <Sun className="h-4 w-4 text-intel-cyan" />
+            Solar Flare Probability
           </CardTitle>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className={modelBadge.color}>
@@ -197,7 +211,7 @@ export function SuryaCardV2() {
             <div className="text-2xl font-bold font-mono text-intel-cyan">
               {(avgConfidence * 100).toFixed(0)}%
             </div>
-            <div className="text-xs text-intel-muted">Model certainty</div>
+            <div className="text-xs text-intel-muted">{confidenceLabel}</div>
           </div>
 
           <div className="space-y-1">
@@ -360,6 +374,10 @@ export function SuryaCardV2() {
             </ResponsiveContainer>
           </div>
         </div>
+
+        {sourceNote && (
+          <div className="text-xs text-intel-muted">{sourceNote}</div>
+        )}
 
         {/* Footer Info */}
         <div className="flex justify-between items-center text-xs">
