@@ -16,6 +16,64 @@ interface EmailOptions {
   text?: string;
 }
 
+export interface ResendSendResult {
+  ok: boolean;
+  /** Resend email id, present when ok */
+  id?: string;
+  /** Human-readable reason, present when not ok */
+  error?: string;
+}
+
+/**
+ * Send one email through Resend and report the outcome instead of hiding it.
+ * Failures are logged with the recipient and Resend's response body; the API key is never logged.
+ */
+export async function sendViaResend(options: EmailOptions): Promise<ResendSendResult> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    const error = 'RESEND_API_KEY is not configured';
+    console.error(`[Email] Not sent to ${options.to}: ${error}`);
+    return { ok: false, error };
+  }
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+      }),
+    });
+
+    const bodyText = await response.text();
+    let body: { id?: string; message?: string } = {};
+    try {
+      body = JSON.parse(bodyText);
+    } catch {
+      // Non-JSON body; bodyText is still logged below
+    }
+
+    if (!response.ok) {
+      console.error(`[Email] Resend rejected email to ${options.to} (HTTP ${response.status}):`, bodyText);
+      return { ok: false, error: body.message || `Resend returned HTTP ${response.status}` };
+    }
+
+    console.log(`[Email] Sent to ${options.to}, Resend id: ${body.id}`);
+    return { ok: true, id: body.id };
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    console.error(`[Email] Exception sending to ${options.to}:`, error);
+    return { ok: false, error };
+  }
+}
+
 /**
  * Send email notification (using Resend or SendGrid)
  */
@@ -30,30 +88,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
     // Try Resend first (simpler API)
     if (process.env.RESEND_API_KEY) {
-      const response = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-        },
-        body: JSON.stringify({
-          from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
-          to: options.to,
-          subject: options.subject,
-          html: options.html,
-          text: options.text,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        console.error(`[Email] Resend API error ${response.status}:`, errorBody);
-        throw new Error(`Resend API error: ${response.status} - ${errorBody}`);
-      }
-
-      const result = await response.json();
-      console.log(`[Email] Sent successfully to ${options.to}, ID: ${result.id}`);
-      return true;
+      return (await sendViaResend(options)).ok;
     }
 
     // Fallback to SendGrid

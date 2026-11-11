@@ -78,6 +78,7 @@ export default function AdminDashboard() {
   const [invites, setInvites] = useState<Invite[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [approveNotice, setApproveNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [inviteStatusFilter, setInviteStatusFilter] = useState<'all' | 'pending' | 'sent' | 'accepted' | 'expired'>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -159,18 +160,31 @@ export default function AdminDashboard() {
 
   const handleApprove = async (id: string, withAI: boolean = false) => {
     setActionLoading(id);
+    setApproveNotice(null);
     try {
       const response = await fetch(`/api/admin/requests/${id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: withAI ? 'user_ai' : 'user' }),
       });
+      const data = await response.json().catch(() => ({}));
 
-      if (response.ok) {
+      if (response.ok && data.success) {
+        if (data.emailSent) {
+          setApproveNotice({ ok: true, text: 'Approved. Email sent.' });
+        } else {
+          setApproveNotice({
+            ok: false,
+            text: `Approved, but the email failed: ${data.emailError || 'unknown error'}. The user can use Set up or reset password on the login page.`,
+          });
+        }
         await Promise.all([fetchRequests(), fetchUsers()]);
+      } else {
+        setApproveNotice({ ok: false, text: `Approval failed: ${data.error || `HTTP ${response.status}`}` });
       }
     } catch (error) {
       console.error('Error approving request:', error);
+      setApproveNotice({ ok: false, text: 'Approval failed: network error' });
     } finally {
       setActionLoading(null);
     }
@@ -518,6 +532,26 @@ export default function AdminDashboard() {
               </div>
             </CardHeader>
             <CardContent>
+              {approveNotice && (
+                <div
+                  role={approveNotice.ok ? 'status' : 'alert'}
+                  className={`mb-4 flex items-start justify-between gap-3 rounded-md border px-4 py-3 text-sm ${
+                    approveNotice.ok
+                      ? 'border-green-600/50 bg-green-500/10 text-green-400'
+                      : 'border-red-600/60 bg-red-500/10 text-red-400'
+                  }`}
+                >
+                  <span>{approveNotice.text}</span>
+                  <button
+                    type="button"
+                    onClick={() => setApproveNotice(null)}
+                    className="shrink-0 opacity-70 hover:opacity-100"
+                    aria-label="Dismiss"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
               {loading ? (
                 <div className="text-center py-8 text-slate-400">Loading...</div>
               ) : requests.length === 0 ? (

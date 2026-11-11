@@ -3,6 +3,7 @@ import { getDb } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth/admin';
 import { ObjectId } from 'mongodb';
 import { createPasswordToken, buildSetPasswordUrl } from '@/lib/auth/password-tokens';
+import { sendViaResend, type ResendSendResult } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,63 +90,43 @@ export async function POST(
       }
     );
 
-    // Send approval email directly using Resend API
-    let emailSent = false;
+    // Send the approval email. The approval above stands either way; the result is
+    // reported to the admin so a failed send is visible instead of silently ignored.
+    let emailResult: ResendSendResult;
     try {
-      console.log('[APPROVAL] ========================================');
-      console.log('[APPROVAL] About to send email to:', accessRequest.email);
-      console.log('[APPROVAL] RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY);
-      console.log('[APPROVAL] RESEND_API_KEY length:', process.env.RESEND_API_KEY?.length || 0);
-
       const appUrl = process.env.NEXTAUTH_URL || 'https://www.tswi-ai.com';
       // Single-use, 60-minute link so the approved user can set a password in one click
       const setPasswordUrl = buildSetPasswordUrl(await createPasswordToken(accessRequest.email));
       const html = generateApprovalEmail(accessRequest.name, appUrl, setPasswordUrl);
 
-      // Call Resend API directly to bypass any issues with lib/notifications
-      const resendApiKey = process.env.RESEND_API_KEY;
-      if (!resendApiKey) {
-        console.error('[APPROVAL] ERROR: RESEND_API_KEY is not set!');
-      } else {
-        console.log('[APPROVAL] Making Resend API call...');
-        const emailPayload = {
-          from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
-          to: accessRequest.email,
-          subject: 'Your TSWI Access Has Been Approved',
-          html,
-          text: `Hi ${accessRequest.name}, Your TSWI access has been approved! Sign in at ${appUrl}/login`,
-        };
-        console.log('[APPROVAL] Email payload (sans html):', { ...emailPayload, html: '[HTML content]' });
-
-        const response = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${resendApiKey}`,
-          },
-          body: JSON.stringify(emailPayload),
-        });
-
-        console.log('[APPROVAL] Resend response status:', response.status);
-        const responseText = await response.text();
-        console.log('[APPROVAL] Resend response body:', responseText);
-
-        if (response.ok) {
-          emailSent = true;
-          console.log('[APPROVAL] Email sent successfully!');
-        } else {
-          console.error('[APPROVAL] Resend API error:', response.status, responseText);
-        }
-      }
-      console.log('[APPROVAL] ========================================');
+      emailResult = await sendViaResend({
+        to: accessRequest.email,
+        subject: 'Your TSWI Access Has Been Approved',
+        html,
+        text: `Hi ${accessRequest.name}, Your TSWI access has been approved! Sign in at ${appUrl}/login`,
+      });
     } catch (emailError) {
-      console.error('[APPROVAL] Exception sending email:', emailError);
-      // Continue even if email fails
+      // e.g. password token creation failed before the send was attempted
+      const message = emailError instanceof Error ? emailError.message : String(emailError);
+      console.error(`[APPROVAL] Email to ${accessRequest.email} not sent:`, message);
+      emailResult = { ok: false, error: message };
     }
 
+    if (emailResult.ok) {
+      return NextResponse.json({
+        success: true,
+        message: 'Access request approved successfully',
+        emailSent: true,
+        emailId: emailResult.id,
+      });
+    }
+
+    console.error(`[APPROVAL] Approved ${accessRequest.email} but the approval email failed: ${emailResult.error}`);
     return NextResponse.json({
       success: true,
-      message: 'Access request approved successfully',
+      message: 'Access request approved, but the approval email was not sent',
+      emailSent: false,
+      emailError: emailResult.error,
     });
   } catch (error) {
     console.error('Error approving access request:', error);

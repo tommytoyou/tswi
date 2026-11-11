@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sendEmail } from '@/lib/notifications';
+import { sendViaResend } from '@/lib/notifications';
 import { getDb } from '@/lib/db';
 import { createPasswordToken, buildSetPasswordUrl } from '@/lib/auth/password-tokens';
 
@@ -23,15 +23,13 @@ export async function POST(request: NextRequest) {
 
     // Check if Resend API key is configured
     if (!process.env.RESEND_API_KEY) {
-      console.error('[SendApprovalEmail] RESEND_API_KEY is not configured');
+      console.error(`[SendApprovalEmail] Not sent to ${email}: RESEND_API_KEY is not configured`);
       return NextResponse.json({
         success: true,
         emailSent: false,
-        reason: 'RESEND_API_KEY not configured',
+        emailError: 'RESEND_API_KEY is not configured',
       });
     }
-
-    console.log('[SendApprovalEmail] RESEND_API_KEY is configured');
 
     const appUrl = process.env.NEXTAUTH_URL || 'https://www.tswi-ai.com';
     console.log(`[SendApprovalEmail] Using app URL: ${appUrl}`);
@@ -45,24 +43,19 @@ export async function POST(request: NextRequest) {
 
     const html = generateApprovalEmail(name, appUrl, setPasswordUrl);
 
-    console.log(`[SendApprovalEmail] Calling sendEmail to: ${email}`);
-    const success = await sendEmail({
+    const result = await sendViaResend({
       to: email,
       subject: 'Your TSWI Access Has Been Approved',
       html,
       text: `Hi ${name}, Your TSWI access has been approved! Sign in at ${appUrl}/login`,
     });
 
-    if (!success) {
-      console.warn('[SendApprovalEmail] sendEmail returned false - email not sent');
-    } else {
-      console.log('[SendApprovalEmail] Email sent successfully');
+    if (result.ok) {
+      return NextResponse.json({ success: true, emailSent: true, emailId: result.id });
     }
 
-    return NextResponse.json({
-      success: true,
-      emailSent: success,
-    });
+    console.error(`[SendApprovalEmail] Email to ${email} failed: ${result.error}`);
+    return NextResponse.json({ success: true, emailSent: false, emailError: result.error });
   } catch (error) {
     console.error('[SendApprovalEmail] Error:', error);
     return NextResponse.json(
