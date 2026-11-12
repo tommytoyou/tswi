@@ -6,16 +6,6 @@ import { User } from '@/lib/types';
 
 const SESSION_KEY = 'tswi_session';
 
-export const AUTHENTICATED_USER: User = {
-  _id: 'user_multiplanetary_001',
-  email: 'multiplanetary@tswi.space',
-  name: 'Multiplanetary',
-  company: 'TSWI',
-  role: 'user_ai',
-  created_at: new Date('2025-01-15T00:00:00Z'),
-  last_login: new Date(),
-};
-
 export interface SessionData {
   user: User;
   expiresAt: number;
@@ -58,11 +48,6 @@ export function setClientSession(user: User): void {
 export function clearClientSession(): void {
   if (typeof window === 'undefined') return;
   sessionStorage.removeItem(SESSION_KEY);
-}
-
-// DEPRECATED: No longer used
-export function validateCredentials(username: string, password: string): boolean {
-  return false;
 }
 
 // DEPRECATED: Use useSession from next-auth/react instead

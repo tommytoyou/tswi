@@ -21,7 +21,6 @@ export interface RateLimitRule {
 }
 
 export const RATE_LIMITS = {
-  login: { route: 'login', limit: 10, windowSeconds: 15 * 60 },
   accessRequests: { route: 'access-requests', limit: 5, windowSeconds: 60 * 60 },
   inviteAccept: { route: 'invite-accept', limit: 10, windowSeconds: 60 * 60 },
 } satisfies Record<string, RateLimitRule>;
