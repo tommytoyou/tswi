@@ -3,6 +3,7 @@ import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { getDb } from '@/lib/db';
+import { consumeRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import type { User } from '@/lib/types';
 
 declare module 'next-auth' {
@@ -39,9 +40,21 @@ export const authOptions: NextAuthOptions = {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error('Email and password are required');
+        }
+
+        // Rate-limit before touching the password: per IP+email and per IP
+        const forwarded = req?.headers?.['x-forwarded-for'];
+        const ip = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0].trim() || 'unknown';
+        const email = credentials.email.toLowerCase();
+        const [perEmail, perIp] = await Promise.all([
+          consumeRateLimit(`${ip}|${email}`, RATE_LIMITS.credentialsIpEmail),
+          consumeRateLimit(ip, RATE_LIMITS.credentialsIp),
+        ]);
+        if (perEmail.limited || perIp.limited) {
+          throw new Error('Too many sign-in attempts. Try again in 15 minutes.');
         }
 
         try {
@@ -54,12 +67,12 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (!user) {
-            throw new Error('No account found with this email');
+            throw new Error('Invalid email or password');
           }
 
           // Check if user has a password set
           if (!user.password_hash) {
-            throw new Error('Password not set. Please set a password first or use Google sign-in.');
+            throw new Error('Invalid email or password');
           }
 
           // Verify password
@@ -69,7 +82,7 @@ export const authOptions: NextAuthOptions = {
           );
 
           if (!isValidPassword) {
-            throw new Error('Invalid password');
+            throw new Error('Invalid email or password');
           }
 
           // Update last_login timestamp
