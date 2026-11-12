@@ -44,9 +44,9 @@ async function fetchFromNOAA(
 }> {
   const noaaUrl = 'https://services.swpc.noaa.gov/json/ovation_aurora_latest.json';
 
-  const response = await fetch(noaaUrl, {
-    next: { revalidate: 300 }, // Cache for 5 minutes
-  });
+  // no-store: the Vercel Data Cache copy of this feed was observed ~50 min
+  // behind NOAA with revalidate: 300. NOAA updates it every few minutes.
+  const response = await fetch(noaaUrl, { cache: 'no-store' });
 
   if (!response.ok) {
     throw new Error(`NOAA API returned ${response.status}`);
@@ -132,6 +132,7 @@ export async function GET(request: NextRequest) {
     const fetchMode = searchParams.get('fetch') || 'cached';
     const minProbability = parseInt(searchParams.get('minProbability') || '0');
     const hemisphere = searchParams.get('hemisphere') || 'both';
+    let liveFetchFailed = false;
 
     // If fetch=latest, get from NOAA directly
     if (fetchMode === 'latest') {
@@ -139,8 +140,8 @@ export async function GET(request: NextRequest) {
         const { observation_time, forecast_time, coordinates, allCoordinates } =
           await fetchFromNOAA(minProbability, hemisphere);
 
-        // Try to cache to MongoDB (non-blocking)
-        tryCacheToMongo(observation_time, forecast_time, allCoordinates);
+        // Await the save: un-awaited work can be dropped once the response is sent
+        await tryCacheToMongo(observation_time, forecast_time, allCoordinates);
 
         return NextResponse.json({
           success: true,
@@ -153,7 +154,8 @@ export async function GET(request: NextRequest) {
         });
       } catch (fetchError: any) {
         console.error('NOAA OVATION fetch error:', fetchError);
-        // Fall back to cached data if available
+        // Fall back to cached data if available (flagged below)
+        liveFetchFailed = true;
       }
     }
 
@@ -177,8 +179,13 @@ export async function GET(request: NextRequest) {
             coordinates = coordinates.filter(p => p.Aurora >= minProbability);
           }
 
+          if (liveFetchFailed) {
+            console.warn(`[Aurora] Serving MongoDB fallback from ${cached.observation_time?.toISOString?.() ?? cached.observation_time}`);
+          }
+
           return NextResponse.json({
             success: true,
+            ...(liveFetchFailed ? { fallback: 'mongodb' } : {}),
             observation_time: cached.observation_time,
             forecast_time: cached.forecast_time,
             coordinates,
@@ -197,8 +204,8 @@ export async function GET(request: NextRequest) {
     const { observation_time, forecast_time, coordinates, allCoordinates } =
       await fetchFromNOAA(minProbability, hemisphere);
 
-    // Try to cache for next time
-    tryCacheToMongo(observation_time, forecast_time, allCoordinates);
+    // Save for next time (awaited so the write completes)
+    await tryCacheToMongo(observation_time, forecast_time, allCoordinates);
 
     return NextResponse.json({
       success: true,

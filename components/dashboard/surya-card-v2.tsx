@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Activity, Sun, AlertCircle, Info } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, Legend } from 'recharts';
-import { format } from 'date-fns';
+import { formatUTC as format } from '@/lib/format-utc';
 import { CardSkeleton } from './card-skeleton';
 import { chartColors, chartTheme, riskColors } from '@/lib/design-system';
 

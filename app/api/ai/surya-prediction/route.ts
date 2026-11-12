@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTimeSeriesCollection } from '@/lib/db';
-import { requireAIAccess } from '@/lib/auth/api';
+import { getApiSession } from '@/lib/auth/api';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -77,9 +77,14 @@ interface FluxTimelinePoint {
  * This implementation uses NOAA's operational forecasts enhanced with real-time data.
  */
 export async function GET(request: NextRequest) {
-  // Check if user has AI access
-  const authError = await requireAIAccess();
-  if (authError) return authError;
+  // Any logged-in user: this serves NOAA flare probabilities, not an AI model
+  const session = await getApiSession();
+  if (!session) {
+    return NextResponse.json(
+      { success: false, error: 'Authentication required' },
+      { status: 401 }
+    );
+  }
 
   const startTime = Date.now();
 

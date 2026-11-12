@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Sun, Radiation, Zap, TrendingUp, AlertTriangle } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatUTC as format } from '@/lib/format-utc';
 import { riskColors } from '@/lib/design-system';
 import { calculateRScale, calculateSScale, calculateGScale } from '@/lib/noaa-scales';
 

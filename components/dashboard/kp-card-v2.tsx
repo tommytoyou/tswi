@@ -5,7 +5,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Minus, Zap } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
-import { format, subHours } from 'date-fns';
+import { subHours } from 'date-fns';
+import { formatUTC as format } from '@/lib/format-utc';
 import { CardSkeleton } from './card-skeleton';
 import { getKpLevel, chartColors, chartTheme, calculateTrend, riskColors } from '@/lib/design-system';
 

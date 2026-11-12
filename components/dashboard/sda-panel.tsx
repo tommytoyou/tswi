@@ -17,7 +17,7 @@ import {
   Rocket,
   Trash2,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatUTC as format } from '@/lib/format-utc';
 import {
   BoxscoreData,
   CDMData,
