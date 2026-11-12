@@ -54,30 +54,37 @@ let cachedData: { data: TecGridPoint[]; timestamp: string; fetchedAt: number } |
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Fetch the list of available GloTEC files and return the latest one
+ * Fetch the list of available GloTEC files and return the latest one.
+ *
+ * Bypasses the Next.js data cache: a cached copy of this index went stale on Vercel
+ * and kept pointing at a day-old file. NOAA briefly serves an empty list ("[]") while it
+ * rewrites the index, so an empty response is retried once before giving up.
  */
 async function getLatestGloTecFile(): Promise<GloTecFile | null> {
-  try {
-    const response = await fetch(GLOTEC_LIST_URL, {
-      next: { revalidate: 60 },
-    });
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const response = await fetch(GLOTEC_LIST_URL, { cache: 'no-store' });
 
-    if (!response.ok) {
-      console.error('Failed to fetch GloTEC file list:', response.status);
+      if (!response.ok) {
+        console.error('[GloTEC] File list request failed:', response.status);
+        return null;
+      }
+
+      const files: GloTecFile[] = await response.json();
+      if (Array.isArray(files) && files.length > 0) {
+        // Pick the newest by time_tag rather than trusting list order
+        return files.reduce((a, b) => (b.time_tag > a.time_tag ? b : a));
+      }
+
+      console.warn(`[GloTEC] File list empty (attempt ${attempt}); NOAA may be rewriting it`);
+    } catch (error) {
+      console.error('[GloTEC] Error fetching file list:', error);
       return null;
     }
 
-    const files: GloTecFile[] = await response.json();
-    if (files.length === 0) {
-      return null;
-    }
-
-    // Return the last (most recent) file
-    return files[files.length - 1];
-  } catch (error) {
-    console.error('Error fetching GloTEC file list:', error);
-    return null;
+    if (attempt === 1) await new Promise((r) => setTimeout(r, 2000));
   }
+  return null;
 }
 
 /**
@@ -86,9 +93,8 @@ async function getLatestGloTecFile(): Promise<GloTecFile | null> {
 async function fetchGloTecData(fileUrl: string): Promise<TecGridPoint[]> {
   const fullUrl = `${GLOTEC_BASE_URL}${fileUrl}`;
 
-  const response = await fetch(fullUrl, {
-    next: { revalidate: 60 },
-  });
+  // ~2.5 MB per file: over the 2 MB data-cache limit, so never cache it
+  const response = await fetch(fullUrl, { cache: 'no-store' });
 
   if (!response.ok) {
     throw new Error(`Failed to fetch GloTEC data: ${response.status}`);
@@ -242,8 +248,8 @@ export async function GET(request: NextRequest) {
           fetchedAt: now,
         };
 
-        // Cache to MongoDB asynchronously
-        cacheToMongoDB(tecData, latestFile.time_tag).catch(console.error);
+        // Await the write: on serverless, work left running after the response may never finish
+        await cacheToMongoDB(tecData, latestFile.time_tag);
 
         const downsampled = downsampleData(tecData, resolution);
 
@@ -255,7 +261,7 @@ export async function GET(request: NextRequest) {
           featureCount: downsampled.length,
         } as TecResponse);
       } catch (fetchError) {
-        console.error('Error fetching GloTEC GeoJSON:', fetchError);
+        console.error(`[GloTEC] Error fetching ${latestFile.url}:`, fetchError);
         // Fall through to MongoDB cache
       }
     }
@@ -263,13 +269,9 @@ export async function GET(request: NextRequest) {
     // Fall back to MongoDB cache
     const mongoCache = await getFromMongoCache();
     if (mongoCache) {
-      // Update memory cache from MongoDB
-      cachedData = {
-        data: mongoCache.data,
-        timestamp: mongoCache.timestamp,
-        fetchedAt: now,
-      };
-
+      // Deliberately not stored in the memory cache: the next request should try NOAA
+      // again rather than re-serve this stored copy as if it were fresh.
+      console.warn(`[GloTEC] NOAA unavailable; serving stored copy from ${mongoCache.timestamp}`);
       const downsampled = downsampleData(mongoCache.data, resolution);
 
       return NextResponse.json({

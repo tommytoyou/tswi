@@ -201,7 +201,7 @@ function GlobeViewerComponent() {
                 onChange={(e) => setShowTec(e.target.checked)}
                 className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
               />
-              <span className="text-sm text-slate-300">TEC (Ionosphere)</span>
+              <span className="text-sm text-slate-300">TEC (NOAA GloTEC)</span>
             </label>
           </div>
         </div>

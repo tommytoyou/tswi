@@ -294,6 +294,14 @@ export function TecLayer({ viewer, Cesium, visible = true }: TecLayerProps) {
     return null;
   }
 
+  // Age of the GloTEC file being shown (NOAA time_tag, UTC)
+  const dataTime = tecData?.timestamp ? new Date(tecData.timestamp) : null;
+  const hasDataTime = dataTime !== null && !Number.isNaN(dataTime.getTime());
+  const isStale = hasDataTime && Date.now() - dataTime.getTime() > 60 * 60 * 1000;
+  const dataTimeLabel = hasDataTime
+    ? `${dataTime.toISOString().slice(0, 10)} ${dataTime.toISOString().slice(11, 16)}Z`
+    : 'unknown';
+
   // Get max TEC for display
   const maxTec = tecData?.data?.reduce((max, p) => Math.max(max, p.tec), 0) || 0;
   const dataLength = tecData?.data?.length || 1;
@@ -414,7 +422,10 @@ export function TecLayer({ viewer, Cesium, visible = true }: TecLayerProps) {
               <span className="text-slate-500">Data Points</span>
               <span className="text-slate-400">{tecData?.featureCount || tecData?.data?.length || '--'}</span>
             </div>
-            <div className="text-xs text-slate-600 mt-1">Updates every 10 min</div>
+            <div className={`text-xs mt-1 ${isStale || !hasDataTime ? 'text-amber-400' : 'text-slate-500'}`}>
+              Data: {dataTimeLabel}
+              {isStale && ' · Stale'}
+            </div>
           </div>
         </>
       )}
