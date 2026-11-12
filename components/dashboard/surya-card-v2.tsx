@@ -3,57 +3,51 @@
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Activity, Sun, AlertCircle, Info } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, Legend } from 'recharts';
+import { Activity, Sun, AlertCircle } from 'lucide-react';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, ReferenceLine } from 'recharts';
 import { formatUTC as format } from '@/lib/format-utc';
 import { CardSkeleton } from './card-skeleton';
-import { chartColors, chartTheme, riskColors } from '@/lib/design-system';
+import { chartColors, chartTheme } from '@/lib/design-system';
 
-interface Prediction {
-  time: string;
-  flare_probability: number;
-  class_probabilities: {
-    C: number;
-    M: number;
-    X: number;
-  };
-  confidence: number;
-}
-
-interface SuryaMetadata {
-  noaa_forecast_date?: string;
-  current_xray_flux?: number | null;
-  active_regions_count?: number;
-  complex_regions?: number;
-  data_sources?: string[];
-  data_points_used?: number;
-  processing_time_ms?: number;
-}
-
-interface FluxTimelinePoint {
-  time: string;
-  flux: number;
-  flare_probability: number;
+interface ForecastPeriod {
+  horizon: '24h' | '48h' | '72h';
   C: number;
   M: number;
   X: number;
+  issued: string;
+  source: string;
 }
 
-interface SuryaData {
-  model: string;
-  model_type: string;
-  prediction_time: string;
-  predictions: Prediction[];
-  flux_timeline?: FluxTimelinePoint[];
-  source: string;
-  metadata?: SuryaMetadata;
+interface FluxPoint {
+  time: string;
+  flux: number;
+  class: string;
 }
+
+interface FlareData {
+  forecast: ForecastPeriod[] | null;
+  reason?: string;
+  xray_flux: {
+    current: FluxPoint | null;
+    timeline: FluxPoint[];
+    source: string;
+  };
+  active_regions_count: number | null;
+  generated_at: string;
+}
+
+// Flare class thresholds (W/m², 0.1-0.8 nm)
+const CLASS_LINES: Array<[string, number]> = [['C', 1e-6], ['M', 1e-5], ['X', 1e-4]];
+
+const pct = (v: number) => `${Math.round(v * 100)}%`;
+
+/** NOAA's date field ("2026-11-11T00:00:00") shown as "2026-11-11". */
+const issuedLabel = (issued: string) => issued.slice(0, 10);
 
 export function SuryaCardV2() {
-  const [data, setData] = useState<SuryaData | null>(null);
+  const [data, setData] = useState<FlareData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
@@ -61,16 +55,14 @@ export function SuryaCardV2() {
       const response = await fetch('/api/ai/surya-prediction');
       const result = await response.json().catch(() => null);
 
-      // 503 / success:false means neither NOAA nor stored X-ray data is available.
-      // Show no numbers rather than stale or invented ones.
+      // 503 / success:false: no NOAA data at all. Show no numbers.
       if (!response.ok || !result?.success || !result.data) {
         throw new Error(result?.error || `HTTP ${response.status}`);
       }
 
       setData(result.data);
-      setWarning(result.warning || null);
       setError(null);
-    } catch (err) {
+    } catch {
       setData(null);
       setError('Flare data unavailable. Retrying.');
     } finally {
@@ -102,74 +94,13 @@ export function SuryaCardV2() {
     );
   }
 
-  // Calculate overall risk
-  const avgProbability = data.predictions.reduce((sum, p) => sum + p.flare_probability, 0) / data.predictions.length;
-  const maxProbability = Math.max(...data.predictions.map(p => p.flare_probability));
-  const avgConfidence = data.predictions.reduce((sum, p) => sum + p.confidence, 0) / data.predictions.length;
-
-  let riskLevel: keyof typeof riskColors = 'LOW';
-  if (maxProbability > 0.5) riskLevel = 'SEVERE';
-  else if (maxProbability > 0.3) riskLevel = 'HIGH';
-  else if (maxProbability > 0.15) riskLevel = 'MODERATE';
-
-  const riskColor = riskColors[riskLevel];
-
-  // Format data for the timeline charts. Prefer the real, time-resolved X-ray flux
-  // history (24h, varies genuinely); fall back to the 4-point forecast if it's absent.
-  const timelineSource =
-    data.flux_timeline && data.flux_timeline.length > 0
-      ? data.flux_timeline
-      : data.predictions.map((p) => ({
-          time: p.time,
-          flare_probability: p.flare_probability,
-          C: p.class_probabilities.C,
-          M: p.class_probabilities.M,
-          X: p.class_probabilities.X,
-        }));
-
-  const chartData = timelineSource.map((p) => ({
+  const forecast = data.forecast;
+  const current = data.xray_flux.current;
+  const chartData = data.xray_flux.timeline.map((p) => ({
     time: format(new Date(p.time), 'HH:mm'),
-    timestamp: new Date(p.time).getTime(),
-    probability: p.flare_probability * 100,
-    cClass: Math.max(0, p.C * 100),
-    mClass: Math.max(0, p.M * 100),
-    xClass: Math.max(0, p.X * 100),
+    flux: p.flux,
+    cls: p.class,
   }));
-
-  // Determine model badge info
-  const getModelBadge = () => {
-    switch (data.source) {
-      case 'noaa-swpc-enhanced':
-        return { label: 'NOAA SWPC', color: 'text-intel-cyan border-intel-cyan/30' };
-      case 'statistical-fallback':
-        return { label: 'Statistical', color: 'text-intel-amber border-intel-amber/30' };
-      default:
-        return { label: data.model, color: 'text-intel-cyan border-intel-cyan/30' };
-    }
-  };
-
-  const modelBadge = getModelBadge();
-  const isRealData = data.source === 'noaa-swpc-enhanced';
-
-  const confidenceLabel =
-    data.source === 'noaa-swpc-enhanced'
-      ? 'Forecast confidence (NOAA)'
-      : data.source === 'statistical-fallback'
-        ? 'Estimate confidence'
-        : 'Confidence';
-
-  const sourceNote =
-    data.source === 'noaa-swpc-enhanced'
-      ? 'Source: NOAA SWPC flare probabilities'
-      : data.source === 'statistical-fallback'
-        ? 'Source: TSWI statistical estimate from stored X-ray flux'
-        : null;
-
-  // Format X-ray flux for display
-  const formatXRayFlux = (flux: number | null | undefined) => {
-    if (flux === null || flux === undefined) return 'N/A';
-    return flux.toExponential(2) + ' W/m²';
-  };
 
   return (
     <Card className="lg:col-span-2">
@@ -179,225 +110,135 @@ export function SuryaCardV2() {
             <Sun className="h-4 w-4 text-intel-cyan" />
             Solar Flare Probability
           </CardTitle>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className={modelBadge.color}>
-              {modelBadge.label}
-            </Badge>
-            <Badge className={riskColor.badge}>
-              {riskLevel} RISK
-            </Badge>
-          </div>
+          <Badge variant="outline" className="text-intel-cyan border-intel-cyan/30">
+            NOAA SWPC
+          </Badge>
         </div>
-        {warning && (
-          <div className="flex items-center gap-2 text-xs text-intel-amber/80 mt-2">
-            <AlertCircle className="h-3 w-3" />
-            <span>{warning}</span>
-          </div>
-        )}
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Key Metrics */}
-        <div className="grid grid-cols-4 gap-4">
-          <div className="space-y-1">
-            <div className="text-xs text-intel-muted">Max Probability</div>
-            <div className="text-2xl font-bold font-mono" style={{ color: riskColor.chart }}>
-              {(maxProbability * 100).toFixed(1)}%
+        {/* NOAA forecast table */}
+        {forecast ? (
+          <div className="space-y-2">
+            <div className="text-xs font-semibold text-slate-300">
+              NOAA SWPC forecast, issued {issuedLabel(forecast[0].issued)}
             </div>
-            <div className="text-xs text-intel-muted">Next 2 hours</div>
+            <table className="w-full text-sm font-mono">
+              <thead>
+                <tr className="text-xs text-intel-muted">
+                  <th className="text-left font-normal py-1">Class</th>
+                  {forecast.map((p) => (
+                    <th key={p.horizon} className="text-right font-normal py-1">{p.horizon}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(['C', 'M', 'X'] as const).map((cls) => (
+                  <tr key={cls} className="border-t border-intel-border/40">
+                    <td className="py-1 text-slate-300">{cls}-class</td>
+                    {forecast.map((p) => (
+                      <td key={p.horizon} className="py-1 text-right text-intel-cyan">{pct(p[cls])}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-
-          <div className="space-y-1">
-            <div className="text-xs text-intel-muted">Confidence</div>
-            <div className="text-2xl font-bold font-mono text-intel-cyan">
-              {(avgConfidence * 100).toFixed(0)}%
-            </div>
-            <div className="text-xs text-intel-muted">{confidenceLabel}</div>
-          </div>
-
-          <div className="space-y-1">
-            <div className="text-xs text-intel-muted">Dominant Class</div>
-            <div className="text-2xl font-bold font-mono text-intel-cyan">
-              {data.predictions[0].class_probabilities.C > data.predictions[0].class_probabilities.M ? 'C' : 'M'}
-            </div>
-            <div className="text-xs text-intel-muted">Expected type</div>
-          </div>
-
-          <div className="space-y-1">
-            <div className="text-xs text-intel-muted">Active Regions</div>
-            <div className="text-2xl font-bold font-mono text-intel-cyan">
-              {data.metadata?.active_regions_count ?? '-'}
-            </div>
-            <div className="text-xs text-intel-muted">
-              {data.metadata?.complex_regions ? `${data.metadata.complex_regions} complex` : 'On sun'}
-            </div>
-          </div>
-        </div>
-
-        {/* Real-time data indicators */}
-        {isRealData && data.metadata && (
-          <div className="flex flex-wrap gap-3 text-xs">
-            {data.metadata.current_xray_flux !== null && data.metadata.current_xray_flux !== undefined && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-intel-panel/50 rounded">
-                <Activity className="h-3 w-3 text-intel-cyan" />
-                <span className="text-intel-muted">X-ray:</span>
-                <span className="text-slate-300 font-mono">{formatXRayFlux(data.metadata.current_xray_flux)}</span>
-              </div>
-            )}
-            {data.metadata.noaa_forecast_date && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-intel-panel/50 rounded">
-                <Sun className="h-3 w-3 text-intel-cyan" />
-                <span className="text-intel-muted">NOAA:</span>
-                <span className="text-slate-300">{data.metadata.noaa_forecast_date}</span>
-              </div>
-            )}
+        ) : (
+          <div className="flex items-center gap-2 text-xs text-intel-amber/80">
+            <AlertCircle className="h-3 w-3" />
+            <span>No NOAA forecast available{data.reason ? `: ${data.reason}` : ''}.</span>
           </div>
         )}
 
-        {/* Prediction Timeline - Flare Probability */}
-        <div className="space-y-2">
-          <div className="text-xs font-semibold text-slate-300">Flare Probability Timeline <span className="text-intel-muted font-normal">· observed X-ray flux, past 24h</span></div>
-          <div className="h-[140px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                <defs>
-                  <linearGradient id="probabilityGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={chartColors.danger} stopOpacity={0.8} />
-                    <stop offset="95%" stopColor={chartColors.danger} stopOpacity={0.1} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke={chartTheme.gridColor}
-                  opacity={0.1}
-                />
-                <XAxis
-                  dataKey="time"
-                  stroke={chartTheme.textColor}
-                  style={{ fontSize: chartTheme.fontSize }}
-                  tickLine={false}
-                  interval="preserveStartEnd"
-                  minTickGap={40}
-                />
-                <YAxis
-                  stroke={chartTheme.textColor}
-                  style={{ fontSize: chartTheme.fontSize }}
-                  tickLine={false}
-                  domain={[0, 100]}
-                  label={{ value: '%', angle: -90, position: 'insideLeft', fill: chartTheme.textColor }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: chartTheme.tooltipBg,
-                    border: `1px solid ${chartTheme.tooltipBorder}`,
-                    borderRadius: '6px',
-                    fontSize: chartTheme.fontSize,
-                  }}
-                  formatter={(value: any) => [`${value.toFixed(1)}%`]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="probability"
-                  stroke={chartColors.danger}
-                  fill="url(#probabilityGradient)"
-                  strokeWidth={2}
-                  name="Flare Probability"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+        {/* Current observed flux */}
+        <div className="flex flex-wrap gap-3 text-xs">
+          <div className="flex items-center gap-1 px-2 py-1 bg-intel-panel/50 rounded">
+            <Activity className="h-3 w-3 text-intel-cyan" />
+            <span className="text-intel-muted">Current X-ray:</span>
+            <span className="text-slate-300 font-mono">
+              {current ? `${current.class} (${current.flux.toExponential(2)} W/m²) at ${format(new Date(current.time), 'HH:mm')} UTC` : 'N/A'}
+            </span>
           </div>
+          {data.active_regions_count !== null && (
+            <div className="flex items-center gap-1 px-2 py-1 bg-intel-panel/50 rounded">
+              <Sun className="h-3 w-3 text-intel-cyan" />
+              <span className="text-intel-muted">Active regions:</span>
+              <span className="text-slate-300 font-mono">{data.active_regions_count}</span>
+            </div>
+          )}
         </div>
 
-        {/* Flare Class Breakdown */}
-        <div className="space-y-2">
-          <div className="text-xs font-semibold text-slate-300">Flare Class Probabilities <span className="text-intel-muted font-normal">· derived from observed flux, past 24h</span></div>
-          <div className="h-[120px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke={chartTheme.gridColor}
-                  opacity={0.1}
-                />
-                <XAxis
-                  dataKey="time"
-                  stroke={chartTheme.textColor}
-                  style={{ fontSize: chartTheme.fontSize }}
-                  tickLine={false}
-                  interval="preserveStartEnd"
-                  minTickGap={40}
-                />
-                <YAxis
-                  stroke={chartTheme.textColor}
-                  style={{ fontSize: chartTheme.fontSize }}
-                  tickLine={false}
-                  domain={[0, 'auto']}
-                  label={{ value: '%', angle: -90, position: 'insideLeft', fill: chartTheme.textColor }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: chartTheme.tooltipBg,
-                    border: `1px solid ${chartTheme.tooltipBorder}`,
-                    borderRadius: '6px',
-                    fontSize: chartTheme.fontSize,
-                  }}
-                  formatter={(value: any) => [`${value.toFixed(2)}%`]}
-                />
-                <Legend
-                  wrapperStyle={{ fontSize: chartTheme.fontSize }}
-                  iconType="line"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="cClass"
-                  stroke={chartColors.warning}
-                  dot={false}
-                  strokeWidth={2}
-                  name="C-class"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="mClass"
-                  stroke={chartColors.proton}
-                  dot={false}
-                  strokeWidth={2}
-                  name="M-class"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="xClass"
-                  stroke={chartColors.danger}
-                  dot={false}
-                  strokeWidth={2}
-                  name="X-class"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+        {/* Observed flux chart */}
+        {chartData.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-xs font-semibold text-slate-300">
+              Observed GOES X-ray flux <span className="text-intel-muted font-normal">· past 24h, UTC</span>
+            </div>
+            <div className="h-[160px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.gridColor} opacity={0.1} />
+                  <XAxis
+                    dataKey="time"
+                    stroke={chartTheme.textColor}
+                    style={{ fontSize: chartTheme.fontSize }}
+                    tickLine={false}
+                    interval="preserveStartEnd"
+                    minTickGap={40}
+                  />
+                  <YAxis
+                    scale="log"
+                    domain={[1e-8, 1e-3]}
+                    ticks={[1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3]}
+                    allowDataOverflow
+                    stroke={chartTheme.textColor}
+                    style={{ fontSize: chartTheme.fontSize }}
+                    tickLine={false}
+                    tickFormatter={(v: number) => v.toExponential(0)}
+                    width={45}
+                  />
+                  {CLASS_LINES.map(([label, y]) => (
+                    <ReferenceLine
+                      key={label}
+                      y={y}
+                      stroke={chartTheme.textColor}
+                      strokeOpacity={0.3}
+                      strokeDasharray="2 4"
+                      label={{ value: label, position: 'right', fill: chartTheme.textColor, fontSize: 10 }}
+                    />
+                  ))}
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: chartTheme.tooltipBg,
+                      border: `1px solid ${chartTheme.tooltipBorder}`,
+                      borderRadius: '6px',
+                      fontSize: chartTheme.fontSize,
+                    }}
+                    formatter={(value: any, _name: any, item: any) => [
+                      `${Number(value).toExponential(2)} W/m² (${item?.payload?.cls})`,
+                      'Peak flux',
+                    ]}
+                    labelFormatter={(t) => `${t} UTC`}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="flux"
+                    stroke={chartColors.warning}
+                    fill={chartColors.warning}
+                    fillOpacity={0.15}
+                    strokeWidth={2}
+                    name="X-ray flux"
+                    baseValue={1e-8}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </div>
-
-        {sourceNote && (
-          <div className="text-xs text-intel-muted">{sourceNote}</div>
         )}
 
-        {/* Footer Info */}
-        <div className="flex justify-between items-center text-xs">
-          <div className="text-intel-muted flex items-center gap-1">
-            <Info className="h-3 w-3" />
-            <span>{data.model}</span>
-            {data.metadata?.data_sources && (
-              <span className="text-slate-600">
-                ({data.metadata.data_sources.length} sources)
-              </span>
-            )}
-          </div>
-          <div className="text-intel-muted">
-            {format(new Date(data.prediction_time), 'HH:mm:ss')} UTC
-            {data.metadata?.processing_time_ms !== undefined && (
-              <span className="text-slate-600 ml-2">
-                ({data.metadata.processing_time_ms}ms)
-              </span>
-            )}
-          </div>
+        <div className="flex justify-between items-center text-xs text-intel-muted">
+          <span>Source: NOAA SWPC solar_probabilities.json; GOES X-ray flux</span>
+          <span>{format(new Date(data.generated_at), 'HH:mm:ss')} UTC</span>
         </div>
       </CardContent>
     </Card>

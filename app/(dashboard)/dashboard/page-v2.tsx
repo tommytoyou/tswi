@@ -62,10 +62,10 @@ export default function DashboardPageV2() {
         'Timestamp,Flux (W/m²)',
         ...(xrayFlux.data?.slice(-10).map((d: any) => `${d.ts},${d.flux}`) || []),
         '',
-        'Surya AI Predictions',
-        'Time,Flare Probability,C-Class,M-Class,X-Class,Confidence',
-        ...(suryaPrediction.data?.predictions?.map((p: any) =>
-          `${p.time},${p.flare_probability},${p.class_probabilities.C},${p.class_probabilities.M},${p.class_probabilities.X},${p.confidence}`
+        'NOAA SWPC Flare Forecast',
+        'Horizon,Issued,C-Class,M-Class,X-Class',
+        ...(suryaPrediction.data?.forecast?.map((p: any) =>
+          `${p.horizon},${p.issued},${p.C},${p.M},${p.X}`
         ) || []),
       ].join('\n');
 

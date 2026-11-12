@@ -35,8 +35,7 @@ interface PostureState {
   rLevel: number | null;
   sLevel: number | null;
   gLevel: number | null;
-  maxProbability: number | null;
-  dominantClass: string | null;
+  mFlare24h: number | null;
   alertCount: number | null;
   topSeverity: string | null;
   loading: boolean;
@@ -46,8 +45,7 @@ const initialState: PostureState = {
   rLevel: null,
   sLevel: null,
   gLevel: null,
-  maxProbability: null,
-  dominantClass: null,
+  mFlare24h: null,
   alertCount: null,
   topSeverity: null,
   loading: true,
@@ -99,29 +97,18 @@ export function ThreatPostureStrip() {
         // leave gLevel unset
       }
 
-      // Flare forecast from Surya prediction
+      // NOAA SWPC M-class flare probability, next 24h (as published)
       try {
         const res = await fetch('/api/ai/surya-prediction');
         const json = await res.json();
-        // A 503 / success:false means flare data is unavailable; leave it unset (shown as N/A)
-        const predictions = res.ok && json?.success ? json?.data?.predictions : null;
-        if (Array.isArray(predictions) && predictions.length > 0) {
-          next.maxProbability = Math.max(
-            ...predictions.map((p: { flare_probability: number }) => p.flare_probability)
-          );
-          const cp = predictions[0]?.class_probabilities;
-          if (cp) {
-            const entries: Array<[string, number]> = [
-              ['C', cp.C ?? 0],
-              ['M', cp.M ?? 0],
-              ['X', cp.X ?? 0],
-            ];
-            entries.sort((a, b) => b[1] - a[1]);
-            next.dominantClass = entries[0][0];
-          }
+        // 503 / success:false / forecast:null → leave unset (shown as N/A)
+        const forecast = res.ok && json?.success ? json?.data?.forecast : null;
+        const day1 = Array.isArray(forecast) ? forecast.find((p: { horizon: string }) => p.horizon === '24h') : null;
+        if (day1 && typeof day1.M === 'number') {
+          next.mFlare24h = day1.M;
         }
       } catch {
-        // leave flare values unset
+        // leave mFlare24h unset
       }
 
       // Unacknowledged alerts
@@ -157,7 +144,7 @@ export function ThreatPostureStrip() {
     };
   }, []);
 
-  const { rLevel, sLevel, gLevel, maxProbability, dominantClass, alertCount, topSeverity } = state;
+  const { rLevel, sLevel, gLevel, mFlare24h, alertCount, topSeverity } = state;
 
   // Tier computations
   const scaleTier = Math.max(
@@ -166,11 +153,12 @@ export function ThreatPostureStrip() {
     scaleLevelToTier(gLevel ?? 0)
   ) as 0 | 1 | 2 | 3;
 
+  // Colour tier for NOAA's M-class 24h probability (same cut-offs as before)
   let suryaTier: 0 | 1 | 2 | 3 = 0;
-  if (maxProbability !== null) {
-    if (maxProbability > 0.5) suryaTier = 3;
-    else if (maxProbability > 0.3) suryaTier = 2;
-    else if (maxProbability > 0.15) suryaTier = 1;
+  if (mFlare24h !== null) {
+    if (mFlare24h > 0.5) suryaTier = 3;
+    else if (mFlare24h > 0.3) suryaTier = 2;
+    else if (mFlare24h > 0.15) suryaTier = 1;
   }
 
   const alertTier: 0 | 1 | 2 | 3 = topSeverity ? severityToTier[topSeverity] ?? 0 : 0;
@@ -212,14 +200,17 @@ export function ThreatPostureStrip() {
 
       {/* Segment 3 — Flare forecast */}
       <div className="flex flex-col justify-center px-4 min-w-[150px] flex-1 border-l border-intel-border">
-        <span className={labelClass}>Flare Max (2H)</span>
+        <span className={labelClass}>M-flare 24H</span>
         {state.loading ? (
           <span className="text-sm font-bold font-mono text-intel-muted">--</span>
-        ) : maxProbability === null ? (
-          <span className="text-sm font-bold font-mono text-intel-muted" title="Flare data unavailable">N/A</span>
+        ) : mFlare24h === null ? (
+          <span className="text-sm font-bold font-mono text-intel-muted" title="NOAA flare forecast unavailable">N/A</span>
         ) : (
-          <span className={`text-sm font-bold font-mono ${tierToRiskColors[suryaTier].text}`}>
-            {(maxProbability * 100).toFixed(1)}%{dominantClass ? ` ${dominantClass}` : ''}
+          <span
+            className={`text-sm font-bold font-mono ${tierToRiskColors[suryaTier].text}`}
+            title="NOAA SWPC M-class flare probability, next 24h"
+          >
+            {Math.round(mFlare24h * 100)}%
           </span>
         )}
       </div>
