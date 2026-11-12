@@ -234,7 +234,10 @@ async function sendNotification(alert: Alert, historyEntry: any): Promise<void> 
     try {
       await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ws/alerts`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.CRON_SECRET}`,
+        },
         body: JSON.stringify({
           alert,
           priority: historyEntry.priority,

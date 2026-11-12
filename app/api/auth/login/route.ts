@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateCredentials, AUTHENTICATED_USER } from '@/lib/auth/session';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  const limited = await checkRateLimit(request, RATE_LIMITS.login);
+  if (limited) return limited;
+
   try {
     const text = await request.text();
     const body = JSON.parse(text);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { AccessRequestSchema } from '@/lib/types';
 import { z } from 'zod';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,9 @@ const CreateAccessRequestSchema = z.object({
 
 // POST - Create new access request
 export async function POST(request: NextRequest) {
+  const limited = await checkRateLimit(request, RATE_LIMITS.accessRequests);
+  if (limited) return limited;
+
   try {
     const body = await request.json();
 

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth/api';
+import { checkCronAuth } from '@/lib/cron-auth';
 
 /**
  * WEBSOCKET ALERTS API
@@ -8,12 +10,17 @@ import { NextRequest, NextResponse } from 'next/server';
  * For true WebSocket support, consider using Pusher, Ably, or Socket.io
  */
 
-export const runtime = 'edge';
+// Node runtime: the session and cron-secret checks need Node APIs
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 /**
  * SSE endpoint for real-time alerts
  */
 export async function GET(request: NextRequest) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   // Create a TransformStream for SSE
   const stream = new TransformStream();
   const writer = stream.writable.getWriter();
@@ -58,9 +65,15 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST endpoint to broadcast alert
- * Called by the alert evaluation cron job
+ * Called by the alert evaluation cron job (Bearer CRON_SECRET) or a logged-in user
  */
 export async function POST(request: NextRequest) {
+  // The alert-evaluation cron calls this with the cron Bearer token; users need a session
+  const authError = request.headers.has('authorization')
+    ? checkCronAuth(request, 'ws-alerts')
+    : await requireAuth();
+  if (authError) return authError;
+
   try {
     const body = await request.json();
     const { alert, priority, reasoning } = body;

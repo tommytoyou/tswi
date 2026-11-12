@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { getCollection } from '@/lib/db';
+import { requireAuth } from '@/lib/auth/api';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,9 @@ export const dynamic = 'force-dynamic';
  * - since: ISO date string (optional, only alerts after this time)
  */
 export async function GET(request: NextRequest) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     const { searchParams } = new URL(request.url);
     const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 500);
@@ -82,6 +86,9 @@ export async function GET(request: NextRequest) {
  * Acknowledge an alert (mark as reviewed)
  */
 export async function PUT(request: NextRequest) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     const body = await request.json();
     const { _id, acknowledged } = body;
@@ -134,6 +141,9 @@ export async function PUT(request: NextRequest) {
  * - acknowledged_only: 'true' (only delete acknowledged alerts)
  */
 export async function DELETE(request: NextRequest) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     const { searchParams } = new URL(request.url);
     const before = searchParams.get('before');

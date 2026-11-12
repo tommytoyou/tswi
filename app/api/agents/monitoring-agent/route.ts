@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { analyzeSpaceWeather } from '@/lib/agent';
 import { requireAIAccess } from '@/lib/auth/api';
+import { checkCronAuth } from '@/lib/cron-auth';
+
+/**
+ * Cron callers send `Authorization: Bearer <CRON_SECRET>`; anyone else needs a
+ * logged-in session with AI access (401 when logged out, 403 without AI access).
+ */
+async function authorize(request: NextRequest) {
+  if (request.headers.has('authorization')) {
+    return checkCronAuth(request, 'monitoring-agent');
+  }
+  return requireAIAccess();
+}
 
 /**
  * MONITORING AGENT API
@@ -14,8 +26,7 @@ import { requireAIAccess } from '@/lib/auth/api';
  *   - limit=N: Number of recent decisions to return
  */
 export async function GET(request: NextRequest) {
-  // Check if user has AI access
-  const authError = await requireAIAccess();
+  const authError = await authorize(request);
   if (authError) return authError;
 
   try {
@@ -89,8 +100,7 @@ export async function GET(request: NextRequest) {
  * - Provide feedback on decisions
  */
 export async function POST(request: NextRequest) {
-  // Check if user has AI access
-  const authError = await requireAIAccess();
+  const authError = await authorize(request);
   if (authError) return authError;
 
   try {

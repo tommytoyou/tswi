@@ -1,17 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/db';
 import { AlertSchema } from '@/lib/types';
-import { requireSession } from '@/lib/auth/mock';
+import { getApiSession } from '@/lib/auth/api';
+
+function unauthorized() {
+  return NextResponse.json(
+    { success: false, error: 'Authentication required' },
+    { status: 401 }
+  );
+}
 
 export const runtime = 'nodejs';
 
 export async function GET() {
+  const session = await getApiSession();
+  if (!session) return unauthorized();
+  const userId = session.user.id || session.user.email;
+
   try {
-    const user = await requireSession();
     const collection = await getCollection('alerts');
 
     const alerts = await collection
-      .find({ user_id: user._id })
+      .find({ user_id: userId })
       .sort({ created_at: -1 })
       .toArray();
 
@@ -31,13 +41,16 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await getApiSession();
+  if (!session) return unauthorized();
+  const userId = session.user.id || session.user.email;
+
   try {
-    const user = await requireSession();
     const body = await request.json();
 
     const alert = AlertSchema.parse({
       ...body,
-      user_id: user._id,
+      user_id: userId,
       status: 'active',
       created_at: new Date(),
       updated_at: new Date(),

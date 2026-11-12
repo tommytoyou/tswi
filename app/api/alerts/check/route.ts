@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCollection, getTimeSeriesCollection } from '@/lib/db';
 import { AlertRule, AlertOperator, AlertMetric, TriggeredAlert } from '@/lib/types';
 import { sendAlertRuleNotifications } from '@/lib/notifications';
+import { requireAuth } from '@/lib/auth/api';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -149,6 +150,9 @@ async function wasRecentlyTriggered(ruleId: string, cooldownMinutes: number = 60
  * - cooldown: minutes to wait before re-triggering same rule (default: 60)
  */
 export async function GET(request: Request) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     const url = new URL(request.url);
     const dryRun = url.searchParams.get('dry_run') === 'true';
@@ -292,6 +296,9 @@ export async function GET(request: Request) {
  * Force check with custom metric values (useful for testing rules)
  */
 export async function POST(request: Request) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     const body = await request.json();
     const { metrics: customMetrics, rule_ids } = body;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { getCollection } from '@/lib/db';
 import { AlertRuleSchema, AlertRule } from '@/lib/types';
+import { requireAuth } from '@/lib/auth/api';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -75,6 +76,9 @@ const DEFAULT_RULES: Omit<AlertRule, '_id'>[] = [
  * Fetch all alert rules
  */
 export async function GET() {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     const collection = await getCollection('alert_rules');
 
@@ -106,6 +110,9 @@ export async function GET() {
  * Create a new alert rule
  */
 export async function POST(request: NextRequest) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     const body = await request.json();
 
@@ -136,6 +143,9 @@ export async function POST(request: NextRequest) {
  * Update an existing alert rule (expects _id in body)
  */
 export async function PUT(request: NextRequest) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     const body = await request.json();
     const { _id, ...updates } = body;
@@ -179,6 +189,9 @@ export async function PUT(request: NextRequest) {
  * Delete an alert rule (expects _id in query params)
  */
 export async function DELETE(request: NextRequest) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     const { searchParams } = new URL(request.url);
     const _id = searchParams.get('id');
