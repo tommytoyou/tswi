@@ -5,6 +5,28 @@ import { NoaaSolarEvent } from '@/lib/types';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+/** Raw record from https://services.swpc.noaa.gov/json/edited_events.json */
+interface NoaaEditedEvent {
+  begin_datetime: string;
+  max_datetime: string | null;
+  end_datetime: string | null;
+  observatory: string | null;
+  type: string;
+  location: string | null;
+  frequency: string | null;
+  particulars1: string | null;
+  particulars2: string | null;
+  region: number | null;
+}
+
+/**
+ * NOAA records have no id. begin + type + location alone collides (several
+ * observatories report the same event), so observatory and frequency are added.
+ */
+function buildEventId(e: NoaaEditedEvent): string {
+  return [e.begin_datetime, e.type, e.location || '-', e.observatory || '-', e.frequency || '-'].join('|');
+}
+
 /**
  * GET /api/noaa/solar-events
  *
@@ -30,46 +52,47 @@ export async function GET(request: NextRequest) {
       const noaaUrl = 'https://services.swpc.noaa.gov/json/edited_events.json';
 
       try {
-        const response = await fetch(noaaUrl, {
-          next: { revalidate: 300 }, // Cache for 5 minutes (events don't update as frequently)
-        });
+        const response = await fetch(noaaUrl, { cache: 'no-store' });
 
         if (!response.ok) {
           throw new Error(`NOAA API returned ${response.status}`);
         }
 
-        const rawData = await response.json();
-
-        // Transform NOAA data to our schema
+        const rawData: NoaaEditedEvent[] = await response.json();
         const collection = await getCollection<NoaaSolarEvent>('noaa_solar_events');
+        const fetchedAt = new Date();
         const documents: any[] = [];
 
         for (const item of rawData) {
-          if (!item.event_id || !item.begin_time) continue;
-
-          // Parse the peculiar NOAA date format
-          const beginTime = parseNoaaDate(item.begin_time);
+          if (!item.begin_datetime || !item.type) continue;
+          const beginTime = parseNoaaDate(item.begin_datetime);
           if (!beginTime) continue;
 
-          const doc = {
-            event_id: item.event_id,
-            event_type: item.event_type || 'UNKNOWN',
+          const particulars = [item.particulars1, item.particulars2]
+            .filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+            .join(' ') || null;
+
+          documents.push({
+            event_id: buildEventId(item),
+            event_type: item.type,
             begin_time: beginTime,
-            max_time: item.max_time ? parseNoaaDate(item.max_time) : undefined,
-            end_time: item.end_time ? parseNoaaDate(item.end_time) : undefined,
-            source_location: item.source_location || null,
-            active_region: item.active_region ? parseInt(item.active_region) : undefined,
-            particulars: item.particulars || null,
-            class_type: extractFlareClass(item.particulars),
-            intensity: extractFlareIntensity(item.particulars),
-            created_at: new Date(),
+            max_time: item.max_datetime ? parseNoaaDate(item.max_datetime) ?? undefined : undefined,
+            end_time: item.end_datetime ? parseNoaaDate(item.end_datetime) ?? undefined : undefined,
+            source_location: item.location || null,
+            active_region: typeof item.region === 'number' ? item.region : undefined,
+            observatory: item.observatory || null,
+            frequency: item.frequency || null,
+            particulars,
+            // X-ray flare class is in particulars1 for XRA events (e.g. "C1.0").
+            // FLA events carry an optical class there ("SF"), which is not an X-ray class.
+            class_type: item.type === 'XRA' ? extractFlareClass(item.particulars1) : undefined,
+            intensity: item.type === 'XRA' ? extractFlareIntensity(item.particulars1) : undefined,
+            created_at: fetchedAt,
             meta: {
               source: 'NOAA-SWPC',
-              fetched_at: new Date(),
+              fetched_at: fetchedAt,
             },
-          };
-
-          documents.push(doc);
+          });
         }
 
         // Upsert events by event_id
@@ -91,9 +114,12 @@ export async function GET(request: NextRequest) {
           filteredDocs = documents.filter((d) => d.event_type === eventType);
         }
 
+        // Newest first, to match the cached path
+        filteredDocs = [...filteredDocs].sort((a, b) => b.begin_time.getTime() - a.begin_time.getTime());
+
         return NextResponse.json({
           success: true,
-          data: filteredDocs.slice(-limit),
+          data: filteredDocs.slice(0, limit),
           count: filteredDocs.length,
           source: 'noaa-live',
         });
@@ -134,8 +160,9 @@ export async function GET(request: NextRequest) {
  */
 function parseNoaaDate(dateStr: string): Date | null {
   try {
-    // Replace space with T if present
-    const normalized = dateStr.replace(' ', 'T');
+    // NOAA times are UTC but carry no zone suffix; add one so they are not read as local time
+    let normalized = dateStr.trim().replace(' ', 'T');
+    if (!/[zZ]|[+-]\d\d:?\d\d$/.test(normalized)) normalized += 'Z';
     const date = new Date(normalized);
     return isNaN(date.getTime()) ? null : date;
   } catch {
@@ -147,9 +174,9 @@ function parseNoaaDate(dateStr: string): Date | null {
  * Extract flare class from particulars string
  * Example: "M5.2" -> "M"
  */
-function extractFlareClass(particulars: string | null): string | undefined {
+function extractFlareClass(particulars: string | null | undefined): string | undefined {
   if (!particulars) return undefined;
-  const match = particulars.match(/([ABCMX])\d+\.?\d*/);
+  const match = particulars.match(/^([ABCMX])\d+\.?\d*/);
   return match ? match[1] : undefined;
 }
 
@@ -157,8 +184,8 @@ function extractFlareClass(particulars: string | null): string | undefined {
  * Extract flare intensity from particulars string
  * Example: "M5.2" -> 5.2
  */
-function extractFlareIntensity(particulars: string | null): number | undefined {
+function extractFlareIntensity(particulars: string | null | undefined): number | undefined {
   if (!particulars) return undefined;
-  const match = particulars.match(/[ABCMX](\d+\.?\d*)/);
+  const match = particulars.match(/^[ABCMX](\d+\.?\d*)/);
   return match ? parseFloat(match[1]) : undefined;
 }

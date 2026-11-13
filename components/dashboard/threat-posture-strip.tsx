@@ -153,17 +153,11 @@ export function ThreatPostureStrip() {
     scaleLevelToTier(gLevel ?? 0)
   ) as 0 | 1 | 2 | 3;
 
-  // Colour tier for NOAA's M-class 24h probability (same cut-offs as before)
-  let suryaTier: 0 | 1 | 2 | 3 = 0;
-  if (mFlare24h !== null) {
-    if (mFlare24h > 0.5) suryaTier = 3;
-    else if (mFlare24h > 0.3) suryaTier = 2;
-    else if (mFlare24h > 0.15) suryaTier = 1;
-  }
-
   const alertTier: 0 | 1 | 2 | 3 = topSeverity ? severityToTier[topSeverity] ?? 0 : 0;
 
-  const overallTier = Math.max(scaleTier, suryaTier, alertTier) as 0 | 1 | 2 | 3;
+  // Posture comes only from NOAA R/S/G scale levels and active alerts.
+  // The flare probability is shown as data, not scored.
+  const overallTier = Math.max(scaleTier, alertTier) as 0 | 1 | 2 | 3;
 
   const labelClass = 'text-[10px] font-mono uppercase tracking-widest text-intel-muted';
   const placeholder = <span className="text-intel-muted">--</span>;
@@ -207,7 +201,7 @@ export function ThreatPostureStrip() {
           <span className="text-sm font-bold font-mono text-intel-muted" title="NOAA flare forecast unavailable">N/A</span>
         ) : (
           <span
-            className={`text-sm font-bold font-mono ${tierToRiskColors[suryaTier].text}`}
+            className="text-sm font-bold font-mono text-intel-cyan"
             title="NOAA SWPC M-class flare probability, next 24h"
           >
             {Math.round(mFlare24h * 100)}%
