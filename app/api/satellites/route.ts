@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { loadTleCatalog, TleCatalog } from '@/lib/tle-catalog';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// A due TLE catalog refresh (CelesTrak download + MongoDB upsert) can take a while
+export const maxDuration = 60;
 
 // TLE data structure
 interface TLEData {
@@ -126,50 +129,28 @@ const SPACE_STATION_IDS = new Set([
   '48274', // Tiangong / CSS (TIANHE)
 ]);
 
-// Fetch TLE data from a single CelesTrak category
-async function fetchCategoryTLE(group: string, type: ConstellationType): Promise<TLEData[]> {
-  const tleUrl = `https://celestrak.org/NORAD/elements/gp.php?GROUP=${group}&FORMAT=tle`;
-
-  try {
-    const response = await fetch(tleUrl, {
-      headers: {
-        'User-Agent': 'TSWI-SpaceWeather/1.0',
-      },
-      next: { revalidate: 3600 }, // Cache for 1 hour
-    });
-
-    if (!response.ok) {
-      console.warn(`CelesTrak ${group} returned ${response.status}`);
-      return [];
-    }
-
-    const tleText = await response.text();
-    let satellites = parseTLE(tleText, type);
-
-    // Filter space stations to only include ISS and Tiangong
-    if (group === 'stations') {
-      satellites = satellites.filter(sat => SPACE_STATION_IDS.has(sat.noradId));
-    }
-
-    return satellites;
-  } catch (error) {
-    console.warn(`Failed to fetch ${group}:`, error);
-    return [];
+// Read one CelesTrak group's TLEs from the shared catalog (tle_catalog)
+function categoryTLEs(catalog: TleCatalog, group: string, type: ConstellationType): TLEData[] {
+  const text: string[] = [];
+  for (const rec of catalog.byId.values()) {
+    if (rec.groups?.includes(group)) text.push(rec.name, rec.line1, rec.line2);
   }
+  let satellites = parseTLE(text.join('\n'), type);
+
+  // Filter space stations to only include ISS and Tiangong
+  if (group === 'stations') {
+    satellites = satellites.filter(sat => SPACE_STATION_IDS.has(sat.noradId));
+  }
+  return satellites;
 }
 
 // Fetch all satellite data from multiple CelesTrak categories
-async function fetchAllSatellites(): Promise<{
+async function fetchAllSatellites(catalog: TleCatalog): Promise<{
   satellites: TLEData[];
   starlinkPlanes: OrbitalPlane[];
   iridiumPlanes: OrbitalPlane[];
 }> {
-  // Fetch all categories in parallel
-  const fetchPromises = CELESTRAK_CATEGORIES.map(cat =>
-    fetchCategoryTLE(cat.group, cat.type)
-  );
-
-  const results = await Promise.all(fetchPromises);
+  const results = CELESTRAK_CATEGORIES.map(cat => categoryTLEs(catalog, cat.group, cat.type));
 
   // Separate Starlink and Iridium for orbital plane grouping
   let starlinkSats: TLEData[] = [];
@@ -216,7 +197,8 @@ async function fetchAllSatellites(): Promise<{
 /**
  * GET /api/satellites
  *
- * Fetches TLE data for multiple satellite constellations from CelesTrak
+ * TLE data for multiple satellite constellations, read from the shared
+ * MongoDB catalog (tle_catalog, refreshed from CelesTrak at most every 2 hours)
  *
  * Query params:
  * - type: 'all' | constellation type (default: 'all')
@@ -228,7 +210,8 @@ export async function GET(request: NextRequest) {
     const typeFilter = searchParams.get('type') || 'all';
     const includeOrbitalPlanes = searchParams.get('includeOrbitalPlanes') === 'true';
 
-    const { satellites, starlinkPlanes, iridiumPlanes } = await fetchAllSatellites();
+    const catalog = await loadTleCatalog();
+    const { satellites, starlinkPlanes, iridiumPlanes } = await fetchAllSatellites(catalog);
 
     // Filter by type if specified
     let filtered = satellites;
@@ -249,7 +232,9 @@ export async function GET(request: NextRequest) {
       count: filtered.length,
       countByType,
       timestamp: new Date().toISOString(),
-      source: 'celestrak',
+      source: 'celestrak (tle_catalog)',
+      tleFetchedAt: catalog.fetchedAt,
+      tleStatus: catalog.lastStatus,
     };
 
     // Include orbital plane data if requested

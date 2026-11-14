@@ -46,6 +46,19 @@ interface APIResponse {
     filteredCountryCounts: Record<string, number>;
     filteredSectorCounts: Record<string, number>;
   };
+  /** Percent (0-100) of returned satellites that have a TLE */
+  tleMatchRate: number | null;
+  /** When the shared TLE catalog was last refreshed from CelesTrak */
+  tleFetchedAt: string | null;
+}
+
+/** Human-readable age, e.g. "1h 25m" */
+function formatAge(fromIso: string, now: number): string {
+  const mins = Math.max(0, Math.floor((now - new Date(fromIso).getTime()) / 60000));
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  if (h < 48) return `${h}h ${mins % 60}m`;
+  return `${Math.floor(h / 24)}d ${h % 24}h`;
 }
 
 // Color schemes
@@ -240,6 +253,7 @@ function NationalAssetsGlobeComponent() {
   // Data
   const [satellites, setSatellites] = useState<SatellitePosition[]>([]);
   const [stats, setStats] = useState<APIResponse['stats'] | null>(null);
+  const [tleInfo, setTleInfo] = useState<{ matchRate: number | null; fetchedAt: string | null; returned: number } | null>(null);
   const [selectedSatellite, setSelectedSatellite] = useState<SatellitePosition | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
 
@@ -357,6 +371,7 @@ function NationalAssetsGlobeComponent() {
       }
 
       setStats(data.stats);
+      setTleInfo({ matchRate: data.tleMatchRate, fetchedAt: data.tleFetchedAt, returned: data.returned });
 
       // Process satellites with TLE data
       const now = new Date();
@@ -635,6 +650,15 @@ function NationalAssetsGlobeComponent() {
       )}
       <div ref={viewerRef} className="w-full h-full" />
 
+      {/* No orbit data: say so instead of showing a blank globe */}
+      {cesiumReady && !dataLoading && tleInfo && tleInfo.returned > 0 && tleInfo.matchRate === 0 && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 max-w-md px-4 py-3 bg-amber-900/80 border border-amber-500 rounded-lg text-center">
+          <p className="text-amber-100 text-sm font-medium">
+            Orbit data unavailable (CelesTrak). Positions can&apos;t be shown.
+          </p>
+        </div>
+      )}
+
       {/* Filter Panel - Bottom Left */}
       {cesiumReady && (
         <div className="absolute bottom-4 left-4 z-20 bg-slate-900/90 backdrop-blur-sm rounded-lg border border-slate-700 p-3 min-w-[220px]">
@@ -717,6 +741,17 @@ function NationalAssetsGlobeComponent() {
           <div className="text-xs text-slate-400 mb-2">
             Showing {satellites.length} of {stats?.totalInDatabase || 0} satellites
           </div>
+          {tleInfo && (
+            <div className="text-xs text-slate-400 mb-2">
+              TLE data age:{' '}
+              <span className="text-slate-300">
+                {tleInfo.fetchedAt ? `${formatAge(tleInfo.fetchedAt, Date.now())} (CelesTrak)` : 'unavailable'}
+              </span>
+              {tleInfo.matchRate !== null && (
+                <span> · {tleInfo.matchRate}% with orbits</span>
+              )}
+            </div>
+          )}
 
           {/* Country breakdown */}
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs mb-3">

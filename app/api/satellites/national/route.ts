@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
+import { loadTleCatalog } from '@/lib/tle-catalog';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// A due TLE catalog refresh (CelesTrak download + MongoDB upsert) can take a while
+export const maxDuration = 60;
 
 // UCS Satellite data structure
 interface UCSSatellite {
@@ -34,12 +37,6 @@ interface UCSData {
   satellites: UCSSatellite[];
 }
 
-// TLE data for live positions
-interface TLEData {
-  line1: string;
-  line2: string;
-}
-
 // Cache for UCS data
 let ucsDataCache: UCSData | null = null;
 
@@ -55,52 +52,12 @@ async function loadUCSData(): Promise<UCSData> {
   return ucsDataCache;
 }
 
-// Fetch TLE data for given NORAD IDs from CelesTrak
-async function fetchTLEsForSatellites(noradIds: string[]): Promise<Map<string, TLEData>> {
-  const tleMap = new Map<string, TLEData>();
-
-  // CelesTrak has a bulk query endpoint, but for large numbers we need to batch
-  // For now, fetch from the active satellites catalog
-  try {
-    const response = await fetch(
-      'https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle',
-      {
-        headers: { 'User-Agent': 'TSWI-SpaceWeather/1.0' },
-        next: { revalidate: 3600 }, // Cache for 1 hour
-      }
-    );
-
-    if (!response.ok) {
-      console.warn('Failed to fetch TLEs from CelesTrak:', response.status);
-      return tleMap;
-    }
-
-    const tleText = await response.text();
-    const lines = tleText.trim().split('\n').map(l => l.trim()).filter(l => l);
-
-    // Parse TLE format (3 lines per satellite: name, line1, line2)
-    for (let i = 0; i < lines.length - 2; i += 3) {
-      const line1 = lines[i + 1];
-      const line2 = lines[i + 2];
-
-      if (line1?.startsWith('1 ') && line2?.startsWith('2 ')) {
-        // Extract NORAD ID from line 1 (columns 3-7)
-        const noradId = line1.substring(2, 7).trim();
-        tleMap.set(noradId, { line1, line2 });
-      }
-    }
-  } catch (error) {
-    console.error('Error fetching TLEs:', error);
-  }
-
-  return tleMap;
-}
-
 /**
  * GET /api/satellites/national
  *
  * Fetches UCS satellite data filtered by country and/or sector
- * Optionally matches with CelesTrak TLEs for live positions
+ * Optionally matches TLEs from the shared MongoDB catalog (tle_catalog, refreshed
+ * from CelesTrak at most every 2 hours) for live positions
  *
  * Query params:
  * - country: Filter by normalized country (USA, China, Russia, EU, India, Japan, Other)
@@ -135,20 +92,31 @@ export async function GET(request: NextRequest) {
     // Limit results
     const limitedResults = filtered.slice(0, limit);
 
-    // Optionally fetch TLEs for live positions
-    let tleMap: Map<string, TLEData> = new Map();
+    // Optionally attach TLEs from the shared catalog for live positions
+    let tleFetchedAt: Date | null = null;
+    let tleStatus: string | null = null;
+    let catalogById: Map<string, { line1: string; line2: string; epoch: Date | null }> | null = null;
     if (includeTLE && limitedResults.length > 0) {
-      const noradIds = limitedResults.map(s => s.noradId);
-      tleMap = await fetchTLEsForSatellites(noradIds);
+      try {
+        const catalog = await loadTleCatalog();
+        catalogById = catalog.byId;
+        tleFetchedAt = catalog.fetchedAt;
+        tleStatus = catalog.lastStatus;
+      } catch (error) {
+        console.error('National satellites: TLE catalog unavailable:', error);
+        tleStatus = 'TLE catalog unavailable';
+      }
     }
 
-    // Build response with TLE data if available
+    let matched = 0;
     const satellitesWithTLE = limitedResults.map(sat => {
-      const tle = tleMap.get(sat.noradId);
+      const rec = catalogById?.get(String(parseInt(String(sat.noradId), 10)));
+      if (rec) matched++;
       return {
         ...sat,
-        tle: tle || null,
-        hasTLE: !!tle,
+        tle: rec ? { line1: rec.line1, line2: rec.line2 } : null,
+        tleEpoch: rec?.epoch ?? null,
+        hasTLE: !!rec,
       };
     });
 
@@ -178,7 +146,13 @@ export async function GET(request: NextRequest) {
         filteredCountryCounts,
         filteredSectorCounts,
       },
-      tleMatchRate: includeTLE ? (tleMap.size / limitedResults.length * 100).toFixed(1) + '%' : null,
+      // Percent of returned satellites that have a TLE (number, 0-100)
+      tleMatchRate: includeTLE
+        ? limitedResults.length > 0 ? Math.round((matched / limitedResults.length) * 1000) / 10 : 0
+        : null,
+      tleMatched: includeTLE ? matched : null,
+      tleFetchedAt,
+      tleStatus,
       lastUpdated: ucsData.lastUpdated,
       source: ucsData.source,
     });

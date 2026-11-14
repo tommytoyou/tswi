@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
 import * as satellite from 'satellite.js';
+import { loadTleCatalog } from '@/lib/tle-catalog';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+// A due TLE catalog refresh (CelesTrak download + MongoDB upsert) can take a while
+export const maxDuration = 60;
 
 // NORAD IDs for threat catalog satellites
 const THREAT_NORAD_IDS = [
@@ -179,40 +185,19 @@ export async function GET(request: Request) {
     : THREAT_NORAD_IDS;
 
   try {
-    // Fetch TLEs from Celestrak for each NORAD ID
-    const tlePromises = noradIds.map(async (noradId) => {
-      try {
-        const response = await fetch(
-          `https://celestrak.org/NORAD/elements/gp.php?CATNR=${noradId}&FORMAT=TLE`,
-          {
-            headers: {
-              'User-Agent': 'TSWI-SpaceWeather/1.0',
-            },
-            next: { revalidate: 3600 }, // Cache for 1 hour
-          }
-        );
-
-        if (!response.ok) {
-          console.warn(`Failed to fetch TLE for ${noradId}: ${response.status}`);
-          return null;
-        }
-
-        const tleText = await response.text();
-        return tleText.trim();
-      } catch (error) {
-        console.error(`Error fetching TLE for ${noradId}:`, error);
-        return null;
-      }
-    });
-
-    const tleTexts = await Promise.all(tlePromises);
-
-    // Combine all TLE texts
-    const combinedTLE = tleTexts.filter(t => t).join('\n');
+    // Read TLEs from the shared catalog (tle_catalog, refreshed from CelesTrak
+    // at most every 2 hours). Threat-catalog objects outside GROUP=active are
+    // fetched by CATNR during that refresh (EXTRA_CATNR_IDS).
+    const catalog = await loadTleCatalog();
+    const combinedTLE = noradIds
+      .map((id) => catalog.byId.get(String(id)))
+      .filter((rec): rec is NonNullable<typeof rec> => !!rec)
+      .map((rec) => [rec.name, rec.line1, rec.line2].join('\n'))
+      .join('\n');
 
     if (!combinedTLE) {
       return NextResponse.json(
-        { error: 'No TLE data available' },
+        { error: 'No TLE data available', tleFetchedAt: catalog.fetchedAt, tleStatus: catalog.lastStatus },
         { status: 503 }
       );
     }
@@ -238,6 +223,7 @@ export async function GET(request: Request) {
       count: positions.length,
       positions,
       tles: rawTLEs, // Include raw TLEs for client-side propagation
+      tleFetchedAt: catalog.fetchedAt,
     });
 
   } catch (error) {
