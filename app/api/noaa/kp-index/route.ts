@@ -10,6 +10,59 @@ const NOAA_KP_URL = 'https://services.swpc.noaa.gov/json/planetary_k_index_1m.js
 const COLLECTION = 'timeseries_noaa_kp_index';
 const MAX_CACHE_AGE_MS = 5 * 60 * 1000;
 const MAX_HOURS = 168;
+const NOAA_KP_3H_URL = 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json';
+
+/**
+ * Official 3-hour planetary Kp from NOAA, served as published (no MongoDB).
+ * Returns the newest ceil(hours / 3) intervals in chronological order; each
+ * time_tag is the start of its 3-hour UTC interval.
+ */
+async function serveOfficial3h(hours: number) {
+  try {
+    const response = await fetch(NOAA_KP_3H_URL, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`NOAA API returned ${response.status}`);
+    const fetchedAt = new Date();
+    const raw: any[] = await response.json();
+
+    // NOAA has published this file both as objects and as a header row + arrays
+    let rows: any[] = raw;
+    if (Array.isArray(raw[0])) {
+      const header = (raw[0] as string[]).map((h) => String(h));
+      rows = raw.slice(1).map((r: any[]) => Object.fromEntries(header.map((h, i) => [h, r[i]])));
+    }
+
+    const all = rows
+      .filter((r) => r.time_tag && r.Kp !== null && r.Kp !== undefined && r.Kp !== '')
+      .map((r) => ({
+        time_tag: parseNoaaTime(String(r.time_tag)).toISOString(),
+        kp: parseFloat(r.Kp),
+        a_running: r.a_running !== undefined && r.a_running !== null ? Number(r.a_running) : null,
+        station_count: r.station_count !== undefined && r.station_count !== null ? Number(r.station_count) : null,
+      }))
+      .filter((r) => Number.isFinite(r.kp))
+      .sort((a, b) => a.time_tag.localeCompare(b.time_tag));
+
+    const data = all.slice(-Math.ceil(hours / 3));
+    const latest = data[data.length - 1] || null;
+    return NextResponse.json({
+      success: true,
+      product: '3h',
+      data,
+      count: data.length,
+      source: 'noaa-live',
+      latest,
+      dataTimestamp: latest?.time_tag ?? null,
+      fetchedAt,
+      windowHours: hours,
+    });
+  } catch (error: any) {
+    console.error('NOAA 3-hour Kp fetch error:', error);
+    return NextResponse.json(
+      { success: false, error: error.message || 'Failed to fetch NOAA 3-hour Kp' },
+      { status: 500 }
+    );
+  }
+}
 
 /**
  * Fetch NOAA's 1-minute Kp feed (about the last 6 hours), map it to our schema
@@ -67,6 +120,9 @@ async function refreshFromNOAA(): Promise<{ documents: any[]; fetchedAt: Date; s
  *   window are returned and `limit` is ignored.
  * - limit: number of newest readings (default: 60, max: 1440). Used when
  *   `hours` is not set.
+ * - product: '3h' returns the official NOAA 3-hour planetary Kp for the last
+ *   `hours` (default 24) straight from products/noaa-planetary-k-index.json.
+ *   No MongoDB is used in this mode.
  *
  * Data is returned in chronological order, with dataTimestamp (newest reading)
  * and fetchedAt (when that copy was fetched from NOAA).
@@ -77,6 +133,10 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(parseInt(searchParams.get('limit') || '60') || 60, 1440);
   const hoursParam = parseFloat(searchParams.get('hours') || '');
   const hours = Number.isFinite(hoursParam) && hoursParam > 0 ? Math.min(hoursParam, MAX_HOURS) : null;
+  if (searchParams.get('product') === '3h') {
+    return serveOfficial3h(hours ?? 24);
+  }
+
   const windowStart = hours !== null ? new Date(Date.now() - hours * 3600 * 1000) : null;
 
   const selectRows = (rows: any[]) =>

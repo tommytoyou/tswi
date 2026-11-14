@@ -5,33 +5,52 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Minus, Zap } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
-import { subHours } from 'date-fns';
 import { formatUTC as format } from '@/lib/format-utc';
 import { CardSkeleton } from './card-skeleton';
 import { getKpLevel, chartColors, chartTheme, calculateTrend, riskColors } from '@/lib/design-system';
 
-interface KpDataPoint {
+/** Official NOAA 3-hour planetary Kp; time_tag is the interval start (UTC). */
+interface Kp3hPoint {
+  time_tag: string;
+  kp: number;
+}
+
+/** NOAA 1-minute estimated Kp reading. */
+interface KpMinutePoint {
   ts: string;
   kp: number;
   kp_index: number;
 }
 
 export function KpCardV2() {
-  const [data, setData] = useState<KpDataPoint[]>([]);
+  const [data, setData] = useState<Kp3hPoint[]>([]);
+  const [estimate, setEstimate] = useState<KpMinutePoint | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/noaa/kp-index?hours=24'); // last 24 hours of 1-minute readings
-      if (!response.ok) throw new Error('Failed to fetch');
-      const result = await response.json();
+      // Official 3-hour Kp for the 24h chart and headline; the 1-minute feed is
+      // used only for the estimated current value.
+      const [res3h, resMin] = await Promise.all([
+        fetch('/api/noaa/kp-index?product=3h&hours=24'),
+        fetch('/api/noaa/kp-index?limit=1').catch(() => null),
+      ]);
+      if (!res3h.ok) throw new Error('Failed to fetch');
+      const result = await res3h.json();
 
       if (result.success && result.data && result.data.length > 0) {
         setData(result.data);
       } else {
         throw new Error('No data available');
+      }
+
+      try {
+        const minResult = resMin && resMin.ok ? await resMin.json() : null;
+        setEstimate(minResult?.success && minResult.latest ? minResult.latest : null);
+      } catch {
+        setEstimate(null);
       }
       setError(null);
     } catch (err) {
@@ -66,34 +85,19 @@ export function KpCardV2() {
   }
 
   const latest = data[data.length - 1];
-  // Reading closest to 1 hour before the latest (rows may have gaps, so go by time)
-  const latestMs = new Date(latest.ts).getTime();
-  const previous = data.reduce((best, d) =>
-    Math.abs(new Date(d.ts).getTime() - (latestMs - 3600000)) <
-    Math.abs(new Date(best.ts).getTime() - (latestMs - 3600000)) ? d : best, data[0]);
-  const currentKp = latest.kp || latest.kp_index;
+  const previous = data.length > 1 ? data[data.length - 2] : latest; // prior 3-hour interval
+  const currentKp = latest.kp;
 
   const kpLevel = getKpLevel(currentKp);
-  const trend = calculateTrend(currentKp, previous.kp || previous.kp_index);
+  const trend = calculateTrend(currentKp, previous.kp);
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
 
-  // Group readings into 3-hour UTC bins (00, 03, 06 ... UTC) by timestamp
-  const BIN_MS = 3 * 3600 * 1000;
-  const bins = new Map<number, number[]>();
-  for (const d of data) {
-    const binStart = Math.floor(new Date(d.ts).getTime() / BIN_MS) * BIN_MS;
-    if (!bins.has(binStart)) bins.set(binStart, []);
-    bins.get(binStart)!.push(d.kp || d.kp_index);
-  }
-  const groupedData = Array.from(bins.entries())
-    .sort(([a], [b]) => a - b)
-    .map(([binStart, values]) => ({
-      time: format(new Date(binStart), 'HH:mm'),
-      kp: Math.round(values.reduce((sum, v) => sum + v, 0) / values.length),
-      timestamp: binStart,
-    }));
-
-  const chartData = groupedData.slice(-9); // 24h window spans up to 9 three-hour UTC bins
+  const chartData = data.map((d) => ({
+    time: format(new Date(d.time_tag), 'HH:mm'),
+    kp: d.kp,
+    timestamp: new Date(d.time_tag).getTime(),
+  }));
+  const estimatedKp = estimate ? estimate.kp ?? estimate.kp_index : null;
 
   return (
     <Card className="border-slate-800 bg-slate-900/50 h-full flex flex-col overflow-hidden">
@@ -124,9 +128,16 @@ export function KpCardV2() {
             />
             <div className="text-xs text-intel-muted">
               <div>3-hour Kp</div>
+              <div>{format(new Date(latest.time_tag), 'HH:mm')}–{format(new Date(new Date(latest.time_tag).getTime() + 3 * 3600 * 1000), 'HH:mm')} UTC</div>
             </div>
           </div>
         </div>
+        {estimatedKp !== null && estimate && (
+          <div className="text-xs text-intel-muted flex-shrink-0">
+            Estimated Kp (1-min): <span className="font-mono text-slate-300">{estimatedKp}</span>
+            {' '}at {format(new Date(estimate.ts), 'HH:mm')} UTC
+          </div>
+        )}
 
         {/* Storm Level Indicator */}
         <div className="grid grid-cols-10 gap-0.5 flex-shrink-0">
@@ -178,7 +189,7 @@ export function KpCardV2() {
                   borderRadius: '6px',
                   fontSize: chartTheme.fontSize,
                 }}
-                formatter={(value: any) => [`Kp ${value}`, 'Index']}
+                formatter={(value: any) => [`Kp ${value}`, '3-hour Kp']}
               />
               <ReferenceLine y={4} stroke={chartColors.warning} strokeDasharray="3 3" label={{ value: 'Active', position: 'right', fill: chartColors.warning, fontSize: 10 }} />
               <ReferenceLine y={5} stroke={chartColors.proton} strokeDasharray="3 3" label={{ value: 'Storm', position: 'right', fill: chartColors.proton, fontSize: 10 }} />
@@ -196,10 +207,10 @@ export function KpCardV2() {
         {/* Footer Info */}
         <div className="flex justify-between items-center text-xs flex-shrink-0">
           <div className="text-intel-muted">
-            24h • NOAA SWPC
+            24h • NOAA SWPC 3-hour Kp
           </div>
           <div className="text-intel-muted">
-            {format(new Date(latest.ts), 'HH:mm')} UTC
+            {format(new Date(latest.time_tag), 'HH:mm')} UTC
           </div>
         </div>
       </CardContent>
