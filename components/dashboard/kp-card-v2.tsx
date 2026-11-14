@@ -24,7 +24,7 @@ export function KpCardV2() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/noaa/kp-index?limit=480'); // 8 hours (one reading per minute)
+      const response = await fetch('/api/noaa/kp-index?hours=24'); // last 24 hours of 1-minute readings
       if (!response.ok) throw new Error('Failed to fetch');
       const result = await response.json();
 
@@ -66,28 +66,34 @@ export function KpCardV2() {
   }
 
   const latest = data[data.length - 1];
-  const previous = data[Math.max(0, data.length - 60)]; // 1 hour ago
+  // Reading closest to 1 hour before the latest (rows may have gaps, so go by time)
+  const latestMs = new Date(latest.ts).getTime();
+  const previous = data.reduce((best, d) =>
+    Math.abs(new Date(d.ts).getTime() - (latestMs - 3600000)) <
+    Math.abs(new Date(best.ts).getTime() - (latestMs - 3600000)) ? d : best, data[0]);
   const currentKp = latest.kp || latest.kp_index;
 
   const kpLevel = getKpLevel(currentKp);
   const trend = calculateTrend(currentKp, previous.kp || previous.kp_index);
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
 
-  // Group data by 3-hour intervals for better visualization
-  const groupedData: { time: string; kp: number; timestamp: number }[] = [];
-  for (let i = 0; i < data.length; i += 180) { // Every 180 minutes = 3 hours
-    const slice = data.slice(i, i + 180);
-    if (slice.length > 0) {
-      const avgKp = slice.reduce((sum, d) => sum + (d.kp || d.kp_index), 0) / slice.length;
-      groupedData.push({
-        time: format(new Date(slice[0].ts), 'HH:mm'),
-        kp: Math.round(avgKp),
-        timestamp: new Date(slice[0].ts).getTime(),
-      });
-    }
+  // Group readings into 3-hour UTC bins (00, 03, 06 ... UTC) by timestamp
+  const BIN_MS = 3 * 3600 * 1000;
+  const bins = new Map<number, number[]>();
+  for (const d of data) {
+    const binStart = Math.floor(new Date(d.ts).getTime() / BIN_MS) * BIN_MS;
+    if (!bins.has(binStart)) bins.set(binStart, []);
+    bins.get(binStart)!.push(d.kp || d.kp_index);
   }
+  const groupedData = Array.from(bins.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([binStart, values]) => ({
+      time: format(new Date(binStart), 'HH:mm'),
+      kp: Math.round(values.reduce((sum, v) => sum + v, 0) / values.length),
+      timestamp: binStart,
+    }));
 
-  const chartData = groupedData.slice(-8); // Last 24 hours (8 x 3-hour periods)
+  const chartData = groupedData.slice(-9); // 24h window spans up to 9 three-hour UTC bins
 
   return (
     <Card className="border-slate-800 bg-slate-900/50 h-full flex flex-col overflow-hidden">
