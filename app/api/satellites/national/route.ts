@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
 import { loadTleCatalog } from '@/lib/tle-catalog';
+import { loadDecayLookup } from '@/lib/satcat';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -64,6 +65,9 @@ async function loadUCSData(): Promise<UCSData> {
  * - sector: Filter by sector (Commercial, Civil, Government, Military)
  * - includeTLE: 'true' to include TLE data for live positions (slower)
  * - limit: Max number of satellites to return (default: 500)
+ *
+ * Satellites that CelesTrak SATCAT lists with a DECAY_DATE are excluded from
+ * the results and from all counts; decayedHidden reports how many were hidden.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -76,17 +80,41 @@ export async function GET(request: NextRequest) {
     // Load UCS data
     const ucsData = await loadUCSData();
 
-    // Apply filters
-    let filtered = ucsData.satellites;
-
-    if (countryFilter) {
-      const countries = countryFilter.split(',').map(c => c.trim());
-      filtered = filtered.filter(s => countries.includes(s.countryNormalized));
+    // Drop satellites SATCAT lists as decayed (re-entered). If SATCAT is not
+    // available, nothing is hidden and satcatStatus says why.
+    let decayMap: Map<string, string> = new Map();
+    let satcatFetchedAt: Date | null = null;
+    let satcatStatus: string | null = null;
+    try {
+      const lookup = await loadDecayLookup();
+      decayMap = lookup.decayed;
+      satcatFetchedAt = lookup.fetchedAt;
+      satcatStatus = lookup.lastStatus;
+    } catch (error) {
+      console.error('National satellites: SATCAT unavailable; not hiding decayed satellites:', error);
+      satcatStatus = 'SATCAT unavailable';
     }
+    const decayDateOf = (s: UCSSatellite) => decayMap.get(String(parseInt(String(s.noradId), 10)));
+    const live = ucsData.satellites.filter(s => !decayDateOf(s));
+    const decayed = ucsData.satellites.filter(s => !!decayDateOf(s));
 
-    if (sectorFilter) {
-      const sectors = sectorFilter.split(',').map(s => s.trim());
-      filtered = filtered.filter(s => sectors.includes(s.sector));
+    // Apply filters
+    const countries = countryFilter ? countryFilter.split(',').map(c => c.trim()) : null;
+    const sectors = sectorFilter ? sectorFilter.split(',').map(s => s.trim()) : null;
+    const matchesFilters = (s: UCSSatellite) =>
+      (!countries || countries.includes(s.countryNormalized)) && (!sectors || sectors.includes(s.sector));
+
+    const filtered = live.filter(matchesFilters);
+    const decayedInFilter = decayed.filter(matchesFilters);
+    // UCS list date (YYYY-MM-DD); decays on or after it happened since the list was made
+    const ucsListDate = String(ucsData.lastUpdated).slice(0, 10);
+    const decayedSinceList = decayedInFilter.filter(s => (decayDateOf(s) as string) >= ucsListDate).length;
+
+    const countryCounts: Record<string, number> = {};
+    const sectorCounts: Record<string, number> = {};
+    for (const sat of live) {
+      countryCounts[sat.countryNormalized] = (countryCounts[sat.countryNormalized] || 0) + 1;
+      sectorCounts[sat.sector] = (sectorCounts[sat.sector] || 0) + 1;
     }
 
     // Limit results
@@ -140,9 +168,9 @@ export async function GET(request: NextRequest) {
         sector: sectorFilter,
       },
       stats: {
-        totalInDatabase: ucsData.totalCount,
-        countryCounts: ucsData.countryCounts,
-        sectorCounts: ucsData.sectorCounts,
+        totalInDatabase: live.length,
+        countryCounts,
+        sectorCounts,
         filteredCountryCounts,
         filteredSectorCounts,
       },
@@ -153,6 +181,16 @@ export async function GET(request: NextRequest) {
       tleMatched: includeTLE ? matched : null,
       tleFetchedAt,
       tleStatus,
+      // Decayed satellites hidden, for the current filter
+      decayedHidden: {
+        total: decayedInFilter.length,
+        sinceUcsList: decayedSinceList,
+        beforeUcsList: decayedInFilter.length - decayedSinceList,
+        ucsListDate,
+        allFilters: decayed.length,
+      },
+      satcatFetchedAt,
+      satcatStatus,
       lastUpdated: ucsData.lastUpdated,
       source: ucsData.source,
     });

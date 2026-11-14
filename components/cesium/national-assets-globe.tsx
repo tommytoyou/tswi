@@ -50,6 +50,8 @@ interface APIResponse {
   tleMatchRate: number | null;
   /** When the shared TLE catalog was last refreshed from CelesTrak */
   tleFetchedAt: string | null;
+  /** Satellites hidden because SATCAT lists them as decayed (current filter) */
+  decayedHidden?: { total: number; sinceUcsList: number; beforeUcsList: number; ucsListDate: string };
 }
 
 /** Human-readable age, e.g. "1h 25m" */
@@ -254,6 +256,7 @@ function NationalAssetsGlobeComponent() {
   const [satellites, setSatellites] = useState<SatellitePosition[]>([]);
   const [stats, setStats] = useState<APIResponse['stats'] | null>(null);
   const [tleInfo, setTleInfo] = useState<{ matchRate: number | null; fetchedAt: string | null; returned: number } | null>(null);
+  const [decayedHidden, setDecayedHidden] = useState<APIResponse['decayedHidden'] | null>(null);
   const [selectedSatellite, setSelectedSatellite] = useState<SatellitePosition | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
 
@@ -372,6 +375,7 @@ function NationalAssetsGlobeComponent() {
 
       setStats(data.stats);
       setTleInfo({ matchRate: data.tleMatchRate, fetchedAt: data.tleFetchedAt, returned: data.returned });
+      setDecayedHidden(data.decayedHidden ?? null);
 
       // Process satellites with TLE data
       const now = new Date();
@@ -749,6 +753,16 @@ function NationalAssetsGlobeComponent() {
               </span>
               {tleInfo.matchRate !== null && (
                 <span> · {tleInfo.matchRate}% with orbits</span>
+              )}
+            </div>
+          )}
+          {decayedHidden && decayedHidden.total > 0 && (
+            <div className="text-xs text-slate-500 mb-2">
+              {decayedHidden.sinceUcsList.toLocaleString()} decayed since UCS list (
+              {new Date(`${decayedHidden.ucsListDate}T00:00:00Z`).toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' })}
+              ) hidden
+              {decayedHidden.beforeUcsList > 0 && (
+                <> · {decayedHidden.beforeUcsList.toLocaleString()} decayed before it hidden</>
               )}
             </div>
           )}
