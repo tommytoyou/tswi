@@ -36,85 +36,44 @@ function buildEventId(e: NoaaEditedEvent): string {
  * Includes: Solar flares, CMEs, SEP events, geomagnetic storms, radio bursts
  *
  * Query params:
- * - fetch: 'latest' | 'cached' (default: 'cached')
+ * - fetch: 'latest' | 'cached' (default: 'cached'; refreshes from NOAA when the
+ *   MongoDB copy is older than 5 minutes)
  * - limit: number (default: 50, max: 500)
  * - type: 'FLA' | 'CME' | 'SEP' | 'all' (default: 'all')
  */
+const NOAA_EVENTS_URL = 'https://services.swpc.noaa.gov/json/edited_events.json';
+const MAX_CACHE_AGE_MS = 5 * 60 * 1000;
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const fetchMode = searchParams.get('fetch') || 'cached';
     const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 500);
     const eventType = searchParams.get('type') || 'all';
+    const collection = await getCollection<NoaaSolarEvent>('noaa_solar_events');
 
-    // If fetch=latest, get from NOAA and store in DB
-    if (fetchMode === 'latest') {
-      const noaaUrl = 'https://services.swpc.noaa.gov/json/edited_events.json';
+    // Decide whether NOAA must be fetched: always for fetch=latest, otherwise
+    // only when the newest MongoDB copy is older than 5 minutes (or missing).
+    let mustRefresh = fetchMode === 'latest';
+    let cachedFetchedAt: Date | null = null;
+    if (!mustRefresh) {
+      const newestCopy = await collection
+        .find({}, { projection: { 'meta.fetched_at': 1 } })
+        .sort({ 'meta.fetched_at': -1 })
+        .limit(1)
+        .next();
+      cachedFetchedAt = (newestCopy as any)?.meta?.fetched_at ?? null;
+      mustRefresh = !cachedFetchedAt || Date.now() - new Date(cachedFetchedAt).getTime() > MAX_CACHE_AGE_MS;
+    }
 
+    let refreshFailed = false;
+    if (mustRefresh) {
       try {
-        const response = await fetch(noaaUrl, { cache: 'no-store' });
+        const { documents, fetchedAt } = await refreshFromNOAA(collection);
 
-        if (!response.ok) {
-          throw new Error(`NOAA API returned ${response.status}`);
-        }
-
-        const rawData: NoaaEditedEvent[] = await response.json();
-        const collection = await getCollection<NoaaSolarEvent>('noaa_solar_events');
-        const fetchedAt = new Date();
-        const documents: any[] = [];
-
-        for (const item of rawData) {
-          if (!item.begin_datetime || !item.type) continue;
-          const beginTime = parseNoaaDate(item.begin_datetime);
-          if (!beginTime) continue;
-
-          const particulars = [item.particulars1, item.particulars2]
-            .filter((v): v is string => typeof v === 'string' && v.trim() !== '')
-            .join(' ') || null;
-
-          documents.push({
-            event_id: buildEventId(item),
-            event_type: item.type,
-            begin_time: beginTime,
-            max_time: item.max_datetime ? parseNoaaDate(item.max_datetime) ?? undefined : undefined,
-            end_time: item.end_datetime ? parseNoaaDate(item.end_datetime) ?? undefined : undefined,
-            source_location: item.location || null,
-            active_region: typeof item.region === 'number' ? item.region : undefined,
-            observatory: item.observatory || null,
-            frequency: item.frequency || null,
-            particulars,
-            // X-ray flare class is in particulars1 for XRA events (e.g. "C1.0").
-            // FLA events carry an optical class there ("SF"), which is not an X-ray class.
-            class_type: item.type === 'XRA' ? extractFlareClass(item.particulars1) : undefined,
-            intensity: item.type === 'XRA' ? extractFlareIntensity(item.particulars1) : undefined,
-            created_at: fetchedAt,
-            meta: {
-              source: 'NOAA-SWPC',
-              fetched_at: fetchedAt,
-            },
-          });
-        }
-
-        // Upsert events by event_id
-        if (documents.length > 0) {
-          const bulkOps = documents.map((doc) => ({
-            updateOne: {
-              filter: { event_id: doc.event_id },
-              update: { $set: doc },
-              upsert: true,
-            },
-          }));
-
-          await collection.bulkWrite(bulkOps);
-        }
-
-        // Filter by event type if specified
-        let filteredDocs = documents;
-        if (eventType !== 'all') {
-          filteredDocs = documents.filter((d) => d.event_type === eventType);
-        }
-
-        // Newest first, to match the cached path
+        let filteredDocs = eventType !== 'all'
+          ? documents.filter((d) => d.event_type === eventType)
+          : documents;
         filteredDocs = [...filteredDocs].sort((a, b) => b.begin_time.getTime() - a.begin_time.getTime());
 
         return NextResponse.json({
@@ -122,28 +81,32 @@ export async function GET(request: NextRequest) {
           data: filteredDocs.slice(0, limit),
           count: filteredDocs.length,
           source: 'noaa-live',
+          dataTimestamp: filteredDocs[0]?.begin_time ?? null,
+          fetchedAt,
         });
       } catch (fetchError: any) {
-        console.error('NOAA events fetch error:', fetchError);
-        // Fall back to cached data
+        console.error('NOAA events fetch error; serving MongoDB copy:', fetchError);
+        refreshFailed = true;
       }
     }
 
-    // Return cached data from MongoDB
-    const collection = await getCollection<NoaaSolarEvent>('noaa_solar_events');
+    // Serve the MongoDB copy (fresh enough, or NOAA refresh failed)
     const query = eventType !== 'all' ? { event_type: eventType } : {};
+    const data = await collection.find(query).sort({ begin_time: -1 }).limit(limit).toArray();
 
-    const data = await collection
-      .find(query)
-      .sort({ begin_time: -1 })
-      .limit(limit)
-      .toArray();
+    if (!cachedFetchedAt) {
+      const newestCopy = await collection.find({}).sort({ 'meta.fetched_at': -1 }).limit(1).next();
+      cachedFetchedAt = (newestCopy as any)?.meta?.fetched_at ?? null;
+    }
 
     return NextResponse.json({
       success: true,
       data,
       count: data.length,
       source: 'mongodb-cache',
+      ...(refreshFailed ? { fallback: 'mongodb' } : {}),
+      dataTimestamp: data[0]?.begin_time ?? null,
+      fetchedAt: cachedFetchedAt,
     });
   } catch (error: any) {
     console.error('Solar events API error:', error);
@@ -152,6 +115,64 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Fetch NOAA's edited events, map them to our schema and upsert them into
+ * MongoDB. The save is awaited so it completes before the response is sent.
+ */
+async function refreshFromNOAA(collection: Awaited<ReturnType<typeof getCollection<NoaaSolarEvent>>>) {
+  const response = await fetch(NOAA_EVENTS_URL, { cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(`NOAA API returned ${response.status}`);
+  }
+
+  const rawData: NoaaEditedEvent[] = await response.json();
+  const fetchedAt = new Date();
+  const documents: any[] = [];
+
+  for (const item of rawData) {
+    if (!item.begin_datetime || !item.type) continue;
+    const beginTime = parseNoaaDate(item.begin_datetime);
+    if (!beginTime) continue;
+
+    const particulars = [item.particulars1, item.particulars2]
+      .filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+      .join(' ') || null;
+
+    documents.push({
+      event_id: buildEventId(item),
+      event_type: item.type,
+      begin_time: beginTime,
+      max_time: item.max_datetime ? parseNoaaDate(item.max_datetime) ?? undefined : undefined,
+      end_time: item.end_datetime ? parseNoaaDate(item.end_datetime) ?? undefined : undefined,
+      source_location: item.location || null,
+      active_region: typeof item.region === 'number' ? item.region : undefined,
+      observatory: item.observatory || null,
+      frequency: item.frequency || null,
+      particulars,
+      // X-ray flare class is in particulars1 for XRA events (e.g. "C1.0").
+      // FLA events carry an optical class there ("SF"), which is not an X-ray class.
+      class_type: item.type === 'XRA' ? extractFlareClass(item.particulars1) : undefined,
+      intensity: item.type === 'XRA' ? extractFlareIntensity(item.particulars1) : undefined,
+      created_at: fetchedAt,
+      meta: {
+        source: 'NOAA-SWPC',
+        fetched_at: fetchedAt,
+      },
+    });
+  }
+
+  if (documents.length > 0) {
+    await collection.bulkWrite(
+      documents.map((doc) => ({
+        updateOne: { filter: { event_id: doc.event_id }, update: { $set: doc }, upsert: true },
+      })),
+      { ordered: false }
+    );
+  }
+
+  return { documents, fetchedAt };
 }
 
 /**
