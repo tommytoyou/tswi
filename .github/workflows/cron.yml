@@ -1,7 +1,7 @@
 name: TSWI cron
+# Scheduling runs on cron-job.org (check-alerts every 5 min, data-ingestion every 10 min).
+# This workflow is kept for manual runs only.
 on:
-  schedule:
-    - cron: '*/5 * * * *'
   workflow_dispatch:
 jobs:
   check-alerts:
