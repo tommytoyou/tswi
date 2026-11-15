@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getCollection } from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Refreshing stale positions queries Horizons one object at a time
+export const maxDuration = 60;
 
 // Spacecraft definitions with NASA JPL Horizons IDs
 interface SpacecraftDef {
@@ -57,105 +60,230 @@ interface HeliocentricPosition {
   distanceFromSun: number; // AU
 }
 
+/** ok: current position; ended: Horizons has no ephemeris for now; unavailable: never fetched successfully */
+type PositionStatus = 'ok' | 'ended' | 'unavailable';
+
 interface SpacecraftData extends SpacecraftDef {
   position: HeliocentricPosition | null;
+  /** Epoch of the position (UTC, start of the hour it was computed for) */
+  positionEpoch: string | null;
+  /** When this position was fetched from Horizons */
+  fetchedAt: string | null;
+  status: PositionStatus;
+  /** Last date Horizons has an ephemeris for, when status is 'ended' (YYYY-MM-DD) */
+  ephemerisEnd?: string;
   error?: string;
 }
 
 interface PlanetData extends PlanetDef {
   position: HeliocentricPosition | null;
+  positionEpoch: string | null;
+  fetchedAt: string | null;
   orbitRadius: number; // Average orbit radius in AU
 }
 
-// Fetch position from JPL Horizons API
-async function fetchHorizonsPosition(horizonsId: string, name: string): Promise<HeliocentricPosition | null> {
+/** One document per Horizons object in MongoDB (horizons_positions). */
+interface CachedPosition {
+  horizonsId: string;
+  name: string;
+  position: HeliocentricPosition | null;
+  positionEpoch: Date | null;
+  fetchedAt: Date | null;
+  status: PositionStatus;
+  ephemerisEnd?: string | null;
+  lastError?: string | null;
+  /** Earliest time another Horizons request may be made for this object */
+  nextAttemptAt: Date;
+}
+
+const HORIZONS_URL = 'https://ssd.jpl.nasa.gov/api/horizons.api';
+const USER_AGENT = 'TSWI-SpaceWeather/1.0 (+https://www.tswi.us; hourly heliocentric positions)';
+const CACHE_COLLECTION = 'horizons_positions';
+const REFRESH_MS = 60 * 60 * 1000; // positions refreshed at most hourly
+const RETRY_AFTER_ERROR_MS = 5 * 60 * 1000; // transient Horizons errors retried after 5 min
+const LOCK_MS = 2 * 60 * 1000; // claim held while one instance queries Horizons
+
+const MONTHS: Record<string, string> = {
+  JAN: '01', FEB: '02', MAR: '03', APR: '04', MAY: '05', JUN: '06',
+  JUL: '07', AUG: '08', SEP: '09', OCT: '10', NOV: '11', DEC: '12',
+};
+
+/** "2019-JAN-01" / "2019-Jan-01" -> "2019-01-01" */
+function horizonsDate(d: string): string | null {
+  const m = d.match(/(\d{4})-([A-Za-z]{3})-(\d{2})/);
+  if (!m) return null;
+  const mm = MONTHS[m[2].toUpperCase()];
+  return mm ? `${m[1]}-${mm}-${m[3]}` : null;
+}
+
+type HorizonsResult =
+  | { kind: 'ok'; position: HeliocentricPosition; epoch: Date }
+  | { kind: 'ended'; ephemerisEnd: string; message: string }
+  | { kind: 'error'; message: string };
+
+const NUM = String.raw`([-+]?\d+(?:\.\d*)?(?:E[-+]?\d+)?)`;
+const X_RE = new RegExp(String.raw`X\s*=\s*` + NUM, 'i');
+const Y_RE = new RegExp(String.raw`Y\s*=\s*` + NUM, 'i');
+const Z_RE = new RegExp(String.raw`Z\s*=\s*` + NUM, 'i');
+
+/**
+ * One Horizons VECTORS request for the start of the current UTC hour.
+ * Horizons answers concurrent requests from one client with HTTP 503
+ * ("Unexpected Server Error" HTML), so callers run these one at a time.
+ */
+async function queryHorizons(horizonsId: string): Promise<HorizonsResult> {
+  const start = new Date(Math.floor(Date.now() / REFRESH_MS) * REFRESH_MS);
+  const stop = new Date(start.getTime() + REFRESH_MS);
+  const fmt = (d: Date) => d.toISOString().slice(0, 16).replace('T', ' ');
+
+  const params = new URLSearchParams({
+    format: 'json',
+    COMMAND: `'${horizonsId}'`,
+    OBJ_DATA: 'NO',
+    MAKE_EPHEM: 'YES',
+    EPHEM_TYPE: 'VECTORS',
+    CENTER: '@sun',
+    START_TIME: `'${fmt(start)}'`,
+    STOP_TIME: `'${fmt(stop)}'`,
+    STEP_SIZE: '1 h',
+    TIME_TYPE: 'UT',
+    VEC_TABLE: '1',
+    REF_SYSTEM: 'ICRF',
+    REF_PLANE: 'ECLIPTIC',
+    VEC_CORR: 'NONE',
+    OUT_UNITS: 'AU-D',
+    VEC_LABELS: 'YES',
+    CSV_FORMAT: 'NO',
+  });
+
+  let response: Response;
   try {
-    // Using JPL Horizons API
-    // COMMAND: object ID
-    // CENTER: @sun (heliocentric)
-    // MAKE_EPHEM: YES
-    // TABLE_TYPE: VECTORS
-    // OUT_UNITS: AU-D (AU and days)
+    response = await fetch(`${HORIZONS_URL}?${params}`, {
+      cache: 'no-store',
+      headers: { 'User-Agent': USER_AGENT },
+    });
+  } catch (error: any) {
+    return { kind: 'error', message: `request failed: ${error?.message || error}` };
+  }
+
+  const body = await response.text();
+  if (!response.ok) {
+    return { kind: 'error', message: `HTTP ${response.status}, ${body.length} bytes` };
+  }
+
+  let result = '';
+  try {
+    const json = JSON.parse(body);
+    result = typeof json.result === 'string' ? json.result : '';
+    if (!result && json.error) return { kind: 'error', message: String(json.error).slice(0, 200) };
+  } catch {
+    return { kind: 'error', message: `non-JSON response: ${body.slice(0, 120)}` };
+  }
+
+  const soe = result.indexOf('$$SOE');
+  const eoe = result.indexOf('$$EOE');
+  if (soe === -1 || eoe === -1) {
+    // e.g. 'No ephemeris for target "X" after A.D. 2019-JAN-01 00:00:00.0000 TDB'
+    const line = result.match(/No ephemeris for target[^\n]*/)?.[0];
+    const after = line?.match(/after A\.D\.\s*(\d{4}-[A-Za-z]{3}-\d{2})/);
+    if (line && after) {
+      return { kind: 'ended', ephemerisEnd: horizonsDate(after[1]) ?? after[1], message: line.trim() };
+    }
+    return { kind: 'error', message: `no ephemeris block: ${result.replace(/\s+/g, ' ').slice(0, 200)}` };
+  }
+
+  const block = result.substring(soe + 5, eoe);
+  const x = block.match(X_RE);
+  const y = block.match(Y_RE);
+  const z = block.match(Z_RE);
+  if (!x || !y || !z) {
+    return { kind: 'error', message: `could not parse vectors: ${block.trim().slice(0, 120)}` };
+  }
+
+  const px = parseFloat(x[1]);
+  const py = parseFloat(y[1]);
+  const pz = parseFloat(z[1]);
+  return {
+    kind: 'ok',
+    position: { x: px, y: py, z: pz, distanceFromSun: Math.sqrt(px * px + py * py + pz * pz) },
+    epoch: start,
+  };
+}
+
+let indexEnsured = false;
+async function positionsCollection() {
+  const collection = await getCollection<CachedPosition>(CACHE_COLLECTION);
+  if (!indexEnsured) {
+    await collection.createIndex({ horizonsId: 1 }, { unique: true });
+    indexEnsured = true;
+  }
+  return collection;
+}
+
+/**
+ * Refresh due positions from Horizons, one request at a time. Each object is
+ * claimed atomically (nextAttemptAt) so concurrent instances never query the
+ * same object twice; on failure the last good position is kept.
+ */
+async function refreshPositions(objects: { horizonsId: string; name: string }[]) {
+  const collection = await positionsCollection();
+
+  for (const obj of objects) {
     const now = new Date();
-    const startTime = now.toISOString().split('T')[0];
-    const endDate = new Date(now.getTime() + 86400000); // +1 day
-    const stopTime = endDate.toISOString().split('T')[0];
-
-    const params = new URLSearchParams({
-      format: 'json',
-      COMMAND: `'${horizonsId}'`,
-      OBJ_DATA: 'NO',
-      MAKE_EPHEM: 'YES',
-      EPHEM_TYPE: 'VECTORS',
-      CENTER: '@sun',
-      START_TIME: `'${startTime}'`,
-      STOP_TIME: `'${stopTime}'`,
-      STEP_SIZE: '1 d',
-      VEC_TABLE: '1',
-      REF_SYSTEM: 'ICRF',
-      REF_PLANE: 'ECLIPTIC',
-      VEC_CORR: 'NONE',
-      OUT_UNITS: 'AU-D',
-      VEC_LABELS: 'YES',
-      CSV_FORMAT: 'NO',
-    });
-
-    const url = `https://ssd.jpl.nasa.gov/api/horizons.api?${params.toString()}`;
-
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'TSWI-SpaceWeather/1.0',
-      },
-      next: { revalidate: 3600 }, // Cache for 1 hour
-    });
-
-    if (!response.ok) {
-      console.warn(`Horizons API returned ${response.status} for ${name}`);
-      return null;
+    try {
+      // Matches when due; inserts on first use; collides on the unique index
+      // (E11000) when the object is fresh or being refreshed elsewhere.
+      await collection.updateOne(
+        { horizonsId: obj.horizonsId, nextAttemptAt: { $lte: now } },
+        {
+          $set: { nextAttemptAt: new Date(now.getTime() + LOCK_MS), name: obj.name },
+          $setOnInsert: { position: null, positionEpoch: null, fetchedAt: null, status: 'unavailable' as PositionStatus },
+        },
+        { upsert: true }
+      );
+    } catch (error: any) {
+      if (error?.code === 11000) continue;
+      throw error;
     }
 
-    const data = await response.json();
-
-    if (!data.result) {
-      console.warn(`No result for ${name}:`, data);
-      return null;
+    let result = await queryHorizons(obj.horizonsId);
+    if (result.kind === 'error' && result.message.startsWith('HTTP 503')) {
+      await new Promise((r) => setTimeout(r, 1500));
+      result = await queryHorizons(obj.horizonsId);
     }
 
-    // Parse the result string to extract X, Y, Z coordinates
-    // The result contains vector data in format like:
-    // X = 1.234567890E+00 Y = 2.345678901E+00 Z = 3.456789012E-01
-    const result = data.result as string;
-
-    // Find the $$SOE marker (start of ephemeris data)
-    const soeIndex = result.indexOf('$$SOE');
-    const eoeIndex = result.indexOf('$$EOE');
-
-    if (soeIndex === -1 || eoeIndex === -1) {
-      console.warn(`Could not find ephemeris markers for ${name}`);
-      return null;
+    const done = new Date();
+    if (result.kind === 'ok') {
+      await collection.updateOne({ horizonsId: obj.horizonsId }, {
+        $set: {
+          position: result.position,
+          positionEpoch: result.epoch,
+          fetchedAt: done,
+          status: 'ok',
+          ephemerisEnd: null,
+          lastError: null,
+          nextAttemptAt: new Date(result.epoch.getTime() + REFRESH_MS),
+        },
+      });
+    } else if (result.kind === 'ended') {
+      console.warn(`[Horizons] ${obj.name} (${obj.horizonsId}): ${result.message}`);
+      await collection.updateOne({ horizonsId: obj.horizonsId }, {
+        $set: {
+          position: null,
+          positionEpoch: null,
+          fetchedAt: done,
+          status: 'ended',
+          ephemerisEnd: result.ephemerisEnd,
+          lastError: result.message,
+          nextAttemptAt: new Date(done.getTime() + 24 * REFRESH_MS),
+        },
+      });
+    } else {
+      console.warn(`[Horizons] ${obj.name} (${obj.horizonsId}) failed: ${result.message}; keeping last good position`);
+      await collection.updateOne({ horizonsId: obj.horizonsId }, {
+        $set: { lastError: result.message, nextAttemptAt: new Date(done.getTime() + RETRY_AFTER_ERROR_MS) },
+      });
     }
-
-    const ephemerisData = result.substring(soeIndex + 5, eoeIndex).trim();
-
-    // Extract X, Y, Z values using regex
-    const xMatch = ephemerisData.match(/X\s*=\s*([-+]?\d+\.?\d*E?[+-]?\d*)/i);
-    const yMatch = ephemerisData.match(/Y\s*=\s*([-+]?\d+\.?\d*E?[+-]?\d*)/i);
-    const zMatch = ephemerisData.match(/Z\s*=\s*([-+]?\d+\.?\d*E?[+-]?\d*)/i);
-
-    if (!xMatch || !yMatch || !zMatch) {
-      console.warn(`Could not parse coordinates for ${name}:`, ephemerisData.substring(0, 200));
-      return null;
-    }
-
-    const x = parseFloat(xMatch[1]);
-    const y = parseFloat(yMatch[1]);
-    const z = parseFloat(zMatch[1]);
-    const distanceFromSun = Math.sqrt(x * x + y * y + z * z);
-
-    return { x, y, z, distanceFromSun };
-  } catch (error) {
-    console.error(`Error fetching position for ${name}:`, error);
-    return null;
   }
 }
 
@@ -171,12 +299,19 @@ const ORBITAL_RADII: Record<string, number> = {
   neptune: 30.069,
 };
 
+const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString() : null);
+
 /**
  * GET /api/spacecraft
  *
- * Fetches heliocentric positions for spacecraft and planets from NASA JPL Horizons
+ * Heliocentric positions for spacecraft and planets from NASA JPL Horizons,
+ * cached in MongoDB (horizons_positions) and refreshed at most hourly per
+ * object. Horizons is queried one object at a time: it answers concurrent
+ * requests with HTTP 503.
  *
- * Returns X, Y, Z coordinates in AU (Astronomical Units) centered on the Sun
+ * Returns X, Y, Z coordinates in AU (Astronomical Units) centered on the Sun.
+ * Spacecraft whose Horizons ephemeris has ended get status 'ended' and
+ * error "No current ephemeris (mission ended <date>)".
  */
 export async function GET(request: NextRequest) {
   try {
@@ -205,29 +340,45 @@ export async function GET(request: NextRequest) {
     }
     // 'full' mode includes all
 
-    // Fetch all positions in parallel
-    const spacecraftPromises = spacecraftToFetch.map(async (sc): Promise<SpacecraftData> => {
-      const position = await fetchHorizonsPosition(sc.horizonsId, sc.name);
-      return {
+    const objects = [...spacecraftToFetch, ...planetsToFetch].map(o => ({ horizonsId: o.horizonsId, name: o.name }));
+    await refreshPositions(objects);
+
+    const collection = await positionsCollection();
+    const cached = await collection
+      .find({ horizonsId: { $in: objects.map(o => o.horizonsId) } }, { projection: { _id: 0 } })
+      .toArray();
+    const byId = new Map(cached.map(c => [c.horizonsId, c]));
+
+    const spacecraftResults: SpacecraftData[] = spacecraftToFetch.map(sc => {
+      const c = byId.get(sc.horizonsId);
+      const status: PositionStatus = c?.status ?? 'unavailable';
+      const base = {
         ...sc,
-        position,
-        error: position ? undefined : 'Position data unavailable',
+        position: c?.position ?? null,
+        positionEpoch: iso(c?.positionEpoch),
+        fetchedAt: iso(c?.fetchedAt),
+        status,
       };
+      if (status === 'ended') {
+        return {
+          ...base,
+          ephemerisEnd: c?.ephemerisEnd ?? undefined,
+          error: `No current ephemeris (mission ended ${c?.ephemerisEnd ?? 'date unknown'})`,
+        };
+      }
+      return base.position ? base : { ...base, error: `Position data unavailable${c?.lastError ? ` (${c.lastError})` : ''}` };
     });
 
-    const planetPromises = planetsToFetch.map(async (planet): Promise<PlanetData> => {
-      const position = await fetchHorizonsPosition(planet.horizonsId, planet.name);
+    const planetResults: PlanetData[] = planetsToFetch.map(planet => {
+      const c = byId.get(planet.horizonsId);
       return {
         ...planet,
-        position,
+        position: c?.position ?? null,
+        positionEpoch: iso(c?.positionEpoch),
+        fetchedAt: iso(c?.fetchedAt),
         orbitRadius: ORBITAL_RADII[planet.id] || 1,
       };
     });
-
-    const [spacecraftResults, planetResults] = await Promise.all([
-      Promise.all(spacecraftPromises),
-      Promise.all(planetPromises),
-    ]);
 
     // Calculate statistics
     const successfulSpacecraft = spacecraftResults.filter(s => s.position !== null);
@@ -252,6 +403,7 @@ export async function GET(request: NextRequest) {
       stats: {
         totalSpacecraft: spacecraftResults.length,
         successfulFetches: successfulSpacecraft.length,
+        endedMissions: spacecraftResults.filter(s => s.status === 'ended').length,
         furthestFromSun: furthestSpacecraft ? {
           name: furthestSpacecraft.name,
           distance: furthestSpacecraft.position?.distanceFromSun,
@@ -261,7 +413,7 @@ export async function GET(request: NextRequest) {
           distance: closestToSun.position?.distanceFromSun,
         } : null,
       },
-      source: 'NASA JPL Horizons',
+      source: 'NASA JPL Horizons (cached hourly)',
     });
   } catch (error: any) {
     console.error('Spacecraft API error:', error);
