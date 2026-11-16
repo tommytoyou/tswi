@@ -7,14 +7,14 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'TSWI - Tactical Space Weather Intelligence',
-  description: 'Real-time monitoring of solar activity, geomagnetic conditions, and AI-powered predictions for space weather events that impact Earth.',
+  description: 'Real-time monitoring of solar activity and geomagnetic conditions, with NOAA SWPC flare forecasts, for operators whose assets space weather affects.',
   icons: {
     icon: { url: '/favicon.svg', type: 'image/svg+xml' },
   },
   metadataBase: new URL('https://www.tswi.us'),
   openGraph: {
     title: 'TSWI - Tactical Space Weather Intelligence',
-    description: 'Real-time monitoring of solar activity, geomagnetic conditions, and AI-powered predictions for space weather events that impact Earth.',
+    description: 'Real-time monitoring of solar activity and geomagnetic conditions, with NOAA SWPC flare forecasts, for operators whose assets space weather affects.',
     url: 'https://www.tswi.us',
     siteName: 'TSWI',
     images: [
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'TSWI - Tactical Space Weather Intelligence',
-    description: 'Real-time monitoring of solar activity, geomagnetic conditions, and AI-powered predictions for space weather events that impact Earth.',
+    description: 'Real-time monitoring of solar activity and geomagnetic conditions, with NOAA SWPC flare forecasts, for operators whose assets space weather affects.',
     images: ['/api/og'],
   },
 };

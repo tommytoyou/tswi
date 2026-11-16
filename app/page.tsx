@@ -48,7 +48,7 @@ export default function HomePage() {
           </h1>
 
           <p className="text-xl text-intel-muted mb-8 max-w-2xl mx-auto">
-            Real-time monitoring of solar activity, geomagnetic conditions, and AI-powered predictions for space weather events that impact Earth.
+            Real-time monitoring of solar activity and geomagnetic conditions, with NOAA SWPC flare forecasts, for operators whose assets space weather affects.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
@@ -76,8 +76,8 @@ export default function HomePage() {
             />
             <FeatureCard
               icon={<Sparkles className="h-6 w-6 text-intel-cyan" />}
-              title="AI Predictions"
-              description="Solar flare probability forecasts powered by machine learning models with confidence metrics and 2-hour horizons."
+              title="Flare Forecasts"
+              description="NOAA SWPC C, M and X class flare probabilities for 24, 48 and 72 hours, alongside live GOES X-ray flux. ML flare forecasting in development."
             />
             <FeatureCard
               icon={<Bell className="h-6 w-6 text-intel-cyan" />}
