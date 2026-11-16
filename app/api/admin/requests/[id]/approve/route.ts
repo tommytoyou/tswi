@@ -94,7 +94,7 @@ export async function POST(
     // reported to the admin so a failed send is visible instead of silently ignored.
     let emailResult: ResendSendResult;
     try {
-      const appUrl = process.env.NEXTAUTH_URL || 'https://www.tswi-ai.com';
+      const appUrl = process.env.NEXTAUTH_URL || 'https://www.tswi.us';
       // Single-use, 60-minute link so the approved user can set a password in one click
       const setPasswordUrl = buildSetPasswordUrl(await createPasswordToken(accessRequest.email));
       const html = generateApprovalEmail(accessRequest.name, appUrl, setPasswordUrl);

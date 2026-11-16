@@ -105,7 +105,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
             subject: options.subject,
           }],
           from: {
-            email: process.env.EMAIL_FROM || 'alerts@tswi.space',
+            email: process.env.EMAIL_FROM || 'deepspace@tswi.us',
             name: 'TSWI Alerts',
           },
           content: [

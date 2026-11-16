@@ -105,6 +105,6 @@ export async function hasRecentPasswordToken(email: string, windowMs: number): P
 
 /** Build the one-click setup link for a raw token. */
 export function buildSetPasswordUrl(token: string): string {
-  const base = process.env.NEXTAUTH_URL || 'https://www.tswi-ai.com';
+  const base = process.env.NEXTAUTH_URL || 'https://www.tswi.us';
   return `${base}/set-password?token=${token}`;
 }

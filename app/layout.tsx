@@ -11,11 +11,11 @@ export const metadata: Metadata = {
   icons: {
     icon: { url: '/favicon.svg', type: 'image/svg+xml' },
   },
-  metadataBase: new URL('https://www.tswi-ai.com'),
+  metadataBase: new URL('https://www.tswi.us'),
   openGraph: {
     title: 'TSWI - Tactical Space Weather Intelligence',
     description: 'Real-time monitoring of solar activity, geomagnetic conditions, and AI-powered predictions for space weather events that impact Earth.',
-    url: 'https://www.tswi-ai.com',
+    url: 'https://www.tswi.us',
     siteName: 'TSWI',
     images: [
       {

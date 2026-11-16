@@ -316,7 +316,7 @@ export default function AdminDashboard() {
   };
 
   const handleCopyLinkedIn = async (invite: Invite) => {
-    const appUrl = typeof window !== 'undefined' ? window.location.origin : 'https://www.tswi-ai.com';
+    const appUrl = typeof window !== 'undefined' ? window.location.origin : 'https://www.tswi.us';
     const inviteUrl = `${appUrl}/invite/${invite.inviteCode}`;
     const message = `${invite.name} - You've been granted early access to TSWI (Tactical Space Weather Intelligence). Real-time space weather monitoring for satellite operations. ${inviteUrl}`;
 

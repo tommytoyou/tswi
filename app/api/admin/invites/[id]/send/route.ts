@@ -63,7 +63,7 @@ export async function POST(
       );
     }
 
-    const appUrl = process.env.NEXTAUTH_URL || 'https://www.tswi-ai.com';
+    const appUrl = process.env.NEXTAUTH_URL || 'https://www.tswi.us';
     const inviteUrl = `${appUrl}/invite/${invite.inviteCode}`;
 
     // Generate and send the email
@@ -148,7 +148,7 @@ function generateInviteEmail(name: string, inviteUrl: string): string {
 
   <div style="margin-top: 32px; padding: 0 20px; color: #6b7280; font-size: 13px;">
     <p style="margin: 0;">Deep Space Dynamics</p>
-    <p style="margin: 4px 0 0;">tswi-ai.com</p>
+    <p style="margin: 4px 0 0;">tswi.us</p>
   </div>
 
 </body>
@@ -168,5 +168,5 @@ Access your account: ${inviteUrl}
 This invitation expires in 30 days.
 
 Deep Space Dynamics
-tswi-ai.com`;
+tswi.us`;
 }

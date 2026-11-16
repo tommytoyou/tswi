@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const appUrl = process.env.NEXTAUTH_URL || 'https://www.tswi-ai.com';
+    const appUrl = process.env.NEXTAUTH_URL || 'https://www.tswi.us';
     console.log(`[SendApprovalEmail] Using app URL: ${appUrl}`);
 
     // Only issue a password setup token for an existing user account
